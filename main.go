@@ -93,7 +93,7 @@ type requestBody struct {
 }
 
 func main() {
-	_ = importJSONDataFromFile("data.json", &data)
+	importJSONDataFromFile("data.json", &data)
 
 	router := httprouter.New()
 	router.GET("/graphql", func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -110,6 +110,7 @@ func main() {
 		err := json.NewDecoder(r.Body).Decode(&body)
 		if err != nil {
 			http.Error(w, "Request body is invalid", 400)
+			return
 		}
 
 		result := executeQuery(body.Query, schema)

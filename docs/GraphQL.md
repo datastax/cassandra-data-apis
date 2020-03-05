@@ -65,7 +65,7 @@ type SomeType {
 
 `blob` (byte array)
 
-`boolean` 
+`boolean`
 
 `counter` (signed 64-bit integer)
 
@@ -99,7 +99,7 @@ type SomeType {
 | `double`   | `Float`                                                                                         |
 | `decimal`  | `String`                                                                                        |
 | `date`     | `String` of the form `"yyyy-mm-dd"`                                                             |
-| `duration` |  ?                                                                                              |
+| `duration` | `String` in ISO 8601 formats or digits and units, for example:  `P21Y5M`, `12h30m`, `33us1ns`   |
 | `time`     | `String` of the form `"hh:mm:ss[.fff]"`                                                         |
 | `timestamp`| `String` of the form `"yyyy-mm-dd [hh:MM:ss[.fff]][+/-NNNN]"`                                   |
 | `uuid`     | `String` of the form `"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"` where x are hex digits `[a-f0-9]` |
@@ -107,7 +107,7 @@ type SomeType {
 | `blob`     | `String` of base64 encoded data                                                                 |
 | `boolean`  | `Boolean`                                                                                       |
 | `counter`  | `String`                                                                                        |
-| `inet`     | `String`                                                                                        | 
+| `inet`     | `String`                                                                                        |
 
 One possible idea here is to "tag" types using objects. `bigint` and other
 similar CQL specific types could be wrapped in a type instead of using just
@@ -222,7 +222,7 @@ type Mutation {
 ### Table management and CRUD operations
 
 Table management would live in under each keyspace directory along with the
-tables CRUD operations. 
+tables CRUD operations.
 
 I think it makes sense to have all the tables CRUD operations live in a combined
 keyspace GraphQL schema so that result can be combined together in different
@@ -287,23 +287,23 @@ camelcase) simultaneously.
 Path: `/graphql/cycling`
 
 ```cql
-CREATE KEYSPACE cycling 
-  WITH REPLICATION = { 
-   'class' : 'NetworkTopologyStrategy', 
-   'datacenter1' : 1 
+CREATE KEYSPACE cycling
+  WITH REPLICATION = {
+   'class' : 'NetworkTopologyStrategy',
+   'datacenter1' : 1
   } ;
 
-CREATE TABLE cycling.cyclist_name ( 
-   id UUID PRIMARY KEY, 
-   lastname text, 
+CREATE TABLE cycling.cyclist_name (
+   id UUID PRIMARY KEY,
+   lastname text,
    firstname text );
 
-CREATE TABLE cycling.cyclist_category ( 
-   category text, 
-   points int, 
-   id UUID, 
-   lastname text, 
-   PRIMARY KEY (category, points)) 
+CREATE TABLE cycling.cyclist_category (
+   category text,
+   points int,
+   id UUID,
+   lastname text,
+   PRIMARY KEY (category, points))
 ```
 
 ```graphql
@@ -330,7 +330,7 @@ schema {
 # aggregates (Maybe the can be their own query: `countCyclistName()`?).
 
 # We can potentially handle optional clustering filters by making them
-# non-nullable parameters? 
+# non-nullable parameters?
 
 # Things to think about:
 # * Expression
@@ -343,7 +343,7 @@ schema {
 #   * Static filters
 
 type Query {
-  cyclistName(id: String!): CyclistName 
+  cyclistName(id: String!): CyclistName
   cyclistCategory(category: String!, points: Int!): CyclistCategory
 }
 
