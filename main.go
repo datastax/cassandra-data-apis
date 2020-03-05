@@ -25,7 +25,8 @@ var data map[string]user
 */
 var userType = graphql.NewObject(
 	graphql.ObjectConfig{
-		Name: "User",
+		Description: "This is a user object",
+		Name:        "User",
 		Fields: graphql.Fields{
 			"id": &graphql.Field{
 				Type: graphql.String,
@@ -51,10 +52,12 @@ var queryType = graphql.NewObject(
 		Name: "Query",
 		Fields: graphql.Fields{
 			"user": &graphql.Field{
-				Type: userType,
+				Description: "This can be used to query users",
+				Type:        userType,
 				Args: graphql.FieldConfigArgument{
 					"id": &graphql.ArgumentConfig{
-						Type: graphql.String,
+						Description: "This is an identifier",
+						Type:        graphql.String,
 					},
 				},
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
