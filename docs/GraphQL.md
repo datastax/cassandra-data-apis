@@ -325,6 +325,23 @@ schema {
   mutation: Mutation
 }
 
+# We can determine the select expression columns from the fields in the graphql
+# query. Not sure how we're going to handle other types of expressions such as
+# aggregates (Maybe the can be their own query: `countCyclistName()`?).
+
+# We can potentially handle optional clustering filters by making them
+# non-nullable parameters? 
+
+# Things to think about:
+# * Expression
+#   * Aggregates (built-in: count(), min(), max())
+#   * DISTINCT (Do we need to support this?)
+#   * Do we care about handling user define function/aggregates?
+# * Filtering
+#   * ORDER BY
+#   * LIMIT
+#   * Static filters
+
 type Query {
   cyclistName(id: String!): CyclistName 
   cyclistCategory(category: String!, points: Int!): CyclistCategory
