@@ -3,80 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/riptano/data-endpoints/db"
+	"github.com/riptano/data-endpoints/schema"
 
+	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
+	"github.com/iancoleman/strcase"
 	"github.com/julienschmidt/httprouter"
-)
-
-type user struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-var data map[string]user
-
-/*
-   Create User object type with fields "id" and "name" by using GraphQLObjectTypeConfig:
-       - Name: name of object type
-       - Fields: a map of fields by using GraphQLFields
-   Setup type of field use GraphQLFieldConfig
-*/
-var userType = graphql.NewObject(
-	graphql.ObjectConfig{
-		Description: "This is a user object",
-		Name:        "User",
-		Fields: graphql.Fields{
-			"id": &graphql.Field{
-				Type: graphql.String,
-			},
-			"name": &graphql.Field{
-				Type: graphql.String,
-			},
-		},
-	},
-)
-
-/*
-   Create Query object type with fields "user" has type [userType] by using GraphQLObjectTypeConfig:
-       - Name: name of object type
-       - Fields: a map of fields by using GraphQLFields
-   Setup type of field use GraphQLFieldConfig to define:
-       - Type: type of field
-       - Args: arguments to query with current field
-       - Resolve: function to query data using params from [Args] and return value with current type
-*/
-var queryType = graphql.NewObject(
-	graphql.ObjectConfig{
-		Name: "Query",
-		Fields: graphql.Fields{
-			"user": &graphql.Field{
-				Description: "This can be used to query users",
-				Type:        userType,
-				Args: graphql.FieldConfigArgument{
-					"id": &graphql.ArgumentConfig{
-						Description: "This is an identifier",
-						Type:        graphql.String,
-					},
-				},
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					idQuery, isOK := p.Args["id"].(string)
-					if isOK {
-						return data[idQuery], nil
-					}
-					return nil, nil
-				},
-			},
-		},
-	})
-
-var schema, _ = graphql.NewSchema(
-	graphql.SchemaConfig{
-		Query: queryType,
-	},
 )
 
 func executeQuery(query string, schema graphql.Schema) *graphql.Result {
@@ -95,26 +30,84 @@ type requestBody struct {
 }
 
 func main() {
-	importJSONDataFromFile("data.json", &data)
-
 	mydb, err := db.NewDb("127.0.0.1")
 	if err != nil {
-		fmt.Println("Error:", err)
+		fmt.Println("Unable to make DB connection")
 		return
 	}
 
-	ks, _ := mydb.Keyspace("system")
+	keyspaceMeta, err := mydb.Keyspace("store")
+	if err != nil {
+		fmt.Println("Unable to find keyspace")
+		return
+	}
 
-	fmt.Println("keyspace: " + ks.Name)
+	s, err := schema.BuildSchema(keyspaceMeta, func(params graphql.ResolveParams) (interface{}, error) {
+		tableMeta := keyspaceMeta.Tables[strcase.ToSnake(params.Info.FieldName)]
+		if tableMeta == nil {
+			return nil, fmt.Errorf("Unable to find table '%s'", params.Info.FieldName)
+		}
 
-	ksList, _ := mydb.Keyspaces()
-	for _, name := range ksList {
-		fmt.Println("keyspace list item: " + name)
+		queryParams := make([]interface{}, 0)
+
+		// FIXME: How do we figure out the filter columns from graphql.ResolveParams?
+		//        Also, we need to valid and convert complex type here.
+
+		whereClause := ""
+		for _, metadata := range tableMeta.PartitionKey {
+			if params.Args[metadata.Name] == nil {
+				return nil, fmt.Errorf("Query does not contain full primary key")
+			}
+			queryParams = append(queryParams, params.Args[metadata.Name])
+			if len(whereClause) > 0 {
+				whereClause += fmt.Sprintf(" AND %s = ?", metadata.Name)
+			} else {
+				whereClause += fmt.Sprintf(" %s = ?", metadata.Name)
+			}
+		}
+
+		for _, metadata := range tableMeta.ClusteringColumns {
+			if params.Args[metadata.Name] != nil {
+				queryParams = append(queryParams, params.Args[metadata.Name])
+				if len(whereClause) > 0 {
+					whereClause += fmt.Sprintf(" AND %s = ?", metadata.Name)
+				} else {
+					whereClause += fmt.Sprintf(" %s = ?", metadata.Name)
+				}
+			}
+		}
+
+		query := fmt.Sprintf("SELECT * FROM %s.%s WHERE%s", keyspaceMeta.Name, tableMeta.Name, whereClause)
+
+		iter := mydb.Select(query, gocql.LocalOne, queryParams...)
+
+		results := make([]map[string]interface{}, 0)
+		row := map[string]interface{}{}
+
+		for iter.MapScan(row) {
+			rowCamel := map[string]interface{}{}
+			for k, v := range row {
+				rowCamel[strcase.ToLowerCamel(k)] = v
+			}
+			results = append(results, rowCamel)
+			row = map[string]interface{}{}
+		}
+
+		if err := iter.Close(); err != nil {
+			return nil, fmt.Errorf("Error executing query: %v", err)
+		}
+
+		return results, nil
+	})
+
+	if err != nil {
+		fmt.Println("Unable to build schema")
+		return
 	}
 
 	router := httprouter.New()
 	router.GET("/graphql", func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-		result := executeQuery(r.URL.Query().Get("query"), schema)
+		result := executeQuery(r.URL.Query().Get("query"), s)
 		json.NewEncoder(w).Encode(result)
 	})
 	router.POST("/graphql", func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -130,26 +123,10 @@ func main() {
 			return
 		}
 
-		result := executeQuery(body.Query, schema)
+		result := executeQuery(body.Query, s)
 		json.NewEncoder(w).Encode(result)
 	})
 
 	fmt.Println("Now server is running on port 8080")
 	http.ListenAndServe(":8080", router)
-}
-
-//Helper function to import json from file to map
-func importJSONDataFromFile(fileName string, result interface{}) (isOK bool) {
-	isOK = true
-	content, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		fmt.Print("Error:", err)
-		isOK = false
-	}
-	err = json.Unmarshal(content, result)
-	if err != nil {
-		isOK = false
-		fmt.Print("Error:", err)
-	}
-	return
 }
