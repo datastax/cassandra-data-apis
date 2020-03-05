@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/riptano/data-endpoints/db"
+
 	"github.com/graphql-go/graphql"
 	"github.com/julienschmidt/httprouter"
 )
@@ -94,6 +96,21 @@ type requestBody struct {
 
 func main() {
 	importJSONDataFromFile("data.json", &data)
+
+	mydb, err := db.NewDb("127.0.0.1")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	ks, _ := mydb.Keyspace("system")
+
+	fmt.Println("keyspace: " + ks.Name)
+
+	ksList, _ := mydb.Keyspaces()
+	for _, name := range ksList {
+		fmt.Println("keyspace list item: " + name)
+	}
 
 	router := httprouter.New()
 	router.GET("/graphql", func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {

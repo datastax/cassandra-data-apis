@@ -1,0 +1,58 @@
+package db
+
+import (
+	"errors"
+
+	"github.com/gocql/gocql"
+)
+
+// Db represents a connection to a db
+type Db struct {
+	session *gocql.Session
+}
+
+// NewDb Gets a pointer to a db
+func NewDb(hosts ...string) (*Db, error) {
+	cluster := gocql.NewCluster(hosts...)
+
+	var (
+		session *gocql.Session
+		err     error
+	)
+
+	session, err = cluster.CreateSession()
+	if err != nil {
+		return nil, err
+	}
+
+	if session == nil {
+		return nil, errors.New("failed to create session")
+	}
+
+	return &Db{
+		session: session,
+	}, nil
+}
+
+// Keyspace Retrieves a keyspace
+func (db *Db) Keyspace(keyspace string) (*gocql.KeyspaceMetadata, error) {
+	// We expose gocql types for now, we should wrap them in the future instead
+	return db.session.KeyspaceMetadata(keyspace)
+}
+
+// Keyspaces Retrieves a keyspace
+func (db *Db) Keyspaces() ([]string, error) {
+	iter := db.session.Query("SELECT keyspace_name FROM system_schema.keyspaces").Iter()
+
+	var keyspaces []string
+
+	var name string
+	for iter.Scan(&name) {
+		keyspaces = append(keyspaces, name)
+	}
+	if err := iter.Close(); err != nil {
+		return nil, err
+	}
+
+	return keyspaces, nil
+}
