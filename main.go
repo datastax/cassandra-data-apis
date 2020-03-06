@@ -8,9 +8,7 @@ import (
 	"github.com/riptano/data-endpoints/db"
 	"github.com/riptano/data-endpoints/schema"
 
-	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
-	"github.com/iancoleman/strcase"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -30,78 +28,16 @@ type requestBody struct {
 }
 
 func main() {
-	mydb, err := db.NewDb("127.0.0.1")
+	dbClient, err := db.NewDb("127.0.0.1")
 	if err != nil {
 		fmt.Println("Unable to make DB connection")
 		return
 	}
 
-	keyspaceMeta, err := mydb.Keyspace("store")
-	if err != nil {
-		fmt.Println("Unable to find keyspace")
-		return
-	}
-
-	s, err := schema.BuildSchema(keyspaceMeta, func(params graphql.ResolveParams) (interface{}, error) {
-		tableMeta := keyspaceMeta.Tables[strcase.ToSnake(params.Info.FieldName)]
-		if tableMeta == nil {
-			return nil, fmt.Errorf("Unable to find table '%s'", params.Info.FieldName)
-		}
-
-		queryParams := make([]interface{}, 0)
-
-		// FIXME: How do we figure out the filter columns from graphql.ResolveParams?
-		//        Also, we need to valid and convert complex type here.
-
-		whereClause := ""
-		for _, metadata := range tableMeta.PartitionKey {
-			if params.Args[metadata.Name] == nil {
-				return nil, fmt.Errorf("Query does not contain full primary key")
-			}
-			queryParams = append(queryParams, params.Args[metadata.Name])
-			if len(whereClause) > 0 {
-				whereClause += fmt.Sprintf(" AND %s = ?", metadata.Name)
-			} else {
-				whereClause += fmt.Sprintf(" %s = ?", metadata.Name)
-			}
-		}
-
-		for _, metadata := range tableMeta.ClusteringColumns {
-			if params.Args[metadata.Name] != nil {
-				queryParams = append(queryParams, params.Args[metadata.Name])
-				if len(whereClause) > 0 {
-					whereClause += fmt.Sprintf(" AND %s = ?", metadata.Name)
-				} else {
-					whereClause += fmt.Sprintf(" %s = ?", metadata.Name)
-				}
-			}
-		}
-
-		query := fmt.Sprintf("SELECT * FROM %s.%s WHERE%s", keyspaceMeta.Name, tableMeta.Name, whereClause)
-
-		iter := mydb.Select(query, gocql.LocalOne, queryParams...)
-
-		results := make([]map[string]interface{}, 0)
-		row := map[string]interface{}{}
-
-		for iter.MapScan(row) {
-			rowCamel := map[string]interface{}{}
-			for k, v := range row {
-				rowCamel[strcase.ToLowerCamel(k)] = v
-			}
-			results = append(results, rowCamel)
-			row = map[string]interface{}{}
-		}
-
-		if err := iter.Close(); err != nil {
-			return nil, fmt.Errorf("Error executing query: %v", err)
-		}
-
-		return results, nil
-	})
+	s, err := schema.BuildSchema("store", dbClient)
 
 	if err != nil {
-		fmt.Println("Unable to build schema")
+		fmt.Printf("Unable to build schema: %s", err)
 		return
 	}
 
