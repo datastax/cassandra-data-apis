@@ -2,7 +2,6 @@ package db
 
 import (
 	"errors"
-
 	"github.com/gocql/gocql"
 )
 
@@ -59,5 +58,11 @@ func (db *Db) Keyspaces() ([]string, error) {
 
 // Select Run select query and return iterator to result set
 func (db *Db) Select(query string, consistency gocql.Consistency, values ...interface{}) *gocql.Iter {
-	return db.session.Query(query, values...).Consistency(consistency).Iter()
+	return db.session.Query(query).Bind(values...).Consistency(consistency).Iter()
+}
+
+// ExecuteNoResult executes a prepared statement without returning row results
+func (db *Db) ExecuteNoResult(query string, consistency gocql.Consistency, values ...interface{}) error {
+	iter := db.session.Query(query).Bind(values...).Consistency(consistency).Iter()
+	return iter.Close()
 }

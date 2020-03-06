@@ -17,12 +17,8 @@ func (db *Db) Insert(columnNames []string, queryParams []interface{}, ksName str
 		"INSERT INTO %s.%s (%s) VALUES (%s)",
 		ksName, table.Name, strings.Join(columnNames, ","), placeholders)
 
-	iter := db.Select(query, gocql.LocalOne, queryParams...)
-
-	if err := iter.Close(); err != nil {
-		return nil, fmt.Errorf("Error executing query: %v", err)
-	}
-	return true, nil
+	err := db.ExecuteNoResult(query, gocql.LocalOne, queryParams...)
+	return err == nil, err
 }
 
 func (db *Db) Delete(columnNames []string, queryParams []interface{}, ksName string,
@@ -33,11 +29,6 @@ func (db *Db) Delete(columnNames []string, queryParams []interface{}, ksName str
 	}
 
 	query := fmt.Sprintf("DELETE FROM %s.%s WHERE %s", ksName, table.Name, whereClause)
-
-	iter := db.Select(query, gocql.LocalOne, queryParams...)
-
-	if err := iter.Close(); err != nil {
-		return nil, fmt.Errorf("Error executing query: %v", err)
-	}
-	return true, nil
+	err := db.ExecuteNoResult(query, gocql.LocalOne, queryParams...)
+	return err == nil, err
 }
