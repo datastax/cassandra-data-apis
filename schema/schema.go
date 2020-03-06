@@ -2,6 +2,8 @@ package schema
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
 	"github.com/iancoleman/strcase"
@@ -73,13 +75,65 @@ func buildQueries(tableMetas map[string]*gocql.TableMetadata, resolve graphql.Fi
 func buildQuery(tableMetas map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) *graphql.Object {
 	return graphql.NewObject(
 		graphql.ObjectConfig{
-			Name:   "Query",
+			Name:   "TableQuery",
 			Fields: buildQueries(tableMetas, resolve),
 		})
 }
 
-func buildMutation(tableMetas map[string]*gocql.TableMetadata) *graphql.Object {
-	return nil
+func buildMutationFields(tableMetas map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
+	fields := graphql.Fields{}
+	for name, table := range tableMetas {
+		fields["insert"+strcase.ToCamel(name)] = &graphql.Field{
+			Type:    graphql.Boolean,
+			Args:    buildInsertArgs(table),
+			Resolve: resolve,
+		}
+
+		//fields["delete" + strcase.ToCamel(name)] = &graphql.Field{
+		//	Type:    graphql.Boolean,
+		//	Args:    buildQueryArgs(table),
+		//	Resolve: resolve,
+		//}
+	}
+	return fields
+}
+
+func buildMutation(tableMetas map[string]*gocql.TableMetadata, resolveFn graphql.FieldResolveFn) *graphql.Object {
+	return graphql.NewObject(
+		graphql.ObjectConfig{
+			Name:   "TableMutation",
+			Fields: buildMutationFields(tableMetas, resolveFn),
+		})
+}
+
+// Marks partition and clustering keys as required, the rest as optional
+func buildInsertArgs(tableMeta *gocql.TableMetadata) graphql.FieldConfigArgument {
+	args := graphql.FieldConfigArgument{}
+
+	for _, column := range tableMeta.PartitionKey {
+		//TODO: Extract name convention configuration
+		args[strcase.ToLowerCamel(column.Name)] = &graphql.ArgumentConfig{
+			Type: graphql.NewNonNull(buildType(column.Type)),
+		}
+	}
+
+	for _, column := range tableMeta.ClusteringColumns {
+		args[strcase.ToLowerCamel(column.Name)] = &graphql.ArgumentConfig{
+			Type: graphql.NewNonNull(buildType(column.Type)),
+		}
+	}
+
+	for _, column := range tableMeta.Columns {
+		memberName := strcase.ToLowerCamel(column.Name)
+		if _, ok := args[memberName]; !ok {
+			// Add the rest as optional
+			args[memberName] = &graphql.ArgumentConfig{
+				Type: buildType(column.Type),
+			}
+		}
+	}
+
+	return args
 }
 
 // Build GraphQL schema for tables in the provided keyspace metadata
@@ -91,8 +145,8 @@ func BuildSchema(keyspaceName string, db *db.Db) (graphql.Schema, error) {
 
 	return graphql.NewSchema(
 		graphql.SchemaConfig{
-			Query: buildQuery(keyspaceMeta.Tables, queryFieldResolver(keyspaceMeta, db)),
-			// Mutation: buildMutation(keyspaceMeta.Tables),
+			Query:    buildQuery(keyspaceMeta.Tables, queryFieldResolver(keyspaceMeta, db)),
+			Mutation: buildMutation(keyspaceMeta.Tables, mutationFieldResolver(keyspaceMeta, db)),
 		},
 	)
 }
@@ -156,4 +210,47 @@ func queryFieldResolver(keyspaceMeta *gocql.KeyspaceMetadata, db *db.Db) graphql
 
 		return results, nil
 	}
+}
+
+func mutationFieldResolver(keyspaceMeta *gocql.KeyspaceMetadata, db *db.Db) graphql.FieldResolveFn {
+	return func(params graphql.ResolveParams) (interface{}, error) {
+		// TODO: Extract name conventions
+		tableName := strcase.ToSnake(removeMutationPrefix(params.Info.FieldName))
+		table := keyspaceMeta.Tables[tableName]
+		if table == nil {
+			return nil, fmt.Errorf("Unable to find table '%s'", tableName)
+		}
+
+		queryParams := make([]interface{}, 0)
+		columnNames := []string{}
+		placeholders := []string{}
+
+		for key, value := range params.Args {
+			columnNames = append(columnNames, key)
+			queryParams = append(queryParams, value)
+			placeholders = append(placeholders, "?")
+			// Probably not very idiomatic...
+		}
+
+		query := fmt.Sprintf(
+			"INSERT INTO %s.%s (%s) VALUES (%s)",
+			keyspaceMeta.Name, table.Name, strings.Join(columnNames, ","), strings.Join(placeholders, ","))
+
+		fmt.Printf(query + "\n")
+
+		iter := db.Select(query, gocql.LocalOne, queryParams...)
+
+		if err := iter.Close(); err != nil {
+			return nil, fmt.Errorf("Error executing query: %v", err)
+		}
+
+		return true, nil
+	}
+}
+
+func removeMutationPrefix(value string) string {
+	if strings.Index(value, "insert") == 0 {
+		return value[len("insert"):]
+	}
+	panic("Unsupported mutation")
 }
