@@ -229,7 +229,7 @@ func mutationFieldResolver(keyspaceMeta *gocql.KeyspaceMetadata, db *db.Db) grap
 		queryParams := make([]interface{}, 0)
 		columnNames := []string{}
 		for key, value := range params.Args {
-			columnNames = append(columnNames, key)
+			columnNames = append(columnNames, strcase.ToSnake(key))
 			queryParams = append(queryParams, value)
 		}
 
