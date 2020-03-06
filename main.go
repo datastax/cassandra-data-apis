@@ -13,7 +13,7 @@ import (
 )
 
 // TODO: Make this a configuration setting
-var singleKsName = "";
+var singleKsName = "store";
 
 var excludedKeyspaces = []string{
 	"system", "system_auth", "system_distributed", "system_schema", "system_traces", "system_views", "system_virtual_schema",

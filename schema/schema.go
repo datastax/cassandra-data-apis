@@ -65,7 +65,7 @@ func buildQueryArgs(table *gocql.TableMetadata) graphql.FieldConfigArgument {
 	return args
 }
 
-func buildQueries(tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
+func buildQueriesFields(tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
 	fields := graphql.Fields{}
 	for name, table := range tables {
 		fields[strcase.ToLowerCamel(name)] = &graphql.Field{
@@ -74,6 +74,19 @@ func buildQueries(tables map[string]*gocql.TableMetadata, resolve graphql.FieldR
 			Resolve: resolve,
 		}
 	}
+	fields["table"] = &graphql.Field{
+		Type: tableType,
+		Args: graphql.FieldConfigArgument{
+			"name": &graphql.ArgumentConfig{
+				Type: graphql.NewNonNull(graphql.String),
+			},
+		},
+		Resolve: resolve,
+	}
+	fields["tables"] = &graphql.Field{
+		Type: graphql.NewList(tableType),
+		Resolve: resolve,
+	}
 	return fields
 }
 
@@ -81,7 +94,7 @@ func buildQuery(tables map[string]*gocql.TableMetadata, resolve graphql.FieldRes
 	return graphql.NewObject(
 		graphql.ObjectConfig{
 			Name:   "TableQuery",
-			Fields: buildQueries(tables, resolve),
+			Fields: buildQueriesFields(tables, resolve),
 		})
 }
 
@@ -99,6 +112,33 @@ func buildMutationFields(tables map[string]*gocql.TableMetadata, resolve graphql
 			Args:    buildQueryArgs(table),
 			Resolve: resolve,
 		}
+	}
+	fields["createTable"] = &graphql.Field{
+		Type: graphql.Boolean,
+		Args: graphql.FieldConfigArgument{
+			"name": &graphql.ArgumentConfig{
+				Type: graphql.NewNonNull(graphql.String),
+			},
+			"primaryKey": &graphql.ArgumentConfig{
+				Type: graphql.NewNonNull(graphql.NewList(columnInput)),
+			},
+			"clusteringKey": &graphql.ArgumentConfig{
+				Type: graphql.NewList(columnInput),
+			},
+			"values": &graphql.ArgumentConfig{
+				Type: graphql.NewList(columnInput),
+			},
+		},
+		Resolve: resolve,
+	}
+	fields["dropTable"] = &graphql.Field{
+		Type: graphql.Boolean,
+		Args: graphql.FieldConfigArgument{
+			"name": &graphql.ArgumentConfig{
+				Type: graphql.NewNonNull(graphql.String),
+			},
+		},
+		Resolve: resolve,
 	}
 	return fields
 }
@@ -158,7 +198,13 @@ func BuildSchema(keyspaceName string, db *db.Db) (graphql.Schema, error) {
 
 func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
-		table := keyspace.Tables[strcase.ToSnake(params.Info.FieldName)]
+		fieldName := params.Info.FieldName
+		if fieldName == "table" {
+			return getTable(keyspace, params.Args)
+		} else if fieldName == "tables" {
+			return getTables(keyspace);
+		}
+		table := keyspace.Tables[strcase.ToSnake(fieldName)]
 		if table == nil {
 			return nil, fmt.Errorf("unable to find table '%s'", params.Info.FieldName)
 		}
@@ -180,7 +226,13 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.Fie
 
 func mutationFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
-		operation, typeName := mutationPrefix(params.Info.FieldName)
+		fieldName := params.Info.FieldName
+		if fieldName == "createTable" {
+			return createTable(keyspace, db, params.Args)
+		} else if fieldName == "dropTable" {
+			return dropTable(db, params.Args)
+		}
+		operation, typeName := mutationPrefix(fieldName)
 		// TODO: Extract name conventions
 		table := keyspace.Tables[strcase.ToSnake(typeName)]
 		if table == nil {
