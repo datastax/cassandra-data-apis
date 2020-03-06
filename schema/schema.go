@@ -10,6 +10,11 @@ import (
 	"github.com/riptano/data-endpoints/db"
 )
 
+// TODO: could be done with enums
+const insertPrefix = "insert"
+const deletePrefix = "delete"
+const updatePrefix = "update"
+
 func buildType(typeInfo gocql.TypeInfo) graphql.Output {
 	switch typeInfo.Type() {
 	case gocql.TypeInt:
@@ -83,17 +88,17 @@ func buildQuery(tableMetas map[string]*gocql.TableMetadata, resolve graphql.Fiel
 func buildMutationFields(tableMetas map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
 	fields := graphql.Fields{}
 	for name, table := range tableMetas {
-		fields["insert"+strcase.ToCamel(name)] = &graphql.Field{
+		fields[insertPrefix+strcase.ToCamel(name)] = &graphql.Field{
 			Type:    graphql.Boolean,
 			Args:    buildInsertArgs(table),
 			Resolve: resolve,
 		}
 
-		//fields["delete" + strcase.ToCamel(name)] = &graphql.Field{
-		//	Type:    graphql.Boolean,
-		//	Args:    buildQueryArgs(table),
-		//	Resolve: resolve,
-		//}
+		fields[deletePrefix+strcase.ToCamel(name)] = &graphql.Field{
+			Type:    graphql.Boolean,
+			Args:    buildQueryArgs(table),
+			Resolve: resolve,
+		}
 	}
 	return fields
 }
@@ -214,43 +219,39 @@ func queryFieldResolver(keyspaceMeta *gocql.KeyspaceMetadata, db *db.Db) graphql
 
 func mutationFieldResolver(keyspaceMeta *gocql.KeyspaceMetadata, db *db.Db) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
+		operation, typeName := mutationPrefix(params.Info.FieldName)
 		// TODO: Extract name conventions
-		tableName := strcase.ToSnake(removeMutationPrefix(params.Info.FieldName))
-		table := keyspaceMeta.Tables[tableName]
+		table := keyspaceMeta.Tables[strcase.ToSnake(typeName)]
 		if table == nil {
-			return nil, fmt.Errorf("Unable to find table '%s'", tableName)
+			return nil, fmt.Errorf("Unable to find table for type name '%s'", params.Info.FieldName)
 		}
 
 		queryParams := make([]interface{}, 0)
 		columnNames := []string{}
-		placeholders := []string{}
-
 		for key, value := range params.Args {
 			columnNames = append(columnNames, key)
 			queryParams = append(queryParams, value)
-			placeholders = append(placeholders, "?")
-			// Probably not very idiomatic...
 		}
 
-		query := fmt.Sprintf(
-			"INSERT INTO %s.%s (%s) VALUES (%s)",
-			keyspaceMeta.Name, table.Name, strings.Join(columnNames, ","), strings.Join(placeholders, ","))
-
-		fmt.Printf(query + "\n")
-
-		iter := db.Select(query, gocql.LocalOne, queryParams...)
-
-		if err := iter.Close(); err != nil {
-			return nil, fmt.Errorf("Error executing query: %v", err)
+		switch operation {
+		case insertPrefix:
+			return db.Insert(columnNames, queryParams, keyspaceMeta.Name, table)
+		case deletePrefix:
+			return db.Delete(columnNames, queryParams, keyspaceMeta.Name, table)
 		}
 
-		return true, nil
+		return false, fmt.Errorf("Operation '%s' not supported", operation)
 	}
 }
 
-func removeMutationPrefix(value string) string {
-	if strings.Index(value, "insert") == 0 {
-		return value[len("insert"):]
+func mutationPrefix(value string) (string, string) {
+	mutationPrefixes := []string{insertPrefix, deletePrefix, updatePrefix}
+
+	for _, prefix := range mutationPrefixes {
+		if strings.Index(value, prefix) == 0 {
+			return prefix, value[len(prefix):]
+		}
 	}
+
 	panic("Unsupported mutation")
 }
