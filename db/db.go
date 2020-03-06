@@ -56,8 +56,8 @@ func (db *Db) Keyspaces() ([]string, error) {
 	return keyspaces, nil
 }
 
-// Select Run select query and return iterator to result set
-func (db *Db) Select(query string, consistency gocql.Consistency, values ...interface{}) *gocql.Iter {
+// Execute executes query and returns iterator to the result set
+func (db *Db) Execute(query string, consistency gocql.Consistency, values ...interface{}) *gocql.Iter {
 	return db.session.Query(query).Bind(values...).Consistency(consistency).Iter()
 }
 
