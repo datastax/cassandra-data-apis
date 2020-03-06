@@ -63,6 +63,5 @@ func (db *Db) Execute(query string, consistency gocql.Consistency, values ...int
 
 // ExecuteNoResult executes a prepared statement without returning row results
 func (db *Db) ExecuteNoResult(query string, consistency gocql.Consistency, values ...interface{}) error {
-	iter := db.session.Query(query).Bind(values...).Consistency(consistency).Iter()
-	return iter.Close()
+	return  db.session.Query(query).Bind(values...).Consistency(consistency).Exec()
 }

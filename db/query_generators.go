@@ -7,14 +7,6 @@ import (
 	"strings"
 )
 
-func buildWhereClause(columnNames []string) string {
-	whereClause := columnNames[0] + " = ?"
-	for i := 1; i < len(columnNames); i++ {
-		whereClause += " AND " + columnNames[i] + " = ?"
-	}
-	return whereClause
-}
-
 func (db *Db) Select(columnNames []string, queryParams []interface{}, ksName string,
 	table *gocql.TableMetadata) ([]map[string]interface{}, error) {
 
@@ -59,4 +51,12 @@ func (db *Db) Delete(columnNames []string, queryParams []interface{}, ksName str
 	query := fmt.Sprintf("DELETE FROM %s.%s WHERE %s", ksName, table.Name, whereClause)
 	err := db.ExecuteNoResult(query, gocql.LocalOne, queryParams...)
 	return err == nil, err
+}
+
+func buildWhereClause(columnNames []string) string {
+	whereClause := columnNames[0] + " = ?"
+	for i := 1; i < len(columnNames); i++ {
+		whereClause += " AND " + columnNames[i] + " = ?"
+	}
+	return whereClause
 }
