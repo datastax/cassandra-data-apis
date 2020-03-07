@@ -8,8 +8,6 @@ import (
 	"github.com/riptano/data-endpoints/db"
 )
 
-type basicType int
-
 const (
 	typeInt = iota
 	typeVarchar
@@ -17,8 +15,6 @@ const (
 	typeUUID
 	// ...
 )
-
-type columnKind int
 
 const (
 	kindPrimary = iota
@@ -29,13 +25,13 @@ const (
 )
 
 type dataTypeValue struct {
-	Basic    string        `json:"basic"`
+	Basic    int              `json:"basic"`
 	SubTypes []*dataTypeValue `json:"subTypes"`
 }
 
 type columnValue struct {
 	Name string         `json:"name"`
-	Kind string     `json:"kind"`
+	Kind int            `json:"kind"`
 	Type *dataTypeValue `json:"type"`
 }
 
@@ -48,16 +44,16 @@ var basicTypeEnum = graphql.NewEnum(graphql.EnumConfig{
 	Name: "BasicType",
 	Values: graphql.EnumValueConfigMap{
 		"INT": &graphql.EnumValueConfig{
-			Value: 0,
+			Value: typeInt,
 		},
 		"VARCHAR": &graphql.EnumValueConfig{
-			Value: 1,
+			Value: typeVarchar,
 		},
 		"TEXT": &graphql.EnumValueConfig{
-			Value: 2,
+			Value: typeText,
 		},
 		"UUID": &graphql.EnumValueConfig{
-			Value: 3,
+			Value: typeUUID,
 		},
 		// ...
 	},
@@ -84,19 +80,19 @@ var columnKindEnum = graphql.NewEnum(graphql.EnumConfig{
 	Name: "ColumnKind",
 	Values: graphql.EnumValueConfigMap{
 		"PRIMARY": &graphql.EnumValueConfig{
-			Value: 0,
+			Value: kindPrimary,
 		},
 		"CLUSTERING": &graphql.EnumValueConfig{
-			Value: 1,
+			Value: kindClustering,
 		},
 		"REGULAR": &graphql.EnumValueConfig{
-			Value: 2,
+			Value: kindRegular,
 		},
 		"STATIC": &graphql.EnumValueConfig{
-			Value: 3,
+			Value: kindStatic,
 		},
 		"COMPACT": &graphql.EnumValueConfig{
-			Value: 4,
+			Value: kindCompact,
 		},
 	},
 })
@@ -188,18 +184,18 @@ func dropTable(db *db.Db, args map[string]interface{}) (interface{}, error) {
 	return nil, nil
 }
 
-func toColumnKind(kind gocql.ColumnKind) string {
+func toColumnKind(kind gocql.ColumnKind) int {
 	switch kind {
 	case gocql.ColumnPartitionKey:
-		return "PRIMARY"
+		return kindPrimary
 	case gocql.ColumnClusteringKey:
-		return "CLUSTERING"
+		return kindClustering
 	case gocql.ColumnRegular:
-		return "REGULAR"
+		return kindRegular
 	case gocql.ColumnStatic:
-		return "STATIC"
+		return kindStatic
 	case gocql.ColumnCompact:
-		return "COMPACT"
+		return kindCompact
 	default:
 		// TODO: Handle this case
 		panic("Unhandled column kind")
@@ -210,22 +206,22 @@ func toColumnType(info gocql.TypeInfo) *dataTypeValue {
 	switch info.Type() {
 	case gocql.TypeInt:
 		return &dataTypeValue{
-			Basic:    "INT",
+			Basic:    typeInt,
 			SubTypes: nil,
 		}
 	case gocql.TypeVarchar:
 		return &dataTypeValue{
-			Basic:    "VARCHAR",
+			Basic:    typeVarchar,
 			SubTypes: nil,
 		}
 	case gocql.TypeText:
 		return &dataTypeValue{
-			Basic:    "TEXT",
+			Basic:    typeText,
 			SubTypes: nil,
 		}
 	case gocql.TypeUUID:
 		return &dataTypeValue{
-			Basic:    "UUID",
+			Basic:    typeUUID,
 			SubTypes: nil,
 		}
 		// ...
@@ -244,4 +240,3 @@ func toColumnValues(columns map[string]*gocql.ColumnMetadata) []*columnValue {
 	}
 	return columnValues
 }
-
