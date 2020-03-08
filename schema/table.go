@@ -5,6 +5,7 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
 	"github.com/iancoleman/strcase"
+	"github.com/mitchellh/mapstructure"
 	"github.com/riptano/data-endpoints/db"
 )
 
@@ -17,7 +18,8 @@ const (
 )
 
 const (
-	kindPrimary = iota
+	kindUnknown = iota
+	kindPrimary
 	kindClustering
 	kindRegular
 	kindStatic
@@ -79,6 +81,9 @@ func buildDataType() *graphql.Object {
 var columnKindEnum = graphql.NewEnum(graphql.EnumConfig{
 	Name: "ColumnKind",
 	Values: graphql.EnumValueConfigMap{
+		"UNKNOWN": &graphql.EnumValueConfig{
+			Value: kindUnknown,
+		},
 		"PRIMARY": &graphql.EnumValueConfig{
 			Value: kindPrimary,
 		},
@@ -176,12 +181,27 @@ func getTables(keyspace *gocql.KeyspaceMetadata) (interface{}, error) {
 	return tableValues, nil
 }
 
-func createTable(keyspace *gocql.KeyspaceMetadata, db *db.Db, args map[string]interface{}) (interface{}, error) {
+func decodeColumns(columns []interface{}) []*columnValue {
+	columnValues := make([]*columnValue, 0)
+	for _, column := range columns {
+		var value columnValue
+		mapstructure.Decode(column, &value)
+		columnValues = append(columnValues, &value)
+	}
+	return columnValues
+}
+
+func createTable(db *db.Db, ksName string, args map[string]interface{}) (interface{}, error) {
+	//name := args["name"].(string)
+	//primaryKey := decodeColumns(args["primaryKey"].([]interface{}))
+	//clusteringKey := decodeColumns(args["clusteringKey"].([]interface{}))
+	//values := decodeColumns(args["values"].([]interface{}))
+
 	return nil, nil
 }
 
-func dropTable(db *db.Db, args map[string]interface{}) (interface{}, error) {
-	return nil, nil
+func dropTable(db *db.Db, ksName string, args map[string]interface{}) (interface{}, error) {
+	return db.DropTable(ksName, strcase.ToSnake(args["name"].(string)))
 }
 
 func toColumnKind(kind gocql.ColumnKind) int {
@@ -197,8 +217,7 @@ func toColumnKind(kind gocql.ColumnKind) int {
 	case gocql.ColumnCompact:
 		return kindCompact
 	default:
-		// TODO: Handle this case
-		panic("Unhandled column kind")
+		return kindUnknown
 	}
 }
 

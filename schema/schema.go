@@ -204,23 +204,22 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.Fie
 		} else if fieldName == "tables" {
 			return getTables(keyspace);
 		}
-		table := keyspace.Tables[strcase.ToSnake(fieldName)]
-		if table == nil {
+		if table, ok := keyspace.Tables[strcase.ToSnake(fieldName)]; ok {
+			columnNames := make([]string, 0)
+			queryParams := make([]interface{}, 0)
+
+			// FIXME: How do we figure out the select expression columns from graphql.ResolveParams?
+			//        Also, we need to validate and convert complex type here.
+
+			for key, value := range params.Args {
+				columnNames = append(columnNames, strcase.ToSnake(key))
+				queryParams = append(queryParams, value)
+			}
+
+			return db.Select(columnNames, queryParams, keyspace.Name, table)
+		} else {
 			return nil, fmt.Errorf("unable to find table '%s'", params.Info.FieldName)
 		}
-
-		columnNames := make([]string, 0)
-		queryParams := make([]interface{}, 0)
-
-		// FIXME: How do we figure out the select expression columns from graphql.ResolveParams?
-		//        Also, we need to validate and convert complex type here.
-
-		for key, value := range params.Args {
-			columnNames = append(columnNames, strcase.ToSnake(key))
-			queryParams = append(queryParams, value)
-		}
-
-		return db.Select(columnNames, queryParams, keyspace.Name, table)
 	}
 }
 
@@ -228,33 +227,32 @@ func mutationFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.
 	return func(params graphql.ResolveParams) (interface{}, error) {
 		fieldName := params.Info.FieldName
 		if fieldName == "createTable" {
-			return createTable(keyspace, db, params.Args)
+			return createTable(db, keyspace.Name, params.Args)
 		} else if fieldName == "dropTable" {
-			return dropTable(db, params.Args)
+			return dropTable(db, keyspace.Name, params.Args)
 		}
 		operation, typeName := mutationPrefix(fieldName)
 		// TODO: Extract name conventions
-		table := keyspace.Tables[strcase.ToSnake(typeName)]
-		if table == nil {
+		if table, ok := keyspace.Tables[strcase.ToSnake(typeName)]; ok {
+			columnNames := make([]string, 0)
+			queryParams := make([]interface{}, 0)
+
+			for key, value := range params.Args {
+				columnNames = append(columnNames, strcase.ToSnake(key))
+				queryParams = append(queryParams, value)
+			}
+
+			switch operation {
+			case insertPrefix:
+				return db.Insert(columnNames, queryParams, keyspace.Name, table)
+			case deletePrefix:
+				return db.Delete(columnNames, queryParams, keyspace.Name, table)
+			}
+
+			return false, fmt.Errorf("operation '%s' not supported", operation)
+		} else {
 			return nil, fmt.Errorf("unable to find table for type name '%s'", params.Info.FieldName)
 		}
-
-		columnNames := make([]string, 0)
-		queryParams := make([]interface{}, 0)
-
-		for key, value := range params.Args {
-			columnNames = append(columnNames, strcase.ToSnake(key))
-			queryParams = append(queryParams, value)
-		}
-
-		switch operation {
-		case insertPrefix:
-			return db.Insert(columnNames, queryParams, keyspace.Name, table)
-		case deletePrefix:
-			return db.Delete(columnNames, queryParams, keyspace.Name, table)
-		}
-
-		return false, fmt.Errorf("operation '%s' not supported", operation)
 	}
 }
 
