@@ -1,7 +1,6 @@
 package db
 
 import (
-	"errors"
 	"github.com/gocql/gocql"
 )
 
@@ -19,13 +18,8 @@ func NewDb(hosts ...string) (*Db, error) {
 		err     error
 	)
 
-	session, err = cluster.CreateSession()
-	if err != nil {
+	if session, err = cluster.CreateSession(); err != nil {
 		return nil, err
-	}
-
-	if session == nil {
-		return nil, errors.New("failed to create session")
 	}
 
 	return &Db{
@@ -63,5 +57,5 @@ func (db *Db) Execute(query string, consistency gocql.Consistency, values ...int
 
 // ExecuteNoResult executes a prepared statement without returning row results
 func (db *Db) ExecuteNoResult(query string, consistency gocql.Consistency, values ...interface{}) error {
-	return  db.session.Query(query).Bind(values...).Consistency(consistency).Exec()
+	return db.session.Query(query).Bind(values...).Consistency(consistency).Exec()
 }

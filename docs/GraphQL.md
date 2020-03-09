@@ -252,7 +252,7 @@ type Column {
 type Table {
   name: String!
   keyspaceName: String!
-  primaryKey: [Column]!
+  partitionKey: [Column]!
   clusteringKey: [Column]
   values: [Column]
   # ...
@@ -270,7 +270,7 @@ type Query {
 }
 
 type Mutation {
-  createTable(name: String!, primaryKey: [Column]!, clusteringKey: [Column], values: [Column]): Table
+  createTable(name: String!, partitionKey: [Column]!, clusteringKey: [Column], values: [Column]): Table
   dropTable(name: String!)
 
   # Do we put the CRUD operations here?

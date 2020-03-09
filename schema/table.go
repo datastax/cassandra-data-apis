@@ -19,7 +19,7 @@ const (
 
 const (
 	kindUnknown = iota
-	kindPrimary
+	kindPartition
 	kindClustering
 	kindRegular
 	kindStatic
@@ -35,6 +35,15 @@ type columnValue struct {
 	Name string         `json:"name"`
 	Kind int            `json:"kind"`
 	Type *dataTypeValue `json:"type"`
+}
+
+type clusteringInfo struct {
+	// mapstructure.Decode() calls don't work when embedding values
+	//columnValue  //embedded
+	Name  string         `json:"name"`
+	Kind  int            `json:"kind"`
+	Type  *dataTypeValue `json:"type"`
+	Order string         `json:"order"`
 }
 
 type tableValue struct {
@@ -84,8 +93,8 @@ var columnKindEnum = graphql.NewEnum(graphql.EnumConfig{
 		"UNKNOWN": &graphql.EnumValueConfig{
 			Value: kindUnknown,
 		},
-		"PRIMARY": &graphql.EnumValueConfig{
-			Value: kindPrimary,
+		"PARTITION": &graphql.EnumValueConfig{
+			Value: kindPartition,
 		},
 		"CLUSTERING": &graphql.EnumValueConfig{
 			Value: kindClustering,
@@ -146,6 +155,21 @@ var columnInput = graphql.NewInputObject(graphql.InputObjectConfig{
 	},
 })
 
+var clusteringKeyInput = graphql.NewInputObject(graphql.InputObjectConfig{
+	Name: "ClusteringKeyInput",
+	Fields: graphql.InputObjectConfigFieldMap{
+		"name": &graphql.InputObjectFieldConfig{
+			Type: graphql.NewNonNull(graphql.String),
+		},
+		"type": &graphql.InputObjectFieldConfig{
+			Type: graphql.NewNonNull(dataTypeInput),
+		},
+		"order": &graphql.InputObjectFieldConfig{
+			Type: graphql.String,
+		},
+	},
+})
+
 var tableType = graphql.NewObject(graphql.ObjectConfig{
 	Name: "Table",
 	Fields: graphql.Fields{
@@ -181,23 +205,76 @@ func getTables(keyspace *gocql.KeyspaceMetadata) (interface{}, error) {
 	return tableValues, nil
 }
 
-func decodeColumns(columns []interface{}) []*columnValue {
-	columnValues := make([]*columnValue, 0)
+func decodeColumns(columns []interface{}) ([]*gocql.ColumnMetadata, error) {
+	columnValues := make([]*gocql.ColumnMetadata, 0)
 	for _, column := range columns {
 		var value columnValue
-		mapstructure.Decode(column, &value)
-		columnValues = append(columnValues, &value)
+		if err := mapstructure.Decode(column, &value); err != nil {
+			return nil, err
+		}
+
+		// Adapt from GraphQL column to gocql column
+		cqlColumn := &gocql.ColumnMetadata{
+			Name: value.Name,
+			Kind: toDbColumnKind(value.Kind),
+			Type: toDbColumnType(value.Type),
+		}
+
+		columnValues = append(columnValues, cqlColumn)
 	}
-	return columnValues
+	return columnValues, nil
+}
+
+func decodeClusteringInfo(columns []interface{}) ([]*gocql.ColumnMetadata, error) {
+	columnValues := make([]*gocql.ColumnMetadata, 0)
+	for _, column := range columns {
+		var value clusteringInfo
+		if err := mapstructure.Decode(column, &value); err != nil {
+			return nil, err
+		}
+
+		// Adapt from GraphQL column to gocql column
+		cqlColumn := &gocql.ColumnMetadata{
+			Name: value.Name,
+			Kind: toDbColumnKind(value.Kind),
+			Type: toDbColumnType(value.Type),
+			//TODO: Use enums
+			ClusteringOrder: value.Order,
+		}
+
+		columnValues = append(columnValues, cqlColumn)
+	}
+	return columnValues, nil
 }
 
 func createTable(db *db.Db, ksName string, args map[string]interface{}) (interface{}, error) {
-	//name := args["name"].(string)
-	//primaryKey := decodeColumns(args["primaryKey"].([]interface{}))
-	//clusteringKey := decodeColumns(args["clusteringKey"].([]interface{}))
-	//values := decodeColumns(args["values"].([]interface{}))
+	var values []*gocql.ColumnMetadata = nil
+	var clusteringKeys []*gocql.ColumnMetadata = nil
+	name := args["name"].(string)
 
-	return nil, nil
+	partitionKeys, err := decodeColumns(args["partitionKeys"].([]interface{}))
+
+	if err != nil {
+		return false, err
+	}
+
+	if args["values"] != nil {
+		if values, err = decodeColumns(args["values"].([]interface{})); err != nil {
+			return nil, err
+		}
+	}
+
+	if args["clusteringKeys"] != nil {
+		if clusteringKeys, err = decodeClusteringInfo(args["clusteringKeys"].([]interface{})); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := db.CreateTable(ksName, name, partitionKeys, clusteringKeys, values); err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 func dropTable(db *db.Db, ksName string, args map[string]interface{}) (interface{}, error) {
@@ -207,7 +284,7 @@ func dropTable(db *db.Db, ksName string, args map[string]interface{}) (interface
 func toColumnKind(kind gocql.ColumnKind) int {
 	switch kind {
 	case gocql.ColumnPartitionKey:
-		return kindPrimary
+		return kindPartition
 	case gocql.ColumnClusteringKey:
 		return kindClustering
 	case gocql.ColumnRegular:
@@ -216,6 +293,23 @@ func toColumnKind(kind gocql.ColumnKind) int {
 		return kindStatic
 	case gocql.ColumnCompact:
 		return kindCompact
+	default:
+		return kindUnknown
+	}
+}
+
+func toDbColumnKind(kind int) gocql.ColumnKind {
+	switch kind {
+	case kindPartition:
+		return gocql.ColumnPartitionKey
+	case kindClustering:
+		return gocql.ColumnClusteringKey
+	case kindRegular:
+		return gocql.ColumnRegular
+	case kindStatic:
+		return gocql.ColumnStatic
+	case kindCompact:
+		return gocql.ColumnCompact
 	default:
 		return kindUnknown
 	}
@@ -245,6 +339,21 @@ func toColumnType(info gocql.TypeInfo) *dataTypeValue {
 		}
 		// ...
 	}
+	return nil
+}
+
+func toDbColumnType(info *dataTypeValue) gocql.TypeInfo {
+	switch info.Basic {
+	case typeInt:
+		return gocql.NewNativeType(0, gocql.TypeInt, "")
+	case typeVarchar:
+		return gocql.NewNativeType(0, gocql.TypeVarchar, "")
+	case typeText:
+		return gocql.NewNativeType(0, gocql.TypeText, "")
+	case typeUUID:
+		return gocql.NewNativeType(0, gocql.TypeUUID, "")
+	}
+
 	return nil
 }
 

@@ -84,7 +84,7 @@ func buildQueriesFields(tables map[string]*gocql.TableMetadata, resolve graphql.
 		Resolve: resolve,
 	}
 	fields["tables"] = &graphql.Field{
-		Type: graphql.NewList(tableType),
+		Type:    graphql.NewList(tableType),
 		Resolve: resolve,
 	}
 	return fields
@@ -119,11 +119,11 @@ func buildMutationFields(tables map[string]*gocql.TableMetadata, resolve graphql
 			"name": &graphql.ArgumentConfig{
 				Type: graphql.NewNonNull(graphql.String),
 			},
-			"primaryKey": &graphql.ArgumentConfig{
+			"partitionKeys": &graphql.ArgumentConfig{
 				Type: graphql.NewNonNull(graphql.NewList(columnInput)),
 			},
-			"clusteringKey": &graphql.ArgumentConfig{
-				Type: graphql.NewList(columnInput),
+			"clusteringKeys": &graphql.ArgumentConfig{
+				Type: graphql.NewList(clusteringKeyInput),
 			},
 			"values": &graphql.ArgumentConfig{
 				Type: graphql.NewList(columnInput),
@@ -202,7 +202,7 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.Fie
 		if fieldName == "table" {
 			return getTable(keyspace, params.Args)
 		} else if fieldName == "tables" {
-			return getTables(keyspace);
+			return getTables(keyspace)
 		}
 		if table, ok := keyspace.Tables[strcase.ToSnake(fieldName)]; ok {
 			columnNames := make([]string, 0)
