@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/riptano/data-endpoints/db"
+	"github.com/riptano/data-endpoints/rest"
 	"github.com/riptano/data-endpoints/schema"
 	"log"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 )
 
 // TODO: Make this a configuration setting
-var singleKsName = "store";
+var singleKsName = "store"
 
 var excludedKeyspaces = []string{
 	"system", "system_auth", "system_distributed", "system_schema", "system_traces", "system_views", "system_virtual_schema",
@@ -109,11 +110,18 @@ func main() {
 			if err != nil {
 				log.Fatalf("unable to build schema for keyspace '%s': %s", ksName, err)
 			}
-			router.GET("/graphql/" + ksName, getHandler(graphqlSchema))
-			router.POST("/graphql/" + ksName, postHandler(graphqlSchema))
+			router.GET("/graphql/"+ksName, getHandler(graphqlSchema))
+			router.POST("/graphql/"+ksName, postHandler(graphqlSchema))
 		}
 	}
 
-	fmt.Println("Now server is running on port 8080")
-	http.ListenAndServe(":8080", router)
+	finish := make(chan bool)
+	go listenAndServe(router, 8080)
+	go listenAndServe(rest.ApiRouter(dbClient), 8081)
+	<-finish
+}
+
+func listenAndServe(router *httprouter.Router, port int) {
+	fmt.Printf("Start listening on %d\n", port)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), router))
 }
