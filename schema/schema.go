@@ -24,9 +24,11 @@ func buildType(typeInfo gocql.TypeInfo) graphql.Output {
 	case gocql.TypeText:
 		return graphql.String
 	case gocql.TypeUUID:
-		return graphql.String
+		return uuid
 	case gocql.TypeTimeUUID:
 		return graphql.String
+	case gocql.TypeTimestamp:
+		return timestamp
 	default:
 		panic("Unsupported type")
 	}
@@ -192,6 +194,7 @@ func BuildSchema(keyspaceName string, db *db.Db) (graphql.Schema, error) {
 		graphql.SchemaConfig{
 			Query:    buildQuery(keyspace.Tables, queryFieldResolver(keyspace, db)),
 			Mutation: buildMutation(keyspace.Tables, mutationFieldResolver(keyspace, db)),
+			Types:    []graphql.Type{timestamp, uuid},
 		},
 	)
 }
