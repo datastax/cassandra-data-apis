@@ -1,7 +1,10 @@
-package schema
+package graphql
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/julienschmidt/httprouter"
+	"net/http"
 	"strings"
 
 	"github.com/gocql/gocql"
@@ -14,6 +17,10 @@ import (
 const insertPrefix = "insert"
 const deletePrefix = "delete"
 const updatePrefix = "update"
+
+type requestBody struct {
+	Query string `json:"query"`
+}
 
 func buildType(typeInfo gocql.TypeInfo) graphql.Output {
 	switch typeInfo.Type() {
@@ -202,26 +209,29 @@ func BuildSchema(keyspaceName string, db *db.Db) (graphql.Schema, error) {
 func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
 		fieldName := params.Info.FieldName
-		if fieldName == "table" {
+		switch fieldName {
+		case "table":
 			return getTable(keyspace, params.Args)
-		} else if fieldName == "tables" {
+		case "tables":
 			return getTables(keyspace)
-		}
-		if table, ok := keyspace.Tables[strcase.ToSnake(fieldName)]; ok {
-			columnNames := make([]string, 0)
-			queryParams := make([]interface{}, 0)
+		default:
+			if table, ok := keyspace.Tables[strcase.ToSnake(fieldName)]; ok {
+				columnNames := make([]string, 0)
+				queryParams := make([]interface{}, 0)
 
-			// FIXME: How do we figure out the select expression columns from graphql.ResolveParams?
-			//        Also, we need to validate and convert complex type here.
+				// FIXME: How do we figure out the select expression columns from graphql.ResolveParams?
+				//        Also, we need to validate and convert complex types here.
 
-			for key, value := range params.Args {
-				columnNames = append(columnNames, strcase.ToSnake(key))
-				queryParams = append(queryParams, value)
+				for key, value := range params.Args {
+					columnNames = append(columnNames, strcase.ToSnake(key))
+					queryParams = append(queryParams, value)
+				}
+
+				return db.Select(columnNames, queryParams, keyspace.Name, table)
+			} else {
+				return nil, fmt.Errorf("unable to find table '%s'", params.Info.FieldName)
 			}
 
-			return db.Select(columnNames, queryParams, keyspace.Name, table)
-		} else {
-			return nil, fmt.Errorf("unable to find table '%s'", params.Info.FieldName)
 		}
 	}
 }
@@ -229,32 +239,35 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.Fie
 func mutationFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
 		fieldName := params.Info.FieldName
-		if fieldName == "createTable" {
+		switch fieldName {
+		case "createTable":
 			return createTable(db, keyspace.Name, params.Args)
-		} else if fieldName == "dropTable" {
+		case "dropTable":
 			return dropTable(db, keyspace.Name, params.Args)
-		}
-		operation, typeName := mutationPrefix(fieldName)
-		// TODO: Extract name conventions
-		if table, ok := keyspace.Tables[strcase.ToSnake(typeName)]; ok {
-			columnNames := make([]string, 0)
-			queryParams := make([]interface{}, 0)
+		default:
+			operation, typeName := mutationPrefix(fieldName)
+			// TODO: Extract name conventions
+			if table, ok := keyspace.Tables[strcase.ToSnake(typeName)]; ok {
+				columnNames := make([]string, 0)
+				queryParams := make([]interface{}, 0)
 
-			for key, value := range params.Args {
-				columnNames = append(columnNames, strcase.ToSnake(key))
-				queryParams = append(queryParams, value)
+				for key, value := range params.Args {
+					columnNames = append(columnNames, strcase.ToSnake(key))
+					queryParams = append(queryParams, value)
+				}
+
+				switch operation {
+				case insertPrefix:
+					return db.Insert(columnNames, queryParams, keyspace.Name, table)
+				case deletePrefix:
+					return db.Delete(columnNames, queryParams, keyspace.Name, table)
+				}
+
+				return false, fmt.Errorf("operation '%s' not supported", operation)
+			} else {
+				return nil, fmt.Errorf("unable to find table for type name '%s'", params.Info.FieldName)
 			}
 
-			switch operation {
-			case insertPrefix:
-				return db.Insert(columnNames, queryParams, keyspace.Name, table)
-			case deletePrefix:
-				return db.Delete(columnNames, queryParams, keyspace.Name, table)
-			}
-
-			return false, fmt.Errorf("operation '%s' not supported", operation)
-		} else {
-			return nil, fmt.Errorf("unable to find table for type name '%s'", params.Info.FieldName)
 		}
 	}
 }
@@ -269,4 +282,41 @@ func mutationPrefix(value string) (string, string) {
 	}
 
 	panic("Unsupported mutation")
+}
+
+func GetHandler(schema graphql.Schema) httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+		result := executeQuery(r.URL.Query().Get("query"), schema)
+		json.NewEncoder(w).Encode(result)
+	}
+}
+
+func PostHandler(schema graphql.Schema) httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+		if r.Body == nil {
+			http.Error(w, "No request body", 400)
+			return
+		}
+
+		var body requestBody
+		err := json.NewDecoder(r.Body).Decode(&body)
+		if err != nil {
+			http.Error(w, "Request body is invalid", 400)
+			return
+		}
+
+		result := executeQuery(body.Query, schema)
+		json.NewEncoder(w).Encode(result)
+	}
+}
+
+func executeQuery(query string, schema graphql.Schema) *graphql.Result {
+	result := graphql.Do(graphql.Params{
+		Schema:        schema,
+		RequestString: query,
+	})
+	if len(result.Errors) > 0 {
+		fmt.Printf("wrong result, unexpected errors: %v", result.Errors)
+	}
+	return result
 }
