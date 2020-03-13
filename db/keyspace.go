@@ -18,7 +18,7 @@ func (db *Db) CreateKeyspace(name string, dcReplicas map[string]int) (bool, erro
 
 	query := fmt.Sprintf("CREATE KEYSPACE %s WITH REPLICATION  = { 'class': 'NetworkTopologyStrategy', %s }", name, dcs)
 
-	err := db.ExecuteNoResult(query, gocql.Any)
+	err := db.session.ExecuteSimple(query, gocql.Any)
 
 	return err == nil, err
 }
@@ -26,7 +26,7 @@ func (db *Db) CreateKeyspace(name string, dcReplicas map[string]int) (bool, erro
 func (db *Db) DropKeyspace(name string) (bool, error) {
 	// TODO: Escape keyspace name?
 	query := fmt.Sprintf("DROP KEYSPACE %s", name)
-	err := db.ExecuteNoResult(query, gocql.Any)
+	err := db.session.ExecuteSimple(query, gocql.Any)
 
 	return err == nil, err
 }

@@ -61,7 +61,7 @@ func (db *Db) Select(columnNames []string, queryParams []interface{}, ksName str
 	whereClause := buildWhereClause(columnNames)
 	query := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", ksName, table.Name, whereClause)
 
-	iter := db.Execute(query, gocql.LocalOne, queryParams...)
+	iter := db.session.ExecuteIter(query, gocql.LocalOne, queryParams...)
 
 	columns := iter.Columns()
 	scanner := iter.Scanner()
@@ -90,7 +90,7 @@ func (db *Db) Insert(columnNames []string, queryParams []interface{}, ksName str
 		"INSERT INTO %s.%s (%s) VALUES (%s)",
 		ksName, table.Name, strings.Join(columnNames, ","), placeholders)
 
-	err := db.ExecuteNoResult(query, gocql.LocalOne, queryParams...)
+	err := db.session.Execute(query, gocql.LocalOne, queryParams...)
 	return err == nil, err
 }
 
@@ -98,7 +98,7 @@ func (db *Db) Delete(columnNames []string, queryParams []interface{}, ksName str
 	table *gocql.TableMetadata) (interface{}, error) {
 	whereClause := buildWhereClause(columnNames)
 	query := fmt.Sprintf("DELETE FROM %s.%s WHERE %s", ksName, table.Name, whereClause)
-	err := db.ExecuteNoResult(query, gocql.LocalOne, queryParams...)
+	err := db.session.Execute(query, gocql.LocalOne, queryParams...)
 	return err == nil, err
 }
 

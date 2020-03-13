@@ -50,13 +50,13 @@ func (db *Db) CreateTable(
 		query += fmt.Sprintf(" WITH CLUSTERING ORDER BY (%s)", clusteringOrder)
 	}
 
-	return db.ExecuteNoResult(query, gocql.Any)
+	return db.session.ExecuteSimple(query, gocql.Any)
 }
 
 func (db *Db) DropTable(ksName string, tableName string) (bool, error) {
 	// TODO: Escape keyspace/table name?
 	query := fmt.Sprintf("DROP TABLE %s.%s", ksName, tableName)
-	err := db.ExecuteNoResult(query, gocql.Any)
+	err := db.session.ExecuteSimple(query, gocql.Any)
 
 	return err == nil, err
 }

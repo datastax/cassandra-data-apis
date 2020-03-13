@@ -6,7 +6,7 @@ import (
 
 // Db represents a connection to a db
 type Db struct {
-	session *gocql.Session
+	session DbSession
 }
 
 // NewDb Gets a pointer to a db
@@ -23,7 +23,7 @@ func NewDb(hosts ...string) (*Db, error) {
 	}
 
 	return &Db{
-		session: session,
+		session: &GoCqlSession{ref: session},
 	}, nil
 }
 
@@ -35,7 +35,7 @@ func (db *Db) Keyspace(keyspace string) (*gocql.KeyspaceMetadata, error) {
 
 // Keyspaces Retrieves all the keyspace names
 func (db *Db) Keyspaces() ([]string, error) {
-	iter := db.session.Query("SELECT keyspace_name FROM system_schema.keyspaces").Iter()
+	iter := db.session.ExecuteIterSimple("SELECT keyspace_name FROM system_schema.keyspaces", gocql.One)
 
 	var keyspaces []string
 
@@ -48,14 +48,4 @@ func (db *Db) Keyspaces() ([]string, error) {
 	}
 
 	return keyspaces, nil
-}
-
-// Execute executes query and returns iterator to the result set
-func (db *Db) Execute(query string, consistency gocql.Consistency, values ...interface{}) *gocql.Iter {
-	return db.session.Query(query).Bind(values...).Consistency(consistency).Iter()
-}
-
-// ExecuteNoResult executes a prepared statement without returning row results
-func (db *Db) ExecuteNoResult(query string, consistency gocql.Consistency, values ...interface{}) error {
-	return db.session.Query(query).Bind(values...).Consistency(consistency).Exec()
 }
