@@ -48,9 +48,8 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 			gocql.TypeCounter, gocql.TypeBoolean,
 			gocql.TypeFloat, gocql.TypeDouble:
 			value = reflect.Indirect(reflect.ValueOf(value)).Interface()
-		default:
-			mapped[strcase.ToLowerCamel(column.Name)] = value
 		}
+		mapped[strcase.ToLowerCamel(column.Name)] = value
 	}
 
 	return mapped, nil
