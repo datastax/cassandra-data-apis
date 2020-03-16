@@ -24,12 +24,14 @@ type requestBody struct {
 
 func buildType(typeInfo gocql.TypeInfo) graphql.Output {
 	switch typeInfo.Type() {
-	case gocql.TypeInt:
+	case gocql.TypeInt, gocql.TypeTinyInt, gocql.TypeSmallInt:
 		return graphql.Int
-	case gocql.TypeVarchar:
+	case gocql.TypeFloat, gocql.TypeDouble:
+		return graphql.Float
+	case gocql.TypeText, gocql.TypeVarchar, gocql.TypeBigInt, gocql.TypeDecimal:
 		return graphql.String
-	case gocql.TypeText:
-		return graphql.String
+	case gocql.TypeBoolean:
+		return graphql.Boolean
 	case gocql.TypeUUID:
 		return uuid
 	case gocql.TypeTimeUUID:
@@ -37,7 +39,7 @@ func buildType(typeInfo gocql.TypeInfo) graphql.Output {
 	case gocql.TypeTimestamp:
 		return timestamp
 	default:
-		panic("Unsupported type")
+		panic("Unsupported type " + typeInfo.Type().String())
 	}
 }
 

@@ -14,10 +14,9 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 	for i := range values {
 		typeInfo := columns[i].TypeInfo
 		switch typeInfo.Type() {
-		case gocql.TypeVarchar, gocql.TypeAscii, gocql.TypeInet, gocql.TypeText:
+		case gocql.TypeVarchar, gocql.TypeAscii, gocql.TypeInet, gocql.TypeText, gocql.TypeTimeUUID, gocql.TypeUUID,
+			gocql.TypeBigInt, gocql.TypeCounter:
 			values[i] = reflect.New(reflect.TypeOf(*new(*string))).Interface()
-		case gocql.TypeBigInt, gocql.TypeCounter:
-			values[i] = reflect.New(reflect.TypeOf(*new(*int64))).Interface()
 		case gocql.TypeBoolean:
 			values[i] = reflect.New(reflect.TypeOf(*new(*bool))).Interface()
 		case gocql.TypeFloat:
@@ -49,6 +48,7 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 			gocql.TypeFloat, gocql.TypeDouble:
 			value = reflect.Indirect(reflect.ValueOf(value)).Interface()
 		}
+
 		mapped[strcase.ToLowerCamel(column.Name)] = value
 	}
 
