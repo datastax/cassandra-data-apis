@@ -65,7 +65,7 @@ func buildQueriesFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.
 	fields := graphql.Fields{}
 	for name, table := range tables {
 		fields[strcase.ToLowerCamel(name)] = &graphql.Field{
-			Type:    graphql.NewList(schema.tableValueTypes[table.Name]),
+			Type:    schema.resultSelectTypes[table.Name],
 			Args:    buildQueryArgs(table),
 			Resolve: resolve,
 		}
@@ -94,17 +94,17 @@ func buildQuery(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMet
 		})
 }
 
-func buildMutationFields(tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
+func buildMutationFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
 	fields := graphql.Fields{}
 	for name, table := range tables {
 		fields[insertPrefix+strcase.ToCamel(name)] = &graphql.Field{
-			Type:    graphql.Boolean,
+			Type:    schema.resultUpdateTypes[table.Name],
 			Args:    buildInsertArgs(table),
 			Resolve: resolve,
 		}
 
 		fields[deletePrefix+strcase.ToCamel(name)] = &graphql.Field{
-			Type:    graphql.Boolean,
+			Type:    schema.resultUpdateTypes[table.Name],
 			Args:    buildQueryArgs(table),
 			Resolve: resolve,
 		}
@@ -139,11 +139,11 @@ func buildMutationFields(tables map[string]*gocql.TableMetadata, resolve graphql
 	return fields
 }
 
-func buildMutation(tables map[string]*gocql.TableMetadata, resolveFn graphql.FieldResolveFn) *graphql.Object {
+func buildMutation(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolveFn graphql.FieldResolveFn) *graphql.Object {
 	return graphql.NewObject(
 		graphql.ObjectConfig{
 			Name:   "TableMutation",
-			Fields: buildMutationFields(tables, resolveFn),
+			Fields: buildMutationFields(schema, tables, resolveFn),
 		})
 }
 
@@ -192,7 +192,7 @@ func BuildSchema(keyspaceName string, db *db.Db) (graphql.Schema, error) {
 	return graphql.NewSchema(
 		graphql.SchemaConfig{
 			Query:    buildQuery(keyspaceSchema, keyspace.Tables, queryFieldResolver(keyspace, db)),
-			Mutation: buildMutation(keyspace.Tables, mutationFieldResolver(keyspace, db)),
+			Mutation: buildMutation(keyspaceSchema, keyspace.Tables, mutationFieldResolver(keyspace, db)),
 			Types:    keyspaceSchema.AllTypes(),
 		},
 	)

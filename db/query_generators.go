@@ -1,9 +1,11 @@
 package db
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/gocql/gocql"
 	"github.com/iancoleman/strcase"
+	"github.com/riptano/data-endpoints/types"
 	"reflect"
 	"strings"
 )
@@ -56,31 +58,35 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 }
 
 func (db *Db) Select(columnNames []string, queryParams []interface{}, ksName string,
-	table *gocql.TableMetadata) ([]map[string]interface{}, error) {
+	table *gocql.TableMetadata) (*types.QueryResult, error) {
 
 	whereClause := buildWhereClause(columnNames)
 	query := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", ksName, table.Name, whereClause)
 
 	iter := db.session.ExecuteIter(query, gocql.LocalOne, queryParams...)
 
+	pageState := hex.EncodeToString(iter.PageState())
 	columns := iter.Columns()
 	scanner := iter.Scanner()
 
-	results := make([]map[string]interface{}, 0)
+	values := make([]map[string]interface{}, 0)
 
 	for scanner.Next() {
 		row, err := mapScan(scanner, columns)
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, row)
+		values = append(values, row)
 	}
 
-	return results, nil
+	return &types.QueryResult{
+		PageState: pageState,
+		Values:    values,
+	}, nil
 }
 
 func (db *Db) Insert(columnNames []string, queryParams []interface{}, ksName string,
-	table *gocql.TableMetadata) (interface{}, error) {
+	table *gocql.TableMetadata) (*types.ModificationResult, error) {
 	placeholders := "?"
 	for i := 1; i < len(columnNames); i++ {
 		placeholders += ", ?"
@@ -91,15 +97,16 @@ func (db *Db) Insert(columnNames []string, queryParams []interface{}, ksName str
 		ksName, table.Name, strings.Join(columnNames, ","), placeholders)
 
 	err := db.session.Execute(query, gocql.LocalOne, queryParams...)
-	return err == nil, err
+
+	return &types.ModificationResult{Applied: err == nil}, err
 }
 
 func (db *Db) Delete(columnNames []string, queryParams []interface{}, ksName string,
-	table *gocql.TableMetadata) (interface{}, error) {
+	table *gocql.TableMetadata) (*types.ModificationResult, error) {
 	whereClause := buildWhereClause(columnNames)
 	query := fmt.Sprintf("DELETE FROM %s.%s WHERE %s", ksName, table.Name, whereClause)
 	err := db.session.Execute(query, gocql.LocalOne, queryParams...)
-	return err == nil, err
+	return &types.ModificationResult{Applied: err == nil}, err
 }
 
 func buildWhereClause(columnNames []string) string {
