@@ -12,6 +12,10 @@ type KeyspaceGraphQLSchema struct {
 	commonInputTypes []*graphql.InputObject
 	// A map containing the table type by table name, with each column as scalar value
 	tableValueTypes map[string]*graphql.Object
+	// A map containing the result type by table name for a select query
+	resultSelectTypes map[string]*graphql.Object
+	// A map containing the result type by table name for a update/insert/delete query
+	resultUpdateTypes map[string]*graphql.Object
 	// A map containing the order enum by table name
 	orderEnums map[string]*graphql.Type
 }
@@ -20,6 +24,7 @@ func (s *KeyspaceGraphQLSchema) BuildTypes(keyspace *gocql.KeyspaceMetadata) err
 	s.buildCommonInputTypes()
 	s.buildOrderEnums(keyspace)
 	s.buildTableValueTypes(keyspace)
+	s.buildResultTypes(keyspace)
 	return nil
 }
 
@@ -31,6 +36,12 @@ func (s *KeyspaceGraphQLSchema) buildCommonInputTypes() {
 				"limit":     {Type: graphql.Int},
 				"pageSize":  {Type: graphql.Int},
 				"pageState": {Type: graphql.String},
+			},
+		}),
+		graphql.NewInputObject(graphql.InputObjectConfig{
+			Name: "UpdateOptions",
+			Fields: graphql.InputObjectConfigFieldMap{
+				"ttl": {Type: graphql.Int},
 			},
 		}),
 	}
@@ -62,10 +73,7 @@ func (s *KeyspaceGraphQLSchema) buildOrderEnums(keyspace *gocql.KeyspaceMetadata
 
 func (s *KeyspaceGraphQLSchema) AllTypes() []graphql.Type {
 	result := make([]graphql.Type, 0,
-		len(s.commonInputTypes)+
-			len(Scalars)+
-			len(s.orderEnums)+
-			len(s.tableValueTypes))
+		len(s.commonInputTypes)+len(Scalars)+len(s.orderEnums)+len(s.tableValueTypes)*3)
 
 	for _, t := range s.commonInputTypes {
 		result = append(result, t)
@@ -80,6 +88,14 @@ func (s *KeyspaceGraphQLSchema) AllTypes() []graphql.Type {
 	}
 
 	for _, t := range s.tableValueTypes {
+		result = append(result, t)
+	}
+
+	for _, t := range s.resultSelectTypes {
+		result = append(result, t)
+	}
+
+	for _, t := range s.resultUpdateTypes {
 		result = append(result, t)
 	}
 
@@ -101,6 +117,35 @@ func (s *KeyspaceGraphQLSchema) buildTableValueTypes(keyspace *gocql.KeyspaceMet
 		s.tableValueTypes[table.Name] = graphql.NewObject(graphql.ObjectConfig{
 			Name:   strcase.ToCamel(table.Name),
 			Fields: fields,
+		})
+	}
+}
+
+func (s *KeyspaceGraphQLSchema) buildResultTypes(keyspace *gocql.KeyspaceMetadata) {
+	s.resultSelectTypes = make(map[string]*graphql.Object, len(keyspace.Tables))
+	s.resultUpdateTypes = make(map[string]*graphql.Object, len(keyspace.Tables))
+
+	for _, table := range keyspace.Tables {
+		itemType, ok := s.tableValueTypes[table.Name]
+
+		if !ok {
+			panic(fmt.Sprintf("Table value type for table '%s' not found", table.Name))
+		}
+
+		s.resultSelectTypes[table.Name] = graphql.NewObject(graphql.ObjectConfig{
+			Name: strcase.ToCamel(table.Name + "Result"),
+			Fields: graphql.Fields{
+				"pageState": {Type: graphql.String},
+				"values":    {Type: graphql.NewList(graphql.NewNonNull(itemType))},
+			},
+		})
+
+		s.resultUpdateTypes[table.Name] = graphql.NewObject(graphql.ObjectConfig{
+			Name: strcase.ToCamel(table.Name + "MutationResult"),
+			Fields: graphql.Fields{
+				"applied": {Type: graphql.NewNonNull(graphql.Boolean)},
+				"value":   {Type: itemType},
+			},
 		})
 	}
 }
