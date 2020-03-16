@@ -43,21 +43,6 @@ func buildType(typeInfo gocql.TypeInfo) graphql.Output {
 	}
 }
 
-func buildQueryType(table *gocql.TableMetadata) *graphql.Object {
-	fields := graphql.Fields{}
-
-	for name, column := range table.Columns {
-		fields[strcase.ToLowerCamel(name)] = &graphql.Field{
-			Type: buildType(column.Type),
-		}
-	}
-
-	return graphql.NewObject(graphql.ObjectConfig{
-		Name:   strcase.ToCamel(table.Name),
-		Fields: fields,
-	})
-}
-
 func buildQueryArgs(table *gocql.TableMetadata) graphql.FieldConfigArgument {
 	args := graphql.FieldConfigArgument{}
 
@@ -76,11 +61,11 @@ func buildQueryArgs(table *gocql.TableMetadata) graphql.FieldConfigArgument {
 	return args
 }
 
-func buildQueriesFields(tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
+func buildQueriesFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
 	fields := graphql.Fields{}
 	for name, table := range tables {
 		fields[strcase.ToLowerCamel(name)] = &graphql.Field{
-			Type:    graphql.NewList(buildQueryType(table)),
+			Type:    graphql.NewList(schema.tableValueTypes[table.Name]),
 			Args:    buildQueryArgs(table),
 			Resolve: resolve,
 		}
@@ -101,11 +86,11 @@ func buildQueriesFields(tables map[string]*gocql.TableMetadata, resolve graphql.
 	return fields
 }
 
-func buildQuery(tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) *graphql.Object {
+func buildQuery(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) *graphql.Object {
 	return graphql.NewObject(
 		graphql.ObjectConfig{
 			Name:   "TableQuery",
-			Fields: buildQueriesFields(tables, resolve),
+			Fields: buildQueriesFields(schema, tables, resolve),
 		})
 }
 
@@ -199,11 +184,16 @@ func BuildSchema(keyspaceName string, db *db.Db) (graphql.Schema, error) {
 		return graphql.Schema{}, err
 	}
 
+	keyspaceSchema := &KeyspaceGraphQLSchema{}
+	if err := keyspaceSchema.BuildTypes(keyspace); err != nil {
+		return graphql.Schema{}, err
+	}
+
 	return graphql.NewSchema(
 		graphql.SchemaConfig{
-			Query:    buildQuery(keyspace.Tables, queryFieldResolver(keyspace, db)),
+			Query:    buildQuery(keyspaceSchema, keyspace.Tables, queryFieldResolver(keyspace, db)),
 			Mutation: buildMutation(keyspace.Tables, mutationFieldResolver(keyspace, db)),
-			Types:    []graphql.Type{timestamp, uuid},
+			Types:    keyspaceSchema.AllTypes(),
 		},
 	)
 }
