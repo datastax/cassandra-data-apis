@@ -100,7 +100,7 @@ func buildMutationFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql
 		fields[insertPrefix+strcase.ToCamel(name)] = &graphql.Field{
 			Type: schema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"data":        {Type: graphql.NewNonNull(schema.tableInputTypes[table.Name])},
+				"data":        {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
 				"ifNotExists": {Type: graphql.Boolean},
 				"options":     {Type: inputMutationOptions},
 			},
@@ -110,8 +110,9 @@ func buildMutationFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql
 		fields[deletePrefix+strcase.ToCamel(name)] = &graphql.Field{
 			Type: schema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"data":     {Type: graphql.NewNonNull(schema.tableInputTypes[table.Name])},
+				"data":     {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
 				"ifExists": {Type: graphql.Boolean},
+				"if":       {Type: schema.tableOperatorInputTypes[table.Name]},
 				"options":  {Type: inputMutationOptions},
 			},
 			Resolve: resolve,
@@ -171,7 +172,7 @@ func BuildSchema(keyspaceName string, db *db.Db) (graphql.Schema, error) {
 		graphql.SchemaConfig{
 			Query:    buildQuery(keyspaceSchema, keyspace.Tables, queryFieldResolver(keyspace, db)),
 			Mutation: buildMutation(keyspaceSchema, keyspace.Tables, mutationFieldResolver(keyspace, db)),
-			Types:    keyspaceSchema.AllTypes(),
+			//Types:    keyspaceSchema.AllTypes(),
 		},
 	)
 }

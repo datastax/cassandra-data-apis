@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-var Scalars = []*graphql.Scalar{timestamp, uuid}
-
 var timestamp = graphql.NewScalar(graphql.ScalarConfig{
 	Name: "Timestamp",
 	Description: "The `Timestamp` scalar type represents a DateTime." +

@@ -10,8 +10,10 @@ import (
 type KeyspaceGraphQLSchema struct {
 	// A map containing the table type by table name, with each column as scalar value
 	tableValueTypes map[string]*graphql.Object
-	// A map containing the table type by table name, with each column as scalar value
-	tableInputTypes map[string]*graphql.InputObject
+	// A map containing the table input type by table name, with each column as scalar value
+	tableScalarInputTypes map[string]*graphql.InputObject
+	// A map containing the table type by table name, with each column as input filter
+	tableOperatorInputTypes map[string]*graphql.InputObject
 	// A map containing the result type by table name for a select query
 	resultSelectTypes map[string]*graphql.Object
 	// A map containing the result type by table name for a update/insert/delete query
@@ -38,7 +40,7 @@ var inputMutationOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 
 func (s *KeyspaceGraphQLSchema) BuildTypes(keyspace *gocql.KeyspaceMetadata) error {
 	s.buildOrderEnums(keyspace)
-	s.buildTableValueTypes(keyspace)
+	s.buildTableTypes(keyspace)
 	s.buildResultTypes(keyspace)
 	return nil
 }
@@ -67,48 +69,24 @@ func (s *KeyspaceGraphQLSchema) buildOrderEnums(keyspace *gocql.KeyspaceMetadata
 	}
 }
 
-func (s *KeyspaceGraphQLSchema) AllTypes() []graphql.Type {
-
-	result := make([]graphql.Type, 0, 2+len(Scalars)+len(s.orderEnums)+len(s.tableValueTypes)*4)
-	result = append(result, inputMutationOptions)
-	result = append(result, inputQueryOptions)
-
-	for _, scalar := range Scalars {
-		result = append(result, scalar)
-	}
-
-	for _, t := range s.orderEnums {
-		result = append(result, *t)
-	}
-
-	for _, t := range s.tableValueTypes {
-		result = append(result, t)
-	}
-
-	for _, t := range s.resultSelectTypes {
-		result = append(result, t)
-	}
-
-	for _, t := range s.resultUpdateTypes {
-		result = append(result, t)
-	}
-
-	return result
-}
-
-func (s *KeyspaceGraphQLSchema) buildTableValueTypes(keyspace *gocql.KeyspaceMetadata) {
+func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata) {
 	s.tableValueTypes = make(map[string]*graphql.Object, len(keyspace.Tables))
-	s.tableInputTypes = make(map[string]*graphql.InputObject, len(keyspace.Tables))
+	s.tableScalarInputTypes = make(map[string]*graphql.InputObject, len(keyspace.Tables))
+	s.tableOperatorInputTypes = make(map[string]*graphql.InputObject, len(keyspace.Tables))
 
 	for _, table := range keyspace.Tables {
 		fields := graphql.Fields{}
 		inputFields := graphql.InputObjectConfigFieldMap{}
+		inputOperatorFields := graphql.InputObjectConfigFieldMap{}
 
 		for name, column := range table.Columns {
 			fieldName := strcase.ToLowerCamel(name)
 			fieldType := buildType(column.Type)
 			fields[fieldName] = &graphql.Field{Type: fieldType}
 			inputFields[fieldName] = &graphql.InputObjectFieldConfig{Type: fieldType}
+			inputOperatorFields[fieldName] = &graphql.InputObjectFieldConfig{
+				Type: operatorsInputTypes[column.Type.Type()],
+			}
 		}
 
 		s.tableValueTypes[table.Name] = graphql.NewObject(graphql.ObjectConfig{
@@ -116,9 +94,14 @@ func (s *KeyspaceGraphQLSchema) buildTableValueTypes(keyspace *gocql.KeyspaceMet
 			Fields: fields,
 		})
 
-		s.tableInputTypes[table.Name] = graphql.NewInputObject(graphql.InputObjectConfig{
+		s.tableScalarInputTypes[table.Name] = graphql.NewInputObject(graphql.InputObjectConfig{
 			Name:   strcase.ToCamel(table.Name) + "Input",
 			Fields: inputFields,
+		})
+
+		s.tableOperatorInputTypes[table.Name] = graphql.NewInputObject(graphql.InputObjectConfig{
+			Name:   strcase.ToCamel(table.Name) + "FilterInput",
+			Fields: inputOperatorFields,
 		})
 	}
 }
