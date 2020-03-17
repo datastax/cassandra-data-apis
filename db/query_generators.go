@@ -19,6 +19,24 @@ type SelectInfo struct {
 	OrderBy  []ColumnOrder
 }
 
+type InsertInfo struct {
+	Keyspace    string
+	Table       string
+	Columns     []string
+	QueryParams []interface{}
+	IfNotExists bool
+	TTL         int
+}
+
+type DeleteInfo struct {
+	Keyspace    string
+	Table       string
+	Columns     []string
+	QueryParams []interface{}
+	IfCondition map[string]interface{}
+	IfExists    bool
+}
+
 type ColumnOrder struct {
 	Column string
 	Order  string
@@ -74,7 +92,7 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 	return mapped, nil
 }
 
-func (db *Db) Select(info *SelectInfo) (*types.QueryResult, error) {
+func (db *Db) Select(info *SelectInfo, options *QueryOptions) (*types.QueryResult, error) {
 	values := make([]interface{}, 0, len(info.Columns))
 	whereClause := ""
 	for i := 0; i < len(info.Columns); i++ {
@@ -104,7 +122,7 @@ func (db *Db) Select(info *SelectInfo) (*types.QueryResult, error) {
 		}
 	}
 
-	iter := db.session.ExecuteIter(query, gocql.LocalOne, values...)
+	iter := db.session.ExecuteIter(query, options, values...)
 
 	pageState := hex.EncodeToString(iter.PageState())
 	columns := iter.Columns()
@@ -130,38 +148,35 @@ func (db *Db) Select(info *SelectInfo) (*types.QueryResult, error) {
 	}, nil
 }
 
-func (db *Db) Insert(ksName string, tableName string, columnNames []string,
-	queryParams []interface{}, ifNotExists bool, ttl int) (*types.ModificationResult, error) {
+func (db *Db) Insert(info *InsertInfo, options *QueryOptions) (*types.ModificationResult, error) {
 
 	placeholders := "?"
-	for i := 1; i < len(columnNames); i++ {
+	for i := 1; i < len(info.Columns); i++ {
 		placeholders += ", ?"
 	}
 
 	query := fmt.Sprintf(
 		"INSERT INTO %s.%s (%s) VALUES (%s)",
-		ksName, tableName, strings.Join(columnNames, ","), placeholders)
+		info.Keyspace, info.Table, strings.Join(info.Columns, ","), placeholders)
 
-	if ifNotExists {
+	if info.IfNotExists {
 		query += " IF NOT EXISTS"
 	}
 
-	if ttl >= 0 {
+	if info.TTL >= 0 {
 		query += " USING TTL ?"
-		queryParams = append(queryParams, ttl)
+		info.QueryParams = append(info.QueryParams, info.TTL)
 	}
 
-	err := db.session.Execute(query, gocql.LocalOne, queryParams...)
+	err := db.session.Execute(query, options, info.QueryParams...)
 
 	return &types.ModificationResult{Applied: err == nil}, err
 }
 
-func (db *Db) Delete(ksName string, tableName string, columnNames []string, queryParams []interface{},
-	ifCondition map[string]interface{}, ifExists bool) (*types.ModificationResult, error) {
-
-	whereClause := buildWhereClause(columnNames)
-	query := fmt.Sprintf("DELETE FROM %s.%s WHERE %s", ksName, tableName, whereClause)
-	err := db.session.Execute(query, gocql.LocalOne, queryParams...)
+func (db *Db) Delete(info *DeleteInfo, options *QueryOptions) (*types.ModificationResult, error) {
+	whereClause := buildWhereClause(info.Columns)
+	query := fmt.Sprintf("DELETE FROM %s.%s WHERE %s", info.Keyspace, info.Table, whereClause)
+	err := db.session.Execute(query, options, info.QueryParams...)
 	return &types.ModificationResult{Applied: err == nil}, err
 }
 

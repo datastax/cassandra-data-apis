@@ -17,6 +17,8 @@ const insertPrefix = "insert"
 const deletePrefix = "delete"
 const updatePrefix = "update"
 
+const AuthUserOrRole = "userOrRole"
+
 func buildType(typeInfo gocql.TypeInfo) graphql.Output {
 	switch typeInfo.Type() {
 	case gocql.TypeInt, gocql.TypeTinyInt, gocql.TypeSmallInt:
@@ -148,8 +150,8 @@ func buildMutation(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.Table
 }
 
 // Build GraphQL schema for tables in the provided keyspace metadata
-func BuildSchema(keyspaceName string, db *db.Db) (graphql.Schema, error) {
-	keyspace, err := db.Keyspace(keyspaceName)
+func BuildSchema(keyspaceName string, dbClient *db.Db) (graphql.Schema, error) {
+	keyspace, err := dbClient.Keyspace(keyspaceName)
 	if err != nil {
 		return graphql.Schema{}, err
 	}
@@ -161,8 +163,8 @@ func BuildSchema(keyspaceName string, db *db.Db) (graphql.Schema, error) {
 
 	return graphql.NewSchema(
 		graphql.SchemaConfig{
-			Query:    buildQuery(keyspaceSchema, keyspace.Tables, queryFieldResolver(keyspace, db)),
-			Mutation: buildMutation(keyspaceSchema, keyspace.Tables, mutationFieldResolver(keyspace, db)),
+			Query:    buildQuery(keyspaceSchema, keyspace.Tables, queryFieldResolver(keyspace, dbClient)),
+			Mutation: buildMutation(keyspaceSchema, keyspace.Tables, mutationFieldResolver(keyspace, dbClient)),
 		},
 	)
 }
@@ -229,6 +231,10 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, dbClient *db.Db) graph
 				orderBy = params.Args["orderBy"].([]interface{})
 			}
 
+			userOrRole, err := checkAuthUserOrRole(params)
+			if err != nil {
+				return nil, err
+			}
 			return dbClient.Select(&db.SelectInfo{
 				Keyspace: keyspace.Name,
 				Table:    table.Name,
@@ -236,19 +242,19 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, dbClient *db.Db) graph
 				Values:   queryParams,
 				OrderBy:  parseColumnOrder(orderBy),
 				Options:  &options,
-			})
+			}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 		}
 	}
 }
 
-func mutationFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.FieldResolveFn {
+func mutationFieldResolver(keyspace *gocql.KeyspaceMetadata, dbClient *db.Db) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
 		fieldName := params.Info.FieldName
 		switch fieldName {
 		case "createTable":
-			return createTable(db, keyspace.Name, params.Args)
+			return createTable(dbClient, keyspace.Name, params)
 		case "dropTable":
-			return dropTable(db, keyspace.Name, params.Args)
+			return dropTable(dbClient, keyspace.Name, params)
 		default:
 			operation, typeName := mutationPrefix(fieldName)
 			if table, ok := keyspace.Tables[strcase.ToSnake(typeName)]; ok {
@@ -267,6 +273,11 @@ func mutationFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.
 					options = params.Args["options"].(map[string]interface{})
 				}
 
+				userOrRole, err := checkAuthUserOrRole(params)
+				if err != nil {
+					return nil, err
+				}
+				queryOptions := db.NewQueryOptions().WithUserOrRole(userOrRole)
 				switch operation {
 				case insertPrefix:
 					ttl := -1
@@ -274,14 +285,26 @@ func mutationFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.
 						ttl = options["ttl"].(int)
 					}
 					ifNotExists := params.Args["ifNotExists"] == true
-					return db.Insert(keyspace.Name, table.Name, columnNames, queryParams, ifNotExists, ttl)
+					return dbClient.Insert(&db.InsertInfo{
+						Keyspace:    keyspace.Name,
+						Table:       table.Name,
+						Columns:     columnNames,
+						QueryParams: queryParams,
+						IfNotExists: ifNotExists,
+						TTL:         ttl,
+					}, queryOptions)
 				case deletePrefix:
 					var ifCondition map[string]interface{}
 					if params.Args["ifCondition"] != nil {
 						ifCondition = params.Args["ifCondition"].(map[string]interface{})
 					}
-					return db.Delete(keyspace.Name, table.Name, columnNames,
-						queryParams, ifCondition, params.Args["ifExists"] == true)
+					return dbClient.Delete(&db.DeleteInfo{
+						Keyspace:    keyspace.Name,
+						Table:       table.Name,
+						Columns:     columnNames,
+						QueryParams: queryParams,
+						IfCondition: ifCondition,
+						IfExists:    params.Args["ifExists"] == true}, queryOptions)
 				}
 
 				return false, fmt.Errorf("operation '%s' not supported", operation)
@@ -318,4 +341,13 @@ func parseColumnOrder(values []interface{}) []db.ColumnOrder {
 	}
 
 	return result
+}
+
+func checkAuthUserOrRole(params graphql.ResolveParams) (string, error) {
+	// TODO: Return an error if we're expecting a user/role, but one isn't provided
+	value := params.Context.Value(AuthUserOrRole)
+	if value == nil {
+		return "", nil
+	}
+	return value.(string), nil
 }

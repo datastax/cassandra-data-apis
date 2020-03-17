@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/graphql-go/graphql"
@@ -16,7 +17,7 @@ var systemKeyspaces = []string{
 	"solr_admin",
 }
 
-type executeQueryFunc func(query string) *graphql.Result
+type executeQueryFunc func(query string, ctx context.Context) *graphql.Result
 
 type Route struct {
 	Method      string
@@ -65,8 +66,8 @@ func RoutesKeyspaceManagement(pattern string, db *db.Db) ([]Route, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to build graphql schema for keyspace management: %s", err)
 	}
-	return routesForSchema(pattern, func(query string) *graphql.Result {
-		return executeQuery(query, schema)
+	return routesForSchema(pattern, func(query string, ctx context.Context) *graphql.Result {
+		return executeQuery(query, ctx, schema)
 	}), nil
 }
 
@@ -76,8 +77,8 @@ func RoutesKeyspace(pattern string, ksName string, db *db.Db, updateInterval tim
 		return nil, fmt.Errorf("unable to build graphql schema for keyspace '%s': %s", ksName, err)
 	}
 	go updater.Start()
-	return routesForSchema(pattern, func(query string) *graphql.Result {
-		return executeQuery(query, *updater.Schema())
+	return routesForSchema(pattern, func(query string, ctx context.Context) *graphql.Result {
+		return executeQuery(query, ctx, *updater.Schema())
 	}), nil
 }
 
@@ -96,7 +97,7 @@ func routesForSchema(pattern string, execute executeQueryFunc) []Route {
 			Method: http.MethodGet,
 			Pattern: pattern,
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
-				result:= execute(r.URL.Query().Get("query"))
+				result:= execute(r.URL.Query().Get("query"), r.Context())
 				json.NewEncoder(w).Encode(result)
 			},
 		},
@@ -116,17 +117,18 @@ func routesForSchema(pattern string, execute executeQueryFunc) []Route {
 					return
 				}
 
-				result := execute(body.Query)
+				result := execute(body.Query, r.Context())
 				json.NewEncoder(w).Encode(result)
 			},
 		},
 	}
 }
 
-func executeQuery(query string, schema graphql.Schema) *graphql.Result {
+func executeQuery(query string, ctx context.Context, schema graphql.Schema) *graphql.Result {
 	result := graphql.Do(graphql.Params{
 		Schema:        schema,
 		RequestString: query,
+		Context: ctx,
 	})
 	if len(result.Errors) > 0 {
 		fmt.Printf("wrong result, unexpected errors: %v", result.Errors)

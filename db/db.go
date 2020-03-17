@@ -42,7 +42,7 @@ func (db *Db) Keyspace(keyspace string) (*gocql.KeyspaceMetadata, error) {
 
 // Keyspaces Retrieves all the keyspace names
 func (db *Db) Keyspaces() ([]string, error) {
-	iter := db.session.ExecuteIterSimple("SELECT keyspace_name FROM system_schema.keyspaces", gocql.One)
+	iter := db.session.ExecuteIter("SELECT keyspace_name FROM system_schema.keyspaces", nil)
 
 	var keyspaces []string
 

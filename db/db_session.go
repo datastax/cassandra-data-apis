@@ -2,26 +2,33 @@ package db
 
 import "github.com/gocql/gocql"
 
-func (db *Db) Execute(query string, consistency gocql.Consistency, values ...interface{}) ResultIterator {
-	return db.session.ExecuteIter(query, consistency, values...)
+type QueryOptions struct {
+	UserOrRole string
+	Consistency gocql.Consistency
 }
 
-func (db *Db) ExecuteNoResult(query string, consistency gocql.Consistency, values ...interface{}) error {
-	return db.session.Execute(query, consistency, values)
+func NewQueryOptions() *QueryOptions {
+	return &QueryOptions{
+		Consistency: gocql.LocalOne,
+	}
+}
+
+func (q *QueryOptions) WithUserOrRole(userOrRole string) *QueryOptions {
+	q.UserOrRole = userOrRole
+	return q
+}
+
+func (q *QueryOptions) WithConsistency(userOrRole string) *QueryOptions {
+	q.UserOrRole = userOrRole
+	return q
 }
 
 type DbSession interface {
-	// Execute executes a prepared statement without returning row results
-	Execute(query string, consistency gocql.Consistency, values ...interface{}) error
+	// Execute executes a statement without returning row results
+	Execute(query string, options *QueryOptions, values ...interface{}) error
 
-	// Execute executes a simple statement without returning row results
-	ExecuteSimple(query string, consistency gocql.Consistency, values ...interface{}) error
-
-	// ExecuteIter executes a prepared statement and returns iterator to the result set
-	ExecuteIter(query string, consistency gocql.Consistency, values ...interface{}) ResultIterator
-
-	// ExecuteIterSimple executes a simple statement and returns iterator to the result set
-	ExecuteIterSimple(query string, consistency gocql.Consistency, values ...interface{}) ResultIterator
+	// ExecuteIterSimple executes a statement and returns iterator to the result set
+	ExecuteIter(query string, options *QueryOptions, values ...interface{}) ResultIterator
 
 	//TODO: Extract metadata methods from interface into another interface
 	KeyspaceMetadata(keyspaceName string) (*gocql.KeyspaceMetadata, error)
@@ -40,21 +47,32 @@ type GoCqlSession struct {
 	ref *gocql.Session
 }
 
-func (session *GoCqlSession) Execute(query string, consistency gocql.Consistency, values ...interface{}) error {
-	return session.ref.Query(query).Bind(values...).Consistency(consistency).Exec()
+func (db *Db) Execute(query string, options *QueryOptions, values ...interface{}) ResultIterator {
+	return db.session.ExecuteIter(query, options, values...)
 }
 
-func (session *GoCqlSession) ExecuteSimple(query string, consistency gocql.Consistency, values ...interface{}) error {
-	return session.ref.Query(query, values...).Consistency(consistency).Exec()
+func (db *Db) ExecuteNoResult(query string, options* QueryOptions, values ...interface{}) error {
+	return db.session.Execute(query, options, values)
 }
 
-func (session *GoCqlSession) ExecuteIter(query string, consistency gocql.Consistency, values ...interface{}) ResultIterator {
-	return session.ref.Query(query).Bind(values...).Consistency(consistency).Iter()
+func (session *GoCqlSession) Execute(query string, options *QueryOptions, values ...interface{}) error {
+	return session.ExecuteIter(query, options, values...).Close()
 }
 
-func (session *GoCqlSession) ExecuteIterSimple(query string, consistency gocql.Consistency, values ...interface{}) ResultIterator {
-	return session.ref.Query(query, values...).Consistency(consistency).Iter()
+func (session *GoCqlSession) ExecuteIter(query string, options *QueryOptions, values ...interface{}) ResultIterator {
+	q := session.ref.Query(query, values...)
+	if options != nil {
+		q.Consistency(options.Consistency)
+		if options.UserOrRole != "" {
+			q.CustomPayload(map[string][]byte {
+				"ProxyExecute": []byte(options.UserOrRole),
+			})
+		}
+	}
+	return q.Iter()
 }
+
 func (session *GoCqlSession) KeyspaceMetadata(keyspaceName string) (*gocql.KeyspaceMetadata, error) {
 	return session.ref.KeyspaceMetadata(keyspaceName)
 }
+

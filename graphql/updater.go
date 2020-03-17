@@ -12,14 +12,14 @@ import (
 )
 
 type SchemaUpdater struct {
-	ctx context.Context
-	cancel context.CancelFunc
-	mutex sync.Mutex
+	ctx            context.Context
+	cancel         context.CancelFunc
+	mutex          sync.Mutex
 	updateInterval time.Duration
-	schema *graphql.Schema
-	ksName string
-	db *db.Db
-	schemaVersion gocql.UUID
+	schema         *graphql.Schema
+	ksName         string
+	dbClient       *db.Db
+	schemaVersion  gocql.UUID
 }
 
 func (su *SchemaUpdater) Schema() *graphql.Schema {
@@ -29,19 +29,19 @@ func (su *SchemaUpdater) Schema() *graphql.Schema {
 	return su.schema
 }
 
-func NewUpdater(ksName string, db *db.Db, updateInterval time.Duration) (*SchemaUpdater, error) {
-	schema, err := BuildSchema(ksName, db)
+func NewUpdater(ksName string, dbClient *db.Db, updateInterval time.Duration) (*SchemaUpdater, error) {
+	schema, err := BuildSchema(ksName, dbClient)
 	if err != nil {
 		return nil, err
 	}
 	updater := &SchemaUpdater{
-		ctx:    nil,
-		cancel: nil,
-		mutex:  sync.Mutex{},
+		ctx:            nil,
+		cancel:         nil,
+		mutex:          sync.Mutex{},
 		updateInterval: updateInterval,
-		schema: &schema,
-		ksName: ksName,
-		db: db,
+		schema:         &schema,
+		ksName:         ksName,
+		dbClient:       dbClient,
 	}
 	return updater, nil
 }
@@ -49,7 +49,7 @@ func NewUpdater(ksName string, db *db.Db, updateInterval time.Duration) (*Schema
 func (su *SchemaUpdater) Start() {
 	su.ctx, su.cancel = context.WithCancel(context.Background())
 	for {
-		iter := su.db.Execute("SELECT schema_version FROM system.local", gocql.LocalOne)
+		iter := su.dbClient.Execute("SELECT schema_version FROM system.local", nil)
 
 		shouldUpdate := false
 		row := make(map[string]interface{})
@@ -69,7 +69,7 @@ func (su *SchemaUpdater) Start() {
 		}
 
 		if shouldUpdate {
-			schema, err := BuildSchema(su.ksName, su.db)
+			schema, err := BuildSchema(su.ksName, su.dbClient)
 			if err != nil {
 				// TODO: Log error
 				fmt.Fprintf(os.Stderr, "error trying to build graphql schema for keyspace '%s': %s", su.ksName, err)
