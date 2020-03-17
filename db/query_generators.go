@@ -85,8 +85,9 @@ func (db *Db) Select(columnNames []string, queryParams []interface{}, ksName str
 	}, nil
 }
 
-func (db *Db) Insert(columnNames []string, queryParams []interface{}, ksName string,
-	table *gocql.TableMetadata) (*types.ModificationResult, error) {
+func (db *Db) Insert(ksName string, tableName string, columnNames []string,
+	queryParams []interface{}, ifNotExists bool, ttl int) (*types.ModificationResult, error) {
+
 	placeholders := "?"
 	for i := 1; i < len(columnNames); i++ {
 		placeholders += ", ?"
@@ -94,17 +95,25 @@ func (db *Db) Insert(columnNames []string, queryParams []interface{}, ksName str
 
 	query := fmt.Sprintf(
 		"INSERT INTO %s.%s (%s) VALUES (%s)",
-		ksName, table.Name, strings.Join(columnNames, ","), placeholders)
+		ksName, tableName, strings.Join(columnNames, ","), placeholders)
+
+	if ifNotExists {
+		query += " IF NOT EXISTS"
+	}
+
+	if ttl >= 0 {
+		query += " USING TTL ?"
+		queryParams = append(queryParams, ttl)
+	}
 
 	err := db.session.Execute(query, gocql.LocalOne, queryParams...)
 
 	return &types.ModificationResult{Applied: err == nil}, err
 }
 
-func (db *Db) Delete(columnNames []string, queryParams []interface{}, ksName string,
-	table *gocql.TableMetadata) (*types.ModificationResult, error) {
+func (db *Db) Delete(ksName string, tableName string, columnNames []string, queryParams []interface{}) (*types.ModificationResult, error) {
 	whereClause := buildWhereClause(columnNames)
-	query := fmt.Sprintf("DELETE FROM %s.%s WHERE %s", ksName, table.Name, whereClause)
+	query := fmt.Sprintf("DELETE FROM %s.%s WHERE %s", ksName, tableName, whereClause)
 	err := db.session.Execute(query, gocql.LocalOne, queryParams...)
 	return &types.ModificationResult{Applied: err == nil}, err
 }

@@ -98,14 +98,22 @@ func buildMutationFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql
 	fields := graphql.Fields{}
 	for name, table := range tables {
 		fields[insertPrefix+strcase.ToCamel(name)] = &graphql.Field{
-			Type:    schema.resultUpdateTypes[table.Name],
-			Args:    buildInsertArgs(table),
+			Type: schema.resultUpdateTypes[table.Name],
+			Args: graphql.FieldConfigArgument{
+				"data":        {Type: graphql.NewNonNull(schema.tableInputTypes[table.Name])},
+				"ifNotExists": {Type: graphql.Boolean},
+				"options":     {Type: inputMutationOptions},
+			},
 			Resolve: resolve,
 		}
 
 		fields[deletePrefix+strcase.ToCamel(name)] = &graphql.Field{
-			Type:    schema.resultUpdateTypes[table.Name],
-			Args:    buildQueryArgs(table),
+			Type: schema.resultUpdateTypes[table.Name],
+			Args: graphql.FieldConfigArgument{
+				"data":     {Type: graphql.NewNonNull(schema.tableInputTypes[table.Name])},
+				"ifExists": {Type: graphql.Boolean},
+				"options":  {Type: inputMutationOptions},
+			},
 			Resolve: resolve,
 		}
 	}
@@ -145,36 +153,6 @@ func buildMutation(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.Table
 			Name:   "TableMutation",
 			Fields: buildMutationFields(schema, tables, resolveFn),
 		})
-}
-
-// Marks partition and clustering keys as required, the rest as optional
-func buildInsertArgs(table *gocql.TableMetadata) graphql.FieldConfigArgument {
-	args := graphql.FieldConfigArgument{}
-
-	for _, column := range table.PartitionKey {
-		//TODO: Extract name convention configuration
-		args[strcase.ToLowerCamel(column.Name)] = &graphql.ArgumentConfig{
-			Type: graphql.NewNonNull(buildType(column.Type)),
-		}
-	}
-
-	for _, column := range table.ClusteringColumns {
-		args[strcase.ToLowerCamel(column.Name)] = &graphql.ArgumentConfig{
-			Type: graphql.NewNonNull(buildType(column.Type)),
-		}
-	}
-
-	for _, column := range table.Columns {
-		memberName := strcase.ToLowerCamel(column.Name)
-		if _, ok := args[memberName]; !ok {
-			// Add the rest as optional
-			args[memberName] = &graphql.ArgumentConfig{
-				Type: buildType(column.Type),
-			}
-		}
-	}
-
-	return args
 }
 
 // Build GraphQL schema for tables in the provided keyspace metadata
@@ -238,21 +216,32 @@ func mutationFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.
 			return dropTable(db, keyspace.Name, params.Args)
 		default:
 			operation, typeName := mutationPrefix(fieldName)
-			// TODO: Extract name conventions
 			if table, ok := keyspace.Tables[strcase.ToSnake(typeName)]; ok {
-				columnNames := make([]string, 0)
-				queryParams := make([]interface{}, 0)
+				data := params.Args["data"].(map[string]interface{})
+				columnNames := make([]string, 0, len(data))
+				queryParams := make([]interface{}, 0, len(data))
 
-				for key, value := range params.Args {
+				for key, value := range data {
 					columnNames = append(columnNames, strcase.ToSnake(key))
 					queryParams = append(queryParams, value)
 				}
 
+				var options map[string]interface{}
+
+				if params.Args["options"] != nil {
+					options = params.Args["options"].(map[string]interface{})
+				}
+
 				switch operation {
 				case insertPrefix:
-					return db.Insert(columnNames, queryParams, keyspace.Name, table)
+					var ttl int = -1
+					if options != nil {
+						ttl = options["ttl"].(int)
+					}
+					ifNotExists := params.Args["ifNotExists"] == true
+					return db.Insert(keyspace.Name, table.Name, columnNames, queryParams, ifNotExists, ttl)
 				case deletePrefix:
-					return db.Delete(columnNames, queryParams, keyspace.Name, table)
+					return db.Delete(keyspace.Name, table.Name, columnNames, queryParams)
 				}
 
 				return false, fmt.Errorf("operation '%s' not supported", operation)

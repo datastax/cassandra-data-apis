@@ -27,7 +27,7 @@ func TestDeleteGeneration(t *testing.T) {
 	}
 
 	for _, item := range items {
-		_, err := db.Delete(item.columnNames, item.queryParams, "ks1", &gocql.TableMetadata{Name: "tbl1"})
+		_, err := db.Delete("ks1", "tbl1", item.columnNames, item.queryParams)
 		assert.Nil(t, err)
 		sessionMock.AssertCalled(t, "Execute", item.query, consistency, item.queryParams)
 	}
