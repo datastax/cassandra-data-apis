@@ -7,6 +7,7 @@ import (
 	"github.com/riptano/data-endpoints/db"
 	"net/http"
 	"path"
+	"time"
 )
 
 var systemKeyspaces = []string{
@@ -14,6 +15,8 @@ var systemKeyspaces = []string{
 	"dse_insights", "dse_insights_local", "dse_leases", "dse_perf", "dse_security", "dse_system", "dse_system_local",
 	"solr_admin",
 }
+
+type executeQueryFunc func(query string) *graphql.Result
 
 type Route struct {
 	Method      string
@@ -29,7 +32,7 @@ type requestBody struct {
 	Query string `json:"query"`
 }
 
-func Routes(prefixPattern string, ksExcluded []string, db *db.Db) ([]Route, error) {
+func Routes(prefixPattern string, ksExcluded []string, db *db.Db, updateInterval time.Duration) ([]Route, error) {
 	ksNames, err := db.Keyspaces()
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve keyspace names: %s", err)
@@ -47,7 +50,7 @@ func Routes(prefixPattern string, ksExcluded []string, db *db.Db) ([]Route, erro
 		if isKeyspaceExcluded(ksName, systemKeyspaces) || isKeyspaceExcluded(ksName, ksExcluded) {
 			continue
 		}
-		ksRoutes, err := RoutesKeyspace(path.Join(prefixPattern, ksName), ksName, db)
+		ksRoutes, err := RoutesKeyspace(path.Join(prefixPattern, ksName), ksName, db, updateInterval)
 		if err != nil {
 			return nil, err
 		}
@@ -62,15 +65,20 @@ func RoutesKeyspaceManagement(pattern string, db *db.Db) ([]Route, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to build graphql schema for keyspace management: %s", err)
 	}
-	return routesForSchema(pattern, schema), nil
+	return routesForSchema(pattern, func(query string) *graphql.Result {
+		return executeQuery(query, schema)
+	}), nil
 }
 
-func RoutesKeyspace(pattern string, ksName string, db *db.Db) ([]Route, error) {
-	schema, err := BuildSchema(ksName, db)
+func RoutesKeyspace(pattern string, ksName string, db *db.Db, updateInterval time.Duration) ([]Route, error) {
+	updater, err := NewUpdater(ksName, db, updateInterval)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build graphql schema for keyspace '%s': %s", ksName, err)
 	}
-	return routesForSchema(pattern, schema), nil
+	go updater.Start()
+	return routesForSchema(pattern, func(query string) *graphql.Result {
+		return executeQuery(query, *updater.Schema())
+	}), nil
 }
 
 func isKeyspaceExcluded(ksName string, ksExcluded []string) bool {
@@ -82,13 +90,13 @@ func isKeyspaceExcluded(ksName string, ksExcluded []string) bool {
 	return false
 }
 
-func routesForSchema(pattern string, schema graphql.Schema) []Route {
+func routesForSchema(pattern string, execute executeQueryFunc) []Route {
 	return []Route {
 		{
 			Method: http.MethodGet,
 			Pattern: pattern,
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
-				result := executeQuery(r.URL.Query().Get("query"), schema)
+				result:= execute(r.URL.Query().Get("query"))
 				json.NewEncoder(w).Encode(result)
 			},
 		},
@@ -108,7 +116,7 @@ func routesForSchema(pattern string, schema graphql.Schema) []Route {
 					return
 				}
 
-				result := executeQuery(body.Query, schema)
+				result := execute(body.Query)
 				json.NewEncoder(w).Encode(result)
 			},
 		},

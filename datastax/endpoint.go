@@ -3,11 +3,13 @@ package datastax // TODO: Change package name?
 import (
 	"github.com/riptano/data-endpoints/db"
 	"github.com/riptano/data-endpoints/graphql"
+	"time"
 )
 
 type DataEndpointConfig struct {
 	Hosts []string
 	ExcludedKeyspaces []string
+	SchemaUpdateInterval time.Duration
 }
 
 type DataEndpoint struct {
@@ -18,6 +20,7 @@ type DataEndpoint struct {
 func NewConfig(hosts ...string) *DataEndpointConfig {
 	return &DataEndpointConfig{
 		Hosts:hosts,
+		SchemaUpdateInterval: 10 * time.Second,
 	}
 }
 
@@ -33,10 +36,10 @@ func (cfg *DataEndpointConfig) NewEndpoint() (*DataEndpoint, error) {
 }
 
 func (pnt *DataEndpoint) RoutesGql(pattern string) ([]graphql.Route, error) {
-	return graphql.Routes(pattern, pnt.cfg.ExcludedKeyspaces, pnt.db)
+	return graphql.Routes(pattern, pnt.cfg.ExcludedKeyspaces, pnt.db, pnt.cfg.SchemaUpdateInterval)
 }
 
 func (pnt *DataEndpoint) RoutesKeyspaceGql(pattern string, ksName string) ([]graphql.Route, error) {
-	return graphql.RoutesKeyspace(pattern, ksName, pnt.db)
+	return graphql.RoutesKeyspace(pattern, ksName, pnt.db, pnt.cfg.SchemaUpdateInterval)
 }
 
