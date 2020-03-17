@@ -1,10 +1,7 @@
 package graphql
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/julienschmidt/httprouter"
-	"net/http"
 	"strings"
 
 	"github.com/gocql/gocql"
@@ -17,10 +14,6 @@ import (
 const insertPrefix = "insert"
 const deletePrefix = "delete"
 const updatePrefix = "update"
-
-type requestBody struct {
-	Query string `json:"query"`
-}
 
 func buildType(typeInfo gocql.TypeInfo) graphql.Output {
 	switch typeInfo.Type() {
@@ -266,39 +259,3 @@ func mutationPrefix(value string) (string, string) {
 	panic("Unsupported mutation")
 }
 
-func GetHandler(schema graphql.Schema) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-		result := executeQuery(r.URL.Query().Get("query"), schema)
-		json.NewEncoder(w).Encode(result)
-	}
-}
-
-func PostHandler(schema graphql.Schema) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-		if r.Body == nil {
-			http.Error(w, "No request body", 400)
-			return
-		}
-
-		var body requestBody
-		err := json.NewDecoder(r.Body).Decode(&body)
-		if err != nil {
-			http.Error(w, "Request body is invalid", 400)
-			return
-		}
-
-		result := executeQuery(body.Query, schema)
-		json.NewEncoder(w).Encode(result)
-	}
-}
-
-func executeQuery(query string, schema graphql.Schema) *graphql.Result {
-	result := graphql.Do(graphql.Params{
-		Schema:        schema,
-		RequestString: query,
-	})
-	if len(result.Errors) > 0 {
-		fmt.Printf("wrong result, unexpected errors: %v", result.Errors)
-	}
-	return result
-}
