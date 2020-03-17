@@ -10,8 +10,15 @@ type Db struct {
 }
 
 // NewDb Gets a pointer to a db
-func NewDb(hosts ...string) (*Db, error) {
+func NewDb(username string, password string, hosts ...string) (*Db, error) {
 	cluster := gocql.NewCluster(hosts...)
+
+	if username != "" && password != "" {
+		cluster.Authenticator = gocql.PasswordAuthenticator{
+			Username: username,
+			Password: password,
+		}
+	}
 
 	var (
 		session *gocql.Session

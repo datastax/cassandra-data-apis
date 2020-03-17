@@ -25,6 +25,8 @@ func main() {
 	singleKsName := os.Getenv("SINGLE_KEYSPACE")
 
 	cfg := datastax.NewConfig(strings.Split(hosts, ",")...)
+	cfg.DbUsername = os.Getenv("DB_USERNAME");
+	cfg.DbPassword = os.Getenv("DB_PASSWORD");
 
 	endpoint, err := cfg.NewEndpoint()
 	if err != nil {

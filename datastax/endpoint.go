@@ -7,8 +7,10 @@ import (
 )
 
 type DataEndpointConfig struct {
-	Hosts []string
-	ExcludedKeyspaces []string
+	DbHosts              []string
+	DbUsername           string
+	DbPassword           string
+	ExcludedKeyspaces    []string
 	SchemaUpdateInterval time.Duration
 }
 
@@ -19,18 +21,18 @@ type DataEndpoint struct {
 
 func NewConfig(hosts ...string) *DataEndpointConfig {
 	return &DataEndpointConfig{
-		Hosts:hosts,
+		DbHosts:              hosts,
 		SchemaUpdateInterval: 10 * time.Second,
 	}
 }
 
 func (cfg *DataEndpointConfig) NewEndpoint() (*DataEndpoint, error) {
-	db, err := db.NewDb(cfg.Hosts...)
+	db, err := db.NewDb(cfg.DbUsername, cfg.DbPassword, cfg.DbHosts...)
 	if err != nil {
 		return nil, err
 	}
 	return &DataEndpoint{
-		db: db,
+		db:  db,
 		cfg: *cfg,
 	}, nil
 }
@@ -42,4 +44,3 @@ func (pnt *DataEndpoint) RoutesGql(pattern string) ([]graphql.Route, error) {
 func (pnt *DataEndpoint) RoutesKeyspaceGql(pattern string, ksName string) ([]graphql.Route, error) {
 	return graphql.RoutesKeyspace(pattern, ksName, pnt.db, pnt.cfg.SchemaUpdateInterval)
 }
-
