@@ -247,9 +247,10 @@ func decodeClusteringInfo(columns []interface{}) ([]*gocql.ColumnMetadata, error
 	return columnValues, nil
 }
 
-func createTable(db *db.Db, ksName string, args map[string]interface{}) (interface{}, error) {
+func createTable(dbClient *db.Db, ksName string, params graphql.ResolveParams) (interface{}, error) {
 	var values []*gocql.ColumnMetadata = nil
 	var clusteringKeys []*gocql.ColumnMetadata = nil
+	args := params.Args
 	name := args["name"].(string)
 
 	partitionKeys, err := decodeColumns(args["partitionKeys"].([]interface{}))
@@ -270,15 +271,27 @@ func createTable(db *db.Db, ksName string, args map[string]interface{}) (interfa
 		}
 	}
 
-	if err := db.CreateTable(ksName, name, partitionKeys, clusteringKeys, values); err != nil {
-		return false, err
+	userOrRole, err := checkAuthUserOrRole(params)
+	if err != nil {
+		return nil, err
 	}
-
-	return true, nil
+	return dbClient.CreateTable(&db.CreateTableInfo{
+		Keyspace: ksName,
+		Table: name,
+		PartitionKeys: partitionKeys,
+		ClusteringKeys: clusteringKeys,
+		Values: values}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 }
 
-func dropTable(db *db.Db, ksName string, args map[string]interface{}) (interface{}, error) {
-	return db.DropTable(ksName, strcase.ToSnake(args["name"].(string)))
+func dropTable(dbClient *db.Db, ksName string, params graphql.ResolveParams) (interface{}, error) {
+	name := strcase.ToSnake(params.Args["name"].(string))
+	userOrRole, err := checkAuthUserOrRole(params)
+	if err != nil {
+		return nil, err
+	}
+	return dbClient.DropTable(&db.DropTableInfo{
+		Keyspace: ksName,
+		Table: name}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 }
 
 func toColumnKind(kind gocql.ColumnKind) int {

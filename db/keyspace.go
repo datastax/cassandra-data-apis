@@ -2,10 +2,9 @@ package db
 
 import (
 	"fmt"
-	"github.com/gocql/gocql"
 )
 
-func (db *Db) CreateKeyspace(name string, dcReplicas map[string]int) (bool, error) {
+func (db *Db) CreateKeyspace(name string, dcReplicas map[string]int, options *QueryOptions) (bool, error) {
 	// TODO: Escape keyspace datacenter names?
 	dcs := ""
 	for name, replicas := range dcReplicas {
@@ -18,15 +17,15 @@ func (db *Db) CreateKeyspace(name string, dcReplicas map[string]int) (bool, erro
 
 	query := fmt.Sprintf("CREATE KEYSPACE %s WITH REPLICATION  = { 'class': 'NetworkTopologyStrategy', %s }", name, dcs)
 
-	err := db.session.ExecuteSimple(query, gocql.Any)
+	err := db.session.Execute(query, options)
 
 	return err == nil, err
 }
 
-func (db *Db) DropKeyspace(name string) (bool, error) {
+func (db *Db) DropKeyspace(name string, options *QueryOptions) (bool, error) {
 	// TODO: Escape keyspace name?
 	query := fmt.Sprintf("DROP KEYSPACE %s", name)
-	err := db.session.ExecuteSimple(query, gocql.Any)
+	err := db.session.Execute(query, options)
 
 	return err == nil, err
 }

@@ -5,15 +5,26 @@ import (
 	"github.com/gocql/gocql"
 )
 
-func (db *Db) CreateTable(
-	ksName string, name string, partitionKeys []*gocql.ColumnMetadata,
-	clusteringKeys []*gocql.ColumnMetadata, values []*gocql.ColumnMetadata) error {
+type CreateTableInfo struct {
+	Keyspace string
+	Table string
+	PartitionKeys []*gocql.ColumnMetadata
+	ClusteringKeys []*gocql.ColumnMetadata
+	Values []*gocql.ColumnMetadata
+}
+
+type DropTableInfo struct {
+	Keyspace string
+	Table string
+}
+
+func (db *Db) CreateTable(info* CreateTableInfo, options *QueryOptions) (bool, error) {
 
 	columns := ""
 	primaryKeys := ""
 	clusteringOrder := ""
 
-	for _, c := range partitionKeys {
+	for _, c := range info.PartitionKeys {
 		columns += fmt.Sprintf("%s %s, ", c.Name, c.Type)
 		if len(primaryKeys) > 0 {
 			primaryKeys += ", "
@@ -21,10 +32,10 @@ func (db *Db) CreateTable(
 		primaryKeys += c.Name
 	}
 
-	if clusteringKeys != nil {
+	if info.ClusteringKeys != nil {
 		primaryKeys = fmt.Sprintf("(%s)", primaryKeys)
 
-		for _, c := range clusteringKeys {
+		for _, c := range info.ClusteringKeys {
 			columns += fmt.Sprintf("%s %s, ", c.Name, c.Type)
 			primaryKeys += fmt.Sprintf(", %s", c.Name)
 			if len(clusteringOrder) > 0 {
@@ -38,25 +49,25 @@ func (db *Db) CreateTable(
 		}
 	}
 
-	if values != nil {
-		for _, c := range values {
+	if info.Values != nil {
+		for _, c := range info.Values {
 			columns += fmt.Sprintf("%s %s, ", c.Name, c.Type)
 		}
 	}
 
-	query := fmt.Sprintf("CREATE TABLE %s.%s (%sPRIMARY KEY (%s))", ksName, name, columns, primaryKeys)
+	query := fmt.Sprintf("CREATE TABLE %s.%s (%sPRIMARY KEY (%s))", info.Keyspace, info.Table, columns, primaryKeys)
 
 	if clusteringOrder != "" {
 		query += fmt.Sprintf(" WITH CLUSTERING ORDER BY (%s)", clusteringOrder)
 	}
 
-	return db.session.ExecuteSimple(query, gocql.Any)
+	err := db.session.Execute(query, options)
+	return err == nil, err
 }
 
-func (db *Db) DropTable(ksName string, tableName string) (bool, error) {
+func (db *Db) DropTable(info* DropTableInfo, options *QueryOptions) (bool, error) {
 	// TODO: Escape keyspace/table name?
-	query := fmt.Sprintf("DROP TABLE %s.%s", ksName, tableName)
-	err := db.session.ExecuteSimple(query, gocql.Any)
-
+	query := fmt.Sprintf("DROP TABLE %s.%s", info.Table, info.Keyspace)
+	err := db.session.Execute(query, options)
 	return err == nil, err
 }

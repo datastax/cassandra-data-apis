@@ -27,7 +27,11 @@ func TestDeleteGeneration(t *testing.T) {
 	}
 
 	for _, item := range items {
-		_, err := db.Delete("ks1", "tbl1", item.columnNames, item.queryParams, nil, false)
+		_, err := db.Delete(&DeleteInfo{
+			Keyspace: "ks1",
+			Table: "tbl1",
+			Columns: item.columnNames,
+			QueryParams: item.queryParams}, nil)
 		assert.Nil(t, err)
 		sessionMock.AssertCalled(t, "Execute", item.query, consistency, item.queryParams)
 	}
@@ -47,11 +51,11 @@ func TestSelectGeneration(t *testing.T) {
 	//items := []struct {
 	//	columnNames []string
 	//	values 		[]types.OperatorAndValue
-	//	options     *types.QueryOptions
+	//	options     *types.ExecuteOptions
 	//	orderBy     []ColumnOrder
 	//	query       string
 	//}{
-	//	{[]string{"a"}, []types.OperatorAndValue{{"=", 1}}, &types.QueryOptions{}, nil,
+	//	{[]string{"a"}, []types.OperatorAndValue{{"=", 1}}, &types.ExecuteOptions{}, nil,
 	//		"SELECT * FROM ks1.tbl1 WHERE a = ?"},
 	//}
 	//
@@ -81,21 +85,12 @@ type SessionMock struct {
 	mock.Mock
 }
 
-func (o *SessionMock) Execute(query string, consistency gocql.Consistency, values ...interface{}) error {
+func (o *SessionMock) Execute(query string, options *QueryOptions, values ...interface{}) error {
 	args := o.Called(query, consistency, values)
 	return args.Error(0)
 }
 
-func (o *SessionMock) ExecuteSimple(query string, consistency gocql.Consistency, values ...interface{}) error {
-	args := o.Called(query, consistency, values)
-	return args.Error(0)
-}
-
-func (o *SessionMock) ExecuteIter(query string, consistency gocql.Consistency, values ...interface{}) ResultIterator {
-	return nil
-}
-
-func (o *SessionMock) ExecuteIterSimple(query string, consistency gocql.Consistency, values ...interface{}) ResultIterator {
+func (o *SessionMock) ExecuteIter(query string, options *QueryOptions, values ...interface{}) ResultIterator {
 	return nil
 }
 
