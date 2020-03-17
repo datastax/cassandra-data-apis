@@ -24,7 +24,7 @@ func main() {
 	hosts := getEnvOrDefault("DB_HOSTS", "127.0.0.1")
 	singleKsName := os.Getenv("SINGLE_KEYSPACE")
 
-	cfg := datastax.NewConfig(strings.Split(hosts, ",")...)
+	cfg := datastax.NewEndpointConfig(strings.Split(hosts, ",")...)
 	cfg.DbUsername = os.Getenv("DB_USERNAME");
 	cfg.DbPassword = os.Getenv("DB_PASSWORD");
 

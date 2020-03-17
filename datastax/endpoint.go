@@ -19,7 +19,7 @@ type DataEndpoint struct {
 	cfg DataEndpointConfig
 }
 
-func NewConfig(hosts ...string) *DataEndpointConfig {
+func NewEndpointConfig(hosts ...string) *DataEndpointConfig {
 	return &DataEndpointConfig{
 		DbHosts:              hosts,
 		SchemaUpdateInterval: 10 * time.Second,
