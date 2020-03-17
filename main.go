@@ -30,7 +30,7 @@ func main() {
 
 	endpoint, err := cfg.NewEndpoint()
 	if err != nil {
-		log.Fatalf("unable create new service: %s", err)
+		log.Fatalf("unable create new endpoint: %s", err)
 	}
 
 	var routes []graphql.Route
