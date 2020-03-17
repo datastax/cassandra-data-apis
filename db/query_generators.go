@@ -57,31 +57,52 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 	return mapped, nil
 }
 
-func (db *Db) Select(columnNames []string, queryParams []interface{}, ksName string,
-	table *gocql.TableMetadata) (*types.QueryResult, error) {
+func (db *Db) Select(ksName string, table *gocql.TableMetadata, columnNames []string,
+	queryParams []types.OperatorAndValue, options *types.QueryOptions) (*types.QueryResult, error) {
 
-	whereClause := buildWhereClause(columnNames)
+	values := make([]interface{}, 0, len(columnNames))
+
+	whereClause := ""
+	for i := 0; i < len(columnNames); i++ {
+		if i > 0 {
+			whereClause += " AND "
+		}
+
+		opValue := queryParams[i]
+		whereClause += fmt.Sprintf("%s %s ?", columnNames[i], opValue.Operator)
+		values = append(values, opValue.Value)
+	}
+
 	query := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", ksName, table.Name, whereClause)
 
-	iter := db.session.ExecuteIter(query, gocql.LocalOne, queryParams...)
+	if options.Limit > 0 {
+		query += " LIMIT ?"
+		values = append(values, options.Limit)
+	}
+
+	iter := db.session.ExecuteIter(query, gocql.LocalOne, values...)
 
 	pageState := hex.EncodeToString(iter.PageState())
 	columns := iter.Columns()
 	scanner := iter.Scanner()
 
-	values := make([]map[string]interface{}, 0)
+	items := make([]map[string]interface{}, 0)
 
 	for scanner.Next() {
 		row, err := mapScan(scanner, columns)
 		if err != nil {
 			return nil, err
 		}
-		values = append(values, row)
+		items = append(items, row)
+	}
+
+	if err := iter.Close(); err != nil {
+		return nil, err
 	}
 
 	return &types.QueryResult{
 		PageState: pageState,
-		Values:    values,
+		Values:    items,
 	}, nil
 }
 
@@ -111,7 +132,9 @@ func (db *Db) Insert(ksName string, tableName string, columnNames []string,
 	return &types.ModificationResult{Applied: err == nil}, err
 }
 
-func (db *Db) Delete(ksName string, tableName string, columnNames []string, queryParams []interface{}) (*types.ModificationResult, error) {
+func (db *Db) Delete(ksName string, tableName string, columnNames []string, queryParams []interface{},
+	ifCondition map[string]interface{}, ifExists bool) (*types.ModificationResult, error) {
+
 	whereClause := buildWhereClause(columnNames)
 	query := fmt.Sprintf("DELETE FROM %s.%s WHERE %s", ksName, tableName, whereClause)
 	err := db.session.Execute(query, gocql.LocalOne, queryParams...)

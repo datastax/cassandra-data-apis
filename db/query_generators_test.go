@@ -27,7 +27,7 @@ func TestDeleteGeneration(t *testing.T) {
 	}
 
 	for _, item := range items {
-		_, err := db.Delete("ks1", "tbl1", item.columnNames, item.queryParams)
+		_, err := db.Delete("ks1", "tbl1", item.columnNames, item.queryParams, nil, false)
 		assert.Nil(t, err)
 		sessionMock.AssertCalled(t, "Execute", item.query, consistency, item.queryParams)
 	}

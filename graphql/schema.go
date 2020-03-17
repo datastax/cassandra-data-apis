@@ -2,6 +2,8 @@ package graphql
 
 import (
 	"fmt"
+	"github.com/mitchellh/mapstructure"
+	"github.com/riptano/data-endpoints/types"
 	"strings"
 
 	"github.com/gocql/gocql"
@@ -36,30 +38,15 @@ func buildType(typeInfo gocql.TypeInfo) graphql.Output {
 	}
 }
 
-func buildQueryArgs(table *gocql.TableMetadata) graphql.FieldConfigArgument {
-	args := graphql.FieldConfigArgument{}
-
-	for _, column := range table.PartitionKey {
-		args[strcase.ToLowerCamel(column.Name)] = &graphql.ArgumentConfig{
-			Type: graphql.NewNonNull(buildType(column.Type)),
-		}
-	}
-
-	for _, column := range table.ClusteringColumns {
-		args[strcase.ToLowerCamel(column.Name)] = &graphql.ArgumentConfig{
-			Type: buildType(column.Type),
-		}
-	}
-
-	return args
-}
-
 func buildQueriesFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
 	fields := graphql.Fields{}
 	for name, table := range tables {
 		fields[strcase.ToLowerCamel(name)] = &graphql.Field{
-			Type:    schema.resultSelectTypes[table.Name],
-			Args:    buildQueryArgs(table),
+			Type: schema.resultSelectTypes[table.Name],
+			Args: graphql.FieldConfigArgument{
+				"data":    {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
+				"options": {Type: inputQueryOptions},
+			},
 			Resolve: resolve,
 		}
 	}
@@ -103,10 +90,10 @@ func buildMutationFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql
 		fields[deletePrefix+strcase.ToCamel(name)] = &graphql.Field{
 			Type: schema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"data":     {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
-				"ifExists": {Type: graphql.Boolean},
-				"if":       {Type: schema.tableOperatorInputTypes[table.Name]},
-				"options":  {Type: inputMutationOptions},
+				"data":        {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
+				"ifExists":    {Type: graphql.Boolean},
+				"ifCondition": {Type: schema.tableOperatorInputTypes[table.Name]},
+				"options":     {Type: inputMutationOptions},
 			},
 			Resolve: resolve,
 		}
@@ -165,7 +152,6 @@ func BuildSchema(keyspaceName string, db *db.Db) (graphql.Schema, error) {
 		graphql.SchemaConfig{
 			Query:    buildQuery(keyspaceSchema, keyspace.Tables, queryFieldResolver(keyspace, db)),
 			Mutation: buildMutation(keyspaceSchema, keyspace.Tables, mutationFieldResolver(keyspace, db)),
-			//Types:    keyspaceSchema.AllTypes(),
 		},
 	)
 }
@@ -179,23 +165,49 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.Fie
 		case "tables":
 			return getTables(keyspace)
 		default:
-			if table, ok := keyspace.Tables[strcase.ToSnake(fieldName)]; ok {
-				columnNames := make([]string, 0)
-				queryParams := make([]interface{}, 0)
+			var table *gocql.TableMetadata
+			table, tableFound := keyspace.Tables[strcase.ToSnake(fieldName)]
+			data := params.Args["data"].(map[string]interface{})
+			columnNames := make([]string, 0, len(data))
+			queryParams := make([]types.OperatorAndValue, 0, len(data))
 
-				// FIXME: How do we figure out the select expression columns from graphql.ResolveParams?
-				//        Also, we need to validate and convert complex types here.
-
-				for key, value := range params.Args {
+			if tableFound {
+				for key, value := range data {
 					columnNames = append(columnNames, strcase.ToSnake(key))
-					queryParams = append(queryParams, value)
+					queryParams = append(queryParams, types.OperatorAndValue{
+						Operator: "=",
+						Value:    value,
+					})
 				}
-
-				return db.Select(columnNames, queryParams, keyspace.Name, table)
 			} else {
-				return nil, fmt.Errorf("unable to find table '%s'", params.Info.FieldName)
+				if strings.HasSuffix(fieldName, "Filter") {
+					table, tableFound = keyspace.Tables[strcase.ToSnake(strings.TrimSuffix(fieldName, "Filter"))]
+					if !tableFound {
+						return nil, fmt.Errorf("unable to find table '%s'", params.Info.FieldName)
+					}
+					for key, value := range data {
+						if value == nil {
+							continue
+						}
+						mapValue := value.(map[string]interface{})
+
+						for operatorName, itemValue := range mapValue {
+							columnNames = append(columnNames, strcase.ToSnake(key))
+							queryParams = append(queryParams, types.OperatorAndValue{
+								Operator: operatorName, //TODO: Translate operator
+								Value:    itemValue,
+							})
+						}
+					}
+				}
 			}
 
+			var options types.QueryOptions
+			if err := mapstructure.Decode(params.Args["options"], &options); err != nil {
+				return nil, err
+			}
+
+			return db.Select(keyspace.Name, table, columnNames, queryParams, &options)
 		}
 	}
 }
@@ -228,14 +240,19 @@ func mutationFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.
 
 				switch operation {
 				case insertPrefix:
-					var ttl int = -1
+					ttl := -1
 					if options != nil {
 						ttl = options["ttl"].(int)
 					}
 					ifNotExists := params.Args["ifNotExists"] == true
 					return db.Insert(keyspace.Name, table.Name, columnNames, queryParams, ifNotExists, ttl)
 				case deletePrefix:
-					return db.Delete(keyspace.Name, table.Name, columnNames, queryParams)
+					var ifCondition map[string]interface{}
+					if params.Args["ifCondition"] != nil {
+						ifCondition = params.Args["ifCondition"].(map[string]interface{})
+					}
+					return db.Delete(keyspace.Name, table.Name, columnNames,
+						queryParams, ifCondition, params.Args["ifExists"] == true)
 				}
 
 				return false, fmt.Errorf("operation '%s' not supported", operation)

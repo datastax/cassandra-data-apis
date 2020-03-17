@@ -11,3 +11,14 @@ type QueryResult struct {
 	PageState string                   `json:"pageState"`
 	Values    []map[string]interface{} `json:"values"`
 }
+
+type QueryOptions struct {
+	PageState string `json:"pageState"`
+	PageSize  int    `json:"pageSize"`
+	Limit     int    `json:"pageState"`
+}
+
+type OperatorAndValue struct {
+	Operator string
+	Value    interface{}
+}
