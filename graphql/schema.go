@@ -45,6 +45,17 @@ func buildQueriesFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.
 			Type: schema.resultSelectTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
 				"data":    {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
+				"orderBy": {Type: graphql.NewList(schema.orderEnums[table.Name])},
+				"options": {Type: inputQueryOptions},
+			},
+			Resolve: resolve,
+		}
+
+		fields[strcase.ToLowerCamel(name)+"Filter"] = &graphql.Field{
+			Type: schema.resultSelectTypes[table.Name],
+			Args: graphql.FieldConfigArgument{
+				"filter":  {Type: graphql.NewNonNull(schema.tableOperatorInputTypes[table.Name])},
+				"orderBy": {Type: graphql.NewList(schema.orderEnums[table.Name])},
 				"options": {Type: inputQueryOptions},
 			},
 			Resolve: resolve,
@@ -167,7 +178,13 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.Fie
 		default:
 			var table *gocql.TableMetadata
 			table, tableFound := keyspace.Tables[strcase.ToSnake(fieldName)]
-			data := params.Args["data"].(map[string]interface{})
+			var data map[string]interface{}
+			if params.Args["data"] != nil {
+				data = params.Args["data"].(map[string]interface{})
+			} else {
+				data = params.Args["filter"].(map[string]interface{})
+			}
+
 			columnNames := make([]string, 0, len(data))
 			queryParams := make([]types.OperatorAndValue, 0, len(data))
 
@@ -194,7 +211,7 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.Fie
 						for operatorName, itemValue := range mapValue {
 							columnNames = append(columnNames, strcase.ToSnake(key))
 							queryParams = append(queryParams, types.OperatorAndValue{
-								Operator: operatorName, //TODO: Translate operator
+								Operator: cqlOperators[operatorName],
 								Value:    itemValue,
 							})
 						}
@@ -275,4 +292,3 @@ func mutationPrefix(value string) (string, string) {
 
 	panic("Unsupported mutation")
 }
-

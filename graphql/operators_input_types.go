@@ -9,6 +9,17 @@ var stringOperatorType = operatorType(graphql.String)
 var intOperatorType = operatorType(graphql.Int)
 var floatOperatorType = operatorType(graphql.Float)
 
+// cqlOperators contains the CQL operator for a given "graphql" operator
+var cqlOperators = map[string]string{
+	"eq":    "=",
+	"notEq": "!=",
+	"gt":    ">",
+	"gte":   ">=",
+	"lt":    "<",
+	"lte":   "<=",
+	"in":    "IN",
+}
+
 var operatorsInputTypes = map[gocql.Type]*graphql.InputObject{
 	gocql.TypeInt:       intOperatorType,
 	gocql.TypeTinyInt:   intOperatorType,

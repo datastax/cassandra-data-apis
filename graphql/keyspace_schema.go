@@ -19,7 +19,7 @@ type KeyspaceGraphQLSchema struct {
 	// A map containing the result type by table name for a update/insert/delete query
 	resultUpdateTypes map[string]*graphql.Object
 	// A map containing the order enum by table name
-	orderEnums map[string]*graphql.Type
+	orderEnums map[string]*graphql.Enum
 }
 
 var inputQueryOptions = graphql.NewInputObject(graphql.InputObjectConfig{
@@ -46,7 +46,7 @@ func (s *KeyspaceGraphQLSchema) BuildTypes(keyspace *gocql.KeyspaceMetadata) err
 }
 
 func (s *KeyspaceGraphQLSchema) buildOrderEnums(keyspace *gocql.KeyspaceMetadata) {
-	s.orderEnums = make(map[string]*graphql.Type, len(keyspace.Tables))
+	s.orderEnums = make(map[string]*graphql.Enum, len(keyspace.Tables))
 	for _, table := range keyspace.Tables {
 		values := make(map[string]*graphql.EnumValueConfig, len(table.Columns))
 		for _, column := range table.Columns {
@@ -60,12 +60,10 @@ func (s *KeyspaceGraphQLSchema) buildOrderEnums(keyspace *gocql.KeyspaceMetadata
 			}
 		}
 
-		enumType := graphql.Type(graphql.NewEnum(graphql.EnumConfig{
+		s.orderEnums[table.Name] = graphql.NewEnum(graphql.EnumConfig{
 			Name:   strcase.ToCamel(table.Name + "Order"),
 			Values: values,
-		}))
-
-		s.orderEnums[table.Name] = &enumType
+		})
 	}
 }
 
