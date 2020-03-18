@@ -10,6 +10,20 @@ import (
 	"strings"
 )
 
+type SelectInfo struct {
+	Keyspace string
+	Table    string
+	Columns  []string
+	Values   []types.OperatorAndValue
+	Options  *types.QueryOptions
+	OrderBy  []ColumnOrder
+}
+
+type ColumnOrder struct {
+	Column string
+	Order  string
+}
+
 func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]interface{}, error) {
 	values := make([]interface{}, len(columns))
 
@@ -60,27 +74,34 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 	return mapped, nil
 }
 
-func (db *Db) Select(ksName string, table *gocql.TableMetadata, columnNames []string,
-	queryParams []types.OperatorAndValue, options *types.QueryOptions) (*types.QueryResult, error) {
-
-	values := make([]interface{}, 0, len(columnNames))
-
+func (db *Db) Select(info *SelectInfo) (*types.QueryResult, error) {
+	values := make([]interface{}, 0, len(info.Columns))
 	whereClause := ""
-	for i := 0; i < len(columnNames); i++ {
+	for i := 0; i < len(info.Columns); i++ {
 		if i > 0 {
 			whereClause += " AND "
 		}
 
-		opValue := queryParams[i]
-		whereClause += fmt.Sprintf("%s %s ?", columnNames[i], opValue.Operator)
+		opValue := info.Values[i]
+		whereClause += fmt.Sprintf("%s %s ?", info.Columns[i], opValue.Operator)
 		values = append(values, opValue.Value)
 	}
 
-	query := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", ksName, table.Name, whereClause)
+	query := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", info.Keyspace, info.Table, whereClause)
 
-	if options.Limit > 0 {
+	if info.Options.Limit > 0 {
 		query += " LIMIT ?"
-		values = append(values, options.Limit)
+		values = append(values, info.Options.Limit)
+	}
+
+	if len(info.OrderBy) > 0 {
+		query += " ORDER BY "
+		for i, order := range info.OrderBy {
+			if i > 0 {
+				query += ", "
+			}
+			query += order.Column + " " + order.Order
+		}
 	}
 
 	iter := db.session.ExecuteIter(query, gocql.LocalOne, values...)

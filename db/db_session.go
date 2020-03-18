@@ -2,7 +2,7 @@ package db
 
 import "github.com/gocql/gocql"
 
-func (db *Db) Execute(query string, consistency gocql.Consistency, values ...interface{}) *gocql.Iter {
+func (db *Db) Execute(query string, consistency gocql.Consistency, values ...interface{}) ResultIterator {
 	return db.session.ExecuteIter(query, consistency, values...)
 }
 
@@ -18,13 +18,22 @@ type DbSession interface {
 	ExecuteSimple(query string, consistency gocql.Consistency, values ...interface{}) error
 
 	// ExecuteIter executes a prepared statement and returns iterator to the result set
-	ExecuteIter(query string, consistency gocql.Consistency, values ...interface{}) *gocql.Iter
+	ExecuteIter(query string, consistency gocql.Consistency, values ...interface{}) ResultIterator
 
 	// ExecuteIterSimple executes a simple statement and returns iterator to the result set
-	ExecuteIterSimple(query string, consistency gocql.Consistency, values ...interface{}) *gocql.Iter
+	ExecuteIterSimple(query string, consistency gocql.Consistency, values ...interface{}) ResultIterator
 
 	//TODO: Extract metadata methods from interface into another interface
 	KeyspaceMetadata(keyspaceName string) (*gocql.KeyspaceMetadata, error)
+}
+
+type ResultIterator interface {
+	Close() error
+	Columns() []gocql.ColumnInfo
+	Scanner() gocql.Scanner
+	PageState() []byte
+	Scan(dest ...interface{}) bool
+	MapScan(m map[string]interface{}) bool
 }
 
 type GoCqlSession struct {
@@ -39,11 +48,11 @@ func (session *GoCqlSession) ExecuteSimple(query string, consistency gocql.Consi
 	return session.ref.Query(query, values...).Consistency(consistency).Exec()
 }
 
-func (session *GoCqlSession) ExecuteIter(query string, consistency gocql.Consistency, values ...interface{}) *gocql.Iter {
+func (session *GoCqlSession) ExecuteIter(query string, consistency gocql.Consistency, values ...interface{}) ResultIterator {
 	return session.ref.Query(query).Bind(values...).Consistency(consistency).Iter()
 }
 
-func (session *GoCqlSession) ExecuteIterSimple(query string, consistency gocql.Consistency, values ...interface{}) *gocql.Iter {
+func (session *GoCqlSession) ExecuteIterSimple(query string, consistency gocql.Consistency, values ...interface{}) ResultIterator {
 	return session.ref.Query(query, values...).Consistency(consistency).Iter()
 }
 func (session *GoCqlSession) KeyspaceMetadata(keyspaceName string) (*gocql.KeyspaceMetadata, error) {

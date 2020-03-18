@@ -167,7 +167,7 @@ func BuildSchema(keyspaceName string, db *db.Db) (graphql.Schema, error) {
 	)
 }
 
-func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.FieldResolveFn {
+func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, dbClient *db.Db) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
 		fieldName := params.Info.FieldName
 		switch fieldName {
@@ -219,12 +219,24 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, db *db.Db) graphql.Fie
 				}
 			}
 
+			var orderBy []interface{}
 			var options types.QueryOptions
 			if err := mapstructure.Decode(params.Args["options"], &options); err != nil {
 				return nil, err
 			}
 
-			return db.Select(keyspace.Name, table, columnNames, queryParams, &options)
+			if params.Args["orderBy"] != nil {
+				orderBy = params.Args["orderBy"].([]interface{})
+			}
+
+			return dbClient.Select(&db.SelectInfo{
+				Keyspace: keyspace.Name,
+				Table:    table.Name,
+				Columns:  columnNames,
+				Values:   queryParams,
+				OrderBy:  parseColumnOrder(orderBy),
+				Options:  &options,
+			})
 		}
 	}
 }
@@ -291,4 +303,19 @@ func mutationPrefix(value string) (string, string) {
 	}
 
 	panic("Unsupported mutation")
+}
+
+func parseColumnOrder(values []interface{}) []db.ColumnOrder {
+	result := make([]db.ColumnOrder, 0, len(values))
+
+	for _, value := range values {
+		strValue := value.(string)
+		index := strings.LastIndex(strValue, "_")
+		result = append(result, db.ColumnOrder{
+			Column: strValue[0:index],
+			Order:  strValue[index+1:],
+		})
+	}
+
+	return result
 }
