@@ -16,21 +16,23 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 	for i := range values {
 		typeInfo := columns[i].TypeInfo
 		switch typeInfo.Type() {
-		case gocql.TypeVarchar, gocql.TypeAscii, gocql.TypeInet, gocql.TypeText, gocql.TypeTimeUUID, gocql.TypeUUID,
+		case gocql.TypeVarchar, gocql.TypeAscii, gocql.TypeInet, gocql.TypeText,
 			gocql.TypeBigInt, gocql.TypeCounter:
-			values[i] = reflect.New(reflect.TypeOf(*new(*string))).Interface()
+			values[i] = new(*string)
 		case gocql.TypeBoolean:
-			values[i] = reflect.New(reflect.TypeOf(*new(*bool))).Interface()
+			values[i] = new(*bool)
 		case gocql.TypeFloat:
-			values[i] = reflect.New(reflect.TypeOf(*new(*float32))).Interface()
+			values[i] = new(*float32)
 		case gocql.TypeDouble:
-			values[i] = reflect.New(reflect.TypeOf(*new(*float64))).Interface()
+			values[i] = new(*float64)
 		case gocql.TypeInt:
-			values[i] = reflect.New(reflect.TypeOf(*new(*int))).Interface()
+			values[i] = new(*int)
 		case gocql.TypeSmallInt:
-			values[i] = reflect.New(reflect.TypeOf(*new(*int16))).Interface()
+			values[i] = new(*int16)
 		case gocql.TypeTinyInt:
-			values[i] = reflect.New(reflect.TypeOf(*new(*int8))).Interface()
+			values[i] = new(*int8)
+		case gocql.TypeTimeUUID, gocql.TypeUUID:
+			values[i] = new(*gocql.UUID)
 		default:
 			values[i] = columns[i].TypeInfo.New()
 		}
@@ -47,6 +49,7 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 		case gocql.TypeVarchar, gocql.TypeAscii, gocql.TypeInet, gocql.TypeText,
 			gocql.TypeBigInt, gocql.TypeInt, gocql.TypeSmallInt, gocql.TypeTinyInt,
 			gocql.TypeCounter, gocql.TypeBoolean,
+			gocql.TypeTimeUUID, gocql.TypeUUID,
 			gocql.TypeFloat, gocql.TypeDouble:
 			value = reflect.Indirect(reflect.ValueOf(value)).Interface()
 		}
