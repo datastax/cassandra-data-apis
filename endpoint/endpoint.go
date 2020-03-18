@@ -1,4 +1,4 @@
-package datastax // TODO: Change package name?
+package endpoint // TODO: Change package name?
 
 import (
 	"github.com/riptano/data-endpoints/db"

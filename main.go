@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/riptano/data-endpoints/datastax"
+	"github.com/riptano/data-endpoints/endpoint"
 	"github.com/riptano/data-endpoints/graphql"
 	"log"
 	"net/http"
@@ -24,7 +24,7 @@ func main() {
 	hosts := getEnvOrDefault("DB_HOSTS", "127.0.0.1")
 	singleKsName := os.Getenv("SINGLE_KEYSPACE")
 
-	cfg := datastax.NewEndpointConfig(strings.Split(hosts, ",")...)
+	cfg := endpoint.NewEndpointConfig(strings.Split(hosts, ",")...)
 	cfg.DbUsername = os.Getenv("DB_USERNAME");
 	cfg.DbPassword = os.Getenv("DB_PASSWORD");
 
