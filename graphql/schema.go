@@ -235,7 +235,8 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, dbClient *db.Db) graph
 			if err != nil {
 				return nil, err
 			}
-			return dbClient.Select(&db.SelectInfo{
+
+			result, err := dbClient.Select(&db.SelectInfo{
 				Keyspace: keyspace.Name,
 				Table:    table.Name,
 				Columns:  columnNames,
@@ -243,8 +244,31 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, dbClient *db.Db) graph
 				OrderBy:  parseColumnOrder(orderBy),
 				Options:  &options,
 			}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+
+			if err != nil {
+				return nil, err
+			}
+
+			return &types.QueryResult{
+				PageState: result.PageState(),
+				Values:    adaptResultValues(result.Values()),
+			}, nil
 		}
 	}
+}
+
+func adaptResultValues(values []map[string]interface{}) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0, len(values))
+	// TODO: Use naming conventions
+	for _, item := range values {
+		resultItem := make(map[string]interface{})
+		for k, v := range item {
+			resultItem[strcase.ToLowerCamel(k)] = v
+		}
+		result = append(result, resultItem)
+	}
+
+	return result
 }
 
 func mutationFieldResolver(keyspace *gocql.KeyspaceMetadata, dbClient *db.Db) graphql.FieldResolveFn {

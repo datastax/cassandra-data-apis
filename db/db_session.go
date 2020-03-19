@@ -1,9 +1,12 @@
 package db
 
-import "github.com/gocql/gocql"
+import (
+	"encoding/hex"
+	"github.com/gocql/gocql"
+)
 
 type QueryOptions struct {
-	UserOrRole string
+	UserOrRole  string
 	Consistency gocql.Consistency
 }
 
@@ -28,51 +31,84 @@ type DbSession interface {
 	Execute(query string, options *QueryOptions, values ...interface{}) error
 
 	// ExecuteIterSimple executes a statement and returns iterator to the result set
-	ExecuteIter(query string, options *QueryOptions, values ...interface{}) ResultIterator
+	ExecuteIter(query string, options *QueryOptions, values ...interface{}) (ResultSet, error)
 
 	//TODO: Extract metadata methods from interface into another interface
 	KeyspaceMetadata(keyspaceName string) (*gocql.KeyspaceMetadata, error)
 }
 
-type ResultIterator interface {
-	Close() error
-	Columns() []gocql.ColumnInfo
-	Scanner() gocql.Scanner
-	PageState() []byte
-	Scan(dest ...interface{}) bool
-	MapScan(m map[string]interface{}) bool
+type ResultSet interface {
+	PageState() string
+	Values() []map[string]interface{}
+}
+
+func (r *goCqlResultIterator) PageState() string {
+	return hex.EncodeToString(r.pageState)
+}
+
+func (r *goCqlResultIterator) Values() []map[string]interface{} {
+	return r.values
+}
+
+type goCqlResultIterator struct {
+	pageState []byte
+	values    []map[string]interface{}
+}
+
+func newResultIterator(iter *gocql.Iter) (*goCqlResultIterator, error) {
+	columns := iter.Columns()
+	scanner := iter.Scanner()
+
+	items := make([]map[string]interface{}, 0)
+
+	for scanner.Next() {
+		row, err := mapScan(scanner, columns)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, row)
+	}
+
+	if err := iter.Close(); err != nil {
+		return nil, err
+	}
+
+	return &goCqlResultIterator{
+		pageState: iter.PageState(),
+		values:    items,
+	}, nil
 }
 
 type GoCqlSession struct {
 	ref *gocql.Session
 }
 
-func (db *Db) Execute(query string, options *QueryOptions, values ...interface{}) ResultIterator {
+func (db *Db) Execute(query string, options *QueryOptions, values ...interface{}) (ResultSet, error) {
 	return db.session.ExecuteIter(query, options, values...)
 }
 
-func (db *Db) ExecuteNoResult(query string, options* QueryOptions, values ...interface{}) error {
+func (db *Db) ExecuteNoResult(query string, options *QueryOptions, values ...interface{}) error {
 	return db.session.Execute(query, options, values)
 }
 
 func (session *GoCqlSession) Execute(query string, options *QueryOptions, values ...interface{}) error {
-	return session.ExecuteIter(query, options, values...).Close()
+	_, err := session.ExecuteIter(query, options, values...)
+	return err
 }
 
-func (session *GoCqlSession) ExecuteIter(query string, options *QueryOptions, values ...interface{}) ResultIterator {
+func (session *GoCqlSession) ExecuteIter(query string, options *QueryOptions, values ...interface{}) (ResultSet, error) {
 	q := session.ref.Query(query, values...)
 	if options != nil {
 		q.Consistency(options.Consistency)
 		if options.UserOrRole != "" {
-			q.CustomPayload(map[string][]byte {
+			q.CustomPayload(map[string][]byte{
 				"ProxyExecute": []byte(options.UserOrRole),
 			})
 		}
 	}
-	return q.Iter()
+	return newResultIterator(q.Iter())
 }
 
 func (session *GoCqlSession) KeyspaceMetadata(keyspaceName string) (*gocql.KeyspaceMetadata, error) {
 	return session.ref.KeyspaceMetadata(keyspaceName)
 }
-
