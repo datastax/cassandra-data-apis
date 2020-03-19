@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-const consistency = gocql.LocalOne
-
 func TestDeleteGeneration(t *testing.T) {
 	items := []struct {
 		columnNames []string
@@ -35,6 +33,50 @@ func TestDeleteGeneration(t *testing.T) {
 			QueryParams: item.queryParams}, nil)
 		assert.Nil(t, err)
 		sessionMock.AssertCalled(t, "Execute", item.query, mock.Anything, item.queryParams)
+		sessionMock.AssertExpectations(t)
+	}
+}
+
+func TestInsertGeneration(t *testing.T) {
+	items := []struct {
+		columnNames []string
+		queryParams []interface{}
+		ttl         int
+		ifNotExists bool
+		query       string
+	}{
+		{[]string{"a"}, []interface{}{100}, -1, false, "INSERT INTO ks1.tbl1 (a) VALUES (?)"},
+		{[]string{"a", "b"}, []interface{}{100, 2}, -1, false, "INSERT INTO ks1.tbl1 (a, b) VALUES (?, ?)"},
+		{[]string{"a"}, []interface{}{100}, -1, true, "INSERT INTO ks1.tbl1 (a) VALUES (?) IF NOT EXISTS"},
+		{[]string{"a"}, []interface{}{"z"}, 3600, true,
+			"INSERT INTO ks1.tbl1 (a) VALUES (?) IF NOT EXISTS USING TTL ?"},
+	}
+
+	for _, item := range items {
+		sessionMock := SessionMock{}
+		db := &Db{
+			session: &sessionMock,
+		}
+
+		sessionMock.On("Execute", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+		expectedQueryParams := make([]interface{}, len(item.queryParams))
+		copy(expectedQueryParams, item.queryParams)
+
+		if item.ttl >= 0 {
+			expectedQueryParams = append(expectedQueryParams, item.ttl)
+		}
+
+		_, err := db.Insert(&InsertInfo{
+			Keyspace:    "ks1",
+			Table:       "tbl1",
+			Columns:     item.columnNames,
+			QueryParams: item.queryParams,
+			TTL:         item.ttl,
+			IfNotExists: item.ifNotExists,
+		}, nil)
+		assert.Nil(t, err)
+		sessionMock.AssertCalled(t, "Execute", item.query, mock.Anything, expectedQueryParams)
 		sessionMock.AssertExpectations(t)
 	}
 }
@@ -101,7 +143,7 @@ type SessionMock struct {
 }
 
 func (o *SessionMock) Execute(query string, options *QueryOptions, values ...interface{}) error {
-	args := o.Called(query, consistency, values)
+	args := o.Called(query, options, values)
 	return args.Error(0)
 }
 

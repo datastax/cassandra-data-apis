@@ -157,7 +157,7 @@ func (db *Db) Insert(info *InsertInfo, options *QueryOptions) (*types.Modificati
 
 	query := fmt.Sprintf(
 		"INSERT INTO %s.%s (%s) VALUES (%s)",
-		info.Keyspace, info.Table, strings.Join(info.Columns, ","), placeholders)
+		info.Keyspace, info.Table, strings.Join(info.Columns, ", "), placeholders)
 
 	if info.IfNotExists {
 		query += " IF NOT EXISTS"
