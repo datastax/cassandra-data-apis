@@ -20,10 +20,12 @@ func NewDefaultNaming() *defaultNaming {
 }
 
 func (n *defaultNaming) ToCQLColumn(name string) string {
+	// TODO: Fix numbers: "Table2" or "table2" --> "table_2"
 	return strcase.ToSnake(name)
 }
 
 func (n *defaultNaming) ToCQLTable(name string) string {
+	// TODO: Fix numbers: "Table2" or "table2" --> "table_2"
 	return strcase.ToSnake(name)
 }
 
