@@ -35,9 +35,9 @@ func main() {
 
 	var routes []graphql.Route
 	if singleKsName != "" { // Single keyspace mode (useful for cloud)
-		routes, err = endpoint.RoutesKeyspaceGql("/graphql", singleKsName)
+		routes, err = endpoint.RoutesKeyspaceGraphQL("/graphql", singleKsName)
 	} else {
-		routes, err = endpoint.RoutesGql("/graphql")
+		routes, err = endpoint.RoutesGraphQL("/graphql")
 	}
 
 	if err != nil {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
-	"github.com/riptano/data-endpoints/db"
 	"os"
 	"sync"
 	"time"
@@ -17,8 +16,8 @@ type SchemaUpdater struct {
 	mutex          sync.Mutex
 	updateInterval time.Duration
 	schema         *graphql.Schema
+	schemaGen	   *SchemaGenerator
 	ksName         string
-	dbClient       *db.Db
 	schemaVersion  gocql.UUID
 }
 
@@ -29,8 +28,8 @@ func (su *SchemaUpdater) Schema() *graphql.Schema {
 	return su.schema
 }
 
-func NewUpdater(ksName string, dbClient *db.Db, updateInterval time.Duration) (*SchemaUpdater, error) {
-	schema, err := BuildSchema(ksName, dbClient)
+func NewUpdater(schemaGen *SchemaGenerator, ksName string, updateInterval time.Duration) (*SchemaUpdater, error) {
+	schema, err := schemaGen.BuildSchema(ksName)
 	if err != nil {
 		return nil, err
 	}
@@ -40,8 +39,8 @@ func NewUpdater(ksName string, dbClient *db.Db, updateInterval time.Duration) (*
 		mutex:          sync.Mutex{},
 		updateInterval: updateInterval,
 		schema:         &schema,
+		schemaGen:      schemaGen,
 		ksName:         ksName,
-		dbClient:       dbClient,
 	}
 	return updater, nil
 }
@@ -49,7 +48,7 @@ func NewUpdater(ksName string, dbClient *db.Db, updateInterval time.Duration) (*
 func (su *SchemaUpdater) Start() {
 	su.ctx, su.cancel = context.WithCancel(context.Background())
 	for {
-		result, err := su.dbClient.Execute("SELECT schema_version FROM system.local", nil)
+		result, err := su.schemaGen.dbClient.Execute("SELECT schema_version FROM system.local", nil)
 
 		if err != nil {
 			// TODO: Log error
@@ -67,7 +66,7 @@ func (su *SchemaUpdater) Start() {
 		}
 
 		if shouldUpdate {
-			schema, err := BuildSchema(su.ksName, su.dbClient)
+			schema, err := su.schemaGen.BuildSchema(su.ksName)
 			if err != nil {
 				// TODO: Log error
 				fmt.Fprintf(os.Stderr, "error trying to build graphql schema for keyspace '%s': %s", su.ksName, err)
