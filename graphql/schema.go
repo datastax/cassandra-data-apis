@@ -187,13 +187,13 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, dbClient *db.Db) graph
 				data = params.Args["filter"].(map[string]interface{})
 			}
 
-			columnNames := make([]string, 0, len(data))
-			queryParams := make([]types.OperatorAndValue, 0, len(data))
+			var whereClause []types.ConditionItem
 
 			if tableFound {
+				whereClause = make([]types.ConditionItem, 0, len(data))
 				for key, value := range data {
-					columnNames = append(columnNames, strcase.ToSnake(key))
-					queryParams = append(queryParams, types.OperatorAndValue{
+					whereClause = append(whereClause, types.ConditionItem{
+						Column:   strcase.ToSnake(key),
 						Operator: "=",
 						Value:    value,
 					})
@@ -204,20 +204,8 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, dbClient *db.Db) graph
 					if !tableFound {
 						return nil, fmt.Errorf("unable to find table '%s'", params.Info.FieldName)
 					}
-					for key, value := range data {
-						if value == nil {
-							continue
-						}
-						mapValue := value.(map[string]interface{})
 
-						for operatorName, itemValue := range mapValue {
-							columnNames = append(columnNames, strcase.ToSnake(key))
-							queryParams = append(queryParams, types.OperatorAndValue{
-								Operator: cqlOperators[operatorName],
-								Value:    itemValue,
-							})
-						}
-					}
+					whereClause = adaptCondition(data)
 				}
 			}
 
@@ -239,8 +227,7 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, dbClient *db.Db) graph
 			result, err := dbClient.Select(&db.SelectInfo{
 				Keyspace: keyspace.Name,
 				Table:    table.Name,
-				Columns:  columnNames,
-				Values:   queryParams,
+				Where:    whereClause,
 				OrderBy:  parseColumnOrder(orderBy),
 				Options:  &options,
 			}, db.NewQueryOptions().WithUserOrRole(userOrRole))
@@ -255,6 +242,25 @@ func queryFieldResolver(keyspace *gocql.KeyspaceMetadata, dbClient *db.Db) graph
 			}, nil
 		}
 	}
+}
+
+func adaptCondition(data map[string]interface{}) []types.ConditionItem {
+	result := make([]types.ConditionItem, 0, len(data))
+	for key, value := range data {
+		if value == nil {
+			continue
+		}
+		mapValue := value.(map[string]interface{})
+
+		for operatorName, itemValue := range mapValue {
+			result = append(result, types.ConditionItem{
+				Column:   strcase.ToSnake(key),
+				Operator: cqlOperators[operatorName],
+				Value:    itemValue,
+			})
+		}
+	}
+	return result
 }
 
 func adaptResultValues(values []map[string]interface{}) []map[string]interface{} {
@@ -318,9 +324,9 @@ func mutationFieldResolver(keyspace *gocql.KeyspaceMetadata, dbClient *db.Db) gr
 						TTL:         ttl,
 					}, queryOptions)
 				case deletePrefix:
-					var ifCondition map[string]interface{}
+					var ifCondition []types.ConditionItem
 					if params.Args["ifCondition"] != nil {
-						ifCondition = params.Args["ifCondition"].(map[string]interface{})
+						ifCondition = adaptCondition(params.Args["ifCondition"].(map[string]interface{}))
 					}
 					return dbClient.Delete(&db.DeleteInfo{
 						Keyspace:    keyspace.Name,

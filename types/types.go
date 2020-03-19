@@ -18,7 +18,8 @@ type QueryOptions struct {
 	Limit     int    `json:"pageState"`
 }
 
-type OperatorAndValue struct {
+type ConditionItem struct {
+	Column   string
 	Operator string
 	Value    interface{}
 }

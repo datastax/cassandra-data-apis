@@ -11,8 +11,7 @@ import (
 type SelectInfo struct {
 	Keyspace string
 	Table    string
-	Columns  []string
-	Values   []types.OperatorAndValue
+	Where    []types.ConditionItem
 	Options  *types.QueryOptions
 	OrderBy  []ColumnOrder
 }
@@ -31,7 +30,7 @@ type DeleteInfo struct {
 	Table       string
 	Columns     []string
 	QueryParams []interface{}
-	IfCondition map[string]interface{}
+	IfCondition []types.ConditionItem
 	IfExists    bool
 }
 
@@ -91,18 +90,8 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 }
 
 func (db *Db) Select(info *SelectInfo, options *QueryOptions) (ResultSet, error) {
-	values := make([]interface{}, 0, len(info.Columns))
-	whereClause := ""
-	for i := 0; i < len(info.Columns); i++ {
-		if i > 0 {
-			whereClause += " AND "
-		}
-
-		opValue := info.Values[i]
-		whereClause += fmt.Sprintf("%s %s ?", info.Columns[i], opValue.Operator)
-		values = append(values, opValue.Value)
-	}
-
+	values := make([]interface{}, 0, len(info.Where))
+	whereClause := buildCondition(info.Where, &values)
 	query := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", info.Keyspace, info.Table, whereClause)
 
 	if info.Options.Limit > 0 {
@@ -151,7 +140,16 @@ func (db *Db) Insert(info *InsertInfo, options *QueryOptions) (*types.Modificati
 func (db *Db) Delete(info *DeleteInfo, options *QueryOptions) (*types.ModificationResult, error) {
 	whereClause := buildWhereClause(info.Columns)
 	query := fmt.Sprintf("DELETE FROM %s.%s WHERE %s", info.Keyspace, info.Table, whereClause)
-	err := db.session.Execute(query, options, info.QueryParams...)
+	queryParameters := make([]interface{}, len(info.QueryParams))
+	copy(queryParameters, info.QueryParams)
+
+	if info.IfExists {
+		query += " IF EXISTS"
+	} else if len(info.IfCondition) > 0 {
+		query += " IF " + buildCondition(info.IfCondition, &queryParameters)
+	}
+
+	err := db.session.Execute(query, options, queryParameters...)
 	return &types.ModificationResult{Applied: err == nil}, err
 }
 
@@ -161,4 +159,17 @@ func buildWhereClause(columnNames []string) string {
 		whereClause += " AND " + columnNames[i] + " = ?"
 	}
 	return whereClause
+}
+
+func buildCondition(condition []types.ConditionItem, queryParameters *[]interface{}) string {
+	conditionClause := ""
+	for _, item := range condition {
+		if conditionClause != "" {
+			conditionClause += " AND "
+		}
+
+		conditionClause += fmt.Sprintf("%s %s ?", item.Column, item.Operator)
+		*queryParameters = append(*queryParameters, item.Value)
+	}
+	return conditionClause
 }

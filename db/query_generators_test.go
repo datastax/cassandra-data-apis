@@ -13,9 +13,13 @@ func TestDeleteGeneration(t *testing.T) {
 		columnNames []string
 		queryParams []interface{}
 		query       string
+		ifExists    bool
+		ifCondition []types.ConditionItem
 	}{
-		{[]string{"a"}, []interface{}{"b"}, "DELETE FROM ks1.tbl1 WHERE a = ?"},
-		{[]string{"a", "b"}, []interface{}{"A Value", 2}, "DELETE FROM ks1.tbl1 WHERE a = ? AND b = ?"},
+		{[]string{"a"}, []interface{}{"b"}, "DELETE FROM ks1.tbl1 WHERE a = ?", false, nil},
+		{[]string{"a", "b"}, []interface{}{"A Value", 2}, "DELETE FROM ks1.tbl1 WHERE a = ? AND b = ?", false, nil},
+		{[]string{"a"}, []interface{}{"b"}, "DELETE FROM ks1.tbl1 WHERE a = ? IF EXISTS", true, nil},
+		{[]string{"a"}, []interface{}{"b"}, "DELETE FROM ks1.tbl1 WHERE a = ? IF c = ?", false, []types.ConditionItem{{"c", "=", "z"}}},
 	}
 
 	for _, item := range items {
@@ -30,9 +34,21 @@ func TestDeleteGeneration(t *testing.T) {
 			Keyspace:    "ks1",
 			Table:       "tbl1",
 			Columns:     item.columnNames,
-			QueryParams: item.queryParams}, nil)
+			QueryParams: item.queryParams,
+			IfExists:    item.ifExists,
+			IfCondition: item.ifCondition,
+		}, nil)
 		assert.Nil(t, err)
-		sessionMock.AssertCalled(t, "Execute", item.query, mock.Anything, item.queryParams)
+
+		expectedQueryParams := make([]interface{}, len(item.queryParams))
+		copy(expectedQueryParams, item.queryParams)
+
+		if len(item.ifCondition) > 0 {
+			for _, condition := range item.ifCondition {
+				expectedQueryParams = append(expectedQueryParams, condition.Value)
+			}
+		}
+		sessionMock.AssertCalled(t, "Execute", item.query, mock.Anything, expectedQueryParams)
 		sessionMock.AssertExpectations(t)
 	}
 }
@@ -88,19 +104,18 @@ func TestSelectGeneration(t *testing.T) {
 		On("Values").Return([]map[string]interface{}{}, nil)
 
 	items := []struct {
-		columnNames []string
-		values      []types.OperatorAndValue
-		options     *types.QueryOptions
-		orderBy     []ColumnOrder
-		query       string
+		where   []types.ConditionItem
+		options *types.QueryOptions
+		orderBy []ColumnOrder
+		query   string
 	}{
-		{[]string{"a"}, []types.OperatorAndValue{{"=", 1}}, &types.QueryOptions{}, nil,
+		{[]types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, nil,
 			"SELECT * FROM ks1.tbl1 WHERE a = ?"},
-		{[]string{"a", "b"}, []types.OperatorAndValue{{"=", 1}, {">", 2}}, &types.QueryOptions{}, nil,
+		{[]types.ConditionItem{{"a", "=", 1}, {"b", ">", 2}}, &types.QueryOptions{}, nil,
 			"SELECT * FROM ks1.tbl1 WHERE a = ? AND b > ?"},
-		{[]string{"a"}, []types.OperatorAndValue{{"=", 1}}, &types.QueryOptions{}, []ColumnOrder{{"c", "DESC"}},
+		{[]types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, []ColumnOrder{{"c", "DESC"}},
 			"SELECT * FROM ks1.tbl1 WHERE a = ? ORDER BY c DESC"},
-		{[]string{"a"}, []types.OperatorAndValue{{"=", "z"}}, &types.QueryOptions{Limit: 1}, []ColumnOrder{{"c", "ASC"}},
+		{[]types.ConditionItem{{"a", "=", "z"}}, &types.QueryOptions{Limit: 1}, []ColumnOrder{{"c", "ASC"}},
 			"SELECT * FROM ks1.tbl1 WHERE a = ? LIMIT ? ORDER BY c ASC"},
 	}
 
@@ -112,7 +127,7 @@ func TestSelectGeneration(t *testing.T) {
 		sessionMock.On("ExecuteIter", mock.Anything, mock.Anything, mock.Anything).Return(resultMock, nil)
 		queryParams := make([]interface{}, 0)
 
-		for _, v := range item.values {
+		for _, v := range item.where {
 			queryParams = append(queryParams, v.Value)
 		}
 
@@ -123,8 +138,7 @@ func TestSelectGeneration(t *testing.T) {
 		_, err := db.Select(&SelectInfo{
 			Keyspace: "ks1",
 			Table:    "tbl1",
-			Columns:  item.columnNames,
-			Values:   item.values,
+			Where:    item.where,
 			Options:  item.options,
 			OrderBy:  item.orderBy,
 		}, nil)
