@@ -55,7 +55,7 @@ func NewSchemaGenerator(dbClient *db.Db, naming config.NamingConvention) *Schema
 func (sg *SchemaGenerator) buildQueriesFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
 	fields := graphql.Fields{}
 	for name, table := range tables {
-		fields[sg.naming.ToGraphQLField(name)] = &graphql.Field{
+		fields[sg.naming.ToGraphQLOperation("", name)] = &graphql.Field{
 			Type: schema.resultSelectTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
 				"data":    {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
@@ -65,7 +65,7 @@ func (sg *SchemaGenerator) buildQueriesFields(schema *KeyspaceGraphQLSchema, tab
 			Resolve: resolve,
 		}
 
-		fields[sg.naming.ToGraphQLField(name)+"Filter"] = &graphql.Field{
+		fields[sg.naming.ToGraphQLOperation("", name)+"Filter"] = &graphql.Field{
 			Type: schema.resultSelectTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
 				"filter":  {Type: graphql.NewNonNull(schema.tableOperatorInputTypes[table.Name])},
@@ -102,7 +102,7 @@ func (sg *SchemaGenerator) buildQuery(schema *KeyspaceGraphQLSchema, tables map[
 func (sg *SchemaGenerator) buildMutationFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
 	fields := graphql.Fields{}
 	for name, table := range tables {
-		fields[sg.naming.ToGraphQLFieldPrefix(insertPrefix, name)] = &graphql.Field{
+		fields[sg.naming.ToGraphQLOperation(insertPrefix, name)] = &graphql.Field{
 			Type: schema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
 				"data":        {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
@@ -112,7 +112,7 @@ func (sg *SchemaGenerator) buildMutationFields(schema *KeyspaceGraphQLSchema, ta
 			Resolve: resolve,
 		}
 
-		fields[sg.naming.ToGraphQLFieldPrefix(deletePrefix, name)] = &graphql.Field{
+		fields[sg.naming.ToGraphQLOperation(deletePrefix, name)] = &graphql.Field{
 			Type: schema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
 				"data":        {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},

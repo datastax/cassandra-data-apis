@@ -24,7 +24,7 @@ func NewEndpointConfig(hosts ...string) *DataEndpointConfig {
 	return &DataEndpointConfig{
 		DbHosts:              hosts,
 		SchemaUpdateInterval: 10 * time.Second,
-		Naming:               config.NewDefaultNaming(),
+		Naming:               config.DefaultNaming,
 	}
 }
 
