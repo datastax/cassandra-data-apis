@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/graphql-go/graphql"
+	"github.com/riptano/data-endpoints/config"
 	"github.com/riptano/data-endpoints/db"
 	"net/http"
 	"path"
@@ -18,6 +19,13 @@ var systemKeyspaces = []string{
 }
 
 type executeQueryFunc func(query string, ctx context.Context) *graphql.Result
+
+type RouteGenerator struct {
+	dbClient       *db.Db
+	ksExcluded     []string
+	updateInterval time.Duration
+	schemaGen      *SchemaGenerator
+}
 
 type Route struct {
 	Method      string
@@ -33,25 +41,34 @@ type requestBody struct {
 	Query string `json:"query"`
 }
 
-func Routes(prefixPattern string, ksExcluded []string, db *db.Db, updateInterval time.Duration) ([]Route, error) {
-	ksNames, err := db.Keyspaces()
+func NewRouteGenerator(dbClient *db.Db, ksExcluded []string, updateInterval time.Duration, naming config.NamingConvention) *RouteGenerator {
+	return &RouteGenerator{
+		dbClient:       dbClient,
+		ksExcluded:     ksExcluded,
+		updateInterval: updateInterval,
+		schemaGen:      NewSchemaGenerator(dbClient, naming),
+	}
+}
+
+func (rg *RouteGenerator) Routes(prefixPattern string) ([]Route, error) {
+	ksNames, err := rg.dbClient.Keyspaces()
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve keyspace names: %s", err)
 	}
 
-	routes := make([]Route, 0, len(ksNames) + 1)
+	routes := make([]Route, 0, len(ksNames)+1)
 
-	ksManageRoutes, err := RoutesKeyspaceManagement(prefixPattern, db)
+	ksManageRoutes, err := rg.RoutesKeyspaceManagement(prefixPattern)
 	if err != nil {
 		return nil, err
 	}
 	routes = append(routes, ksManageRoutes...)
 
 	for _, ksName := range ksNames {
-		if isKeyspaceExcluded(ksName, systemKeyspaces) || isKeyspaceExcluded(ksName, ksExcluded) {
+		if isKeyspaceExcluded(ksName, systemKeyspaces) || isKeyspaceExcluded(ksName, rg.ksExcluded) {
 			continue
 		}
-		ksRoutes, err := RoutesKeyspace(path.Join(prefixPattern, ksName), ksName, db, updateInterval)
+		ksRoutes, err := rg.RoutesKeyspace(path.Join(prefixPattern, ksName), ksName)
 		if err != nil {
 			return nil, err
 		}
@@ -61,8 +78,8 @@ func Routes(prefixPattern string, ksExcluded []string, db *db.Db, updateInterval
 	return routes, nil
 }
 
-func RoutesKeyspaceManagement(pattern string, db *db.Db) ([]Route, error) {
-	schema, err := BuildKeyspaceSchema(db)
+func (rg *RouteGenerator) RoutesKeyspaceManagement(pattern string) ([]Route, error) {
+	schema, err := rg.schemaGen.BuildKeyspaceSchema()
 	if err != nil {
 		return nil, fmt.Errorf("unable to build graphql schema for keyspace management: %s", err)
 	}
@@ -71,8 +88,8 @@ func RoutesKeyspaceManagement(pattern string, db *db.Db) ([]Route, error) {
 	}), nil
 }
 
-func RoutesKeyspace(pattern string, ksName string, db *db.Db, updateInterval time.Duration) ([]Route, error) {
-	updater, err := NewUpdater(ksName, db, updateInterval)
+func (rg *RouteGenerator) RoutesKeyspace(pattern string, ksName string) ([]Route, error) {
+	updater, err := NewUpdater(rg.schemaGen, ksName, rg.updateInterval)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build graphql schema for keyspace '%s': %s", ksName, err)
 	}
@@ -92,17 +109,17 @@ func isKeyspaceExcluded(ksName string, ksExcluded []string) bool {
 }
 
 func routesForSchema(pattern string, execute executeQueryFunc) []Route {
-	return []Route {
+	return []Route{
 		{
-			Method: http.MethodGet,
+			Method:  http.MethodGet,
 			Pattern: pattern,
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
-				result:= execute(r.URL.Query().Get("query"), r.Context())
+				result := execute(r.URL.Query().Get("query"), r.Context())
 				json.NewEncoder(w).Encode(result)
 			},
 		},
 		{
-			Method: http.MethodPost,
+			Method:  http.MethodPost,
 			Pattern: pattern,
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
 				if r.Body == nil {
@@ -128,7 +145,7 @@ func executeQuery(query string, ctx context.Context, schema graphql.Schema) *gra
 	result := graphql.Do(graphql.Params{
 		Schema:        schema,
 		RequestString: query,
-		Context: ctx,
+		Context:       ctx,
 	})
 	if len(result.Errors) > 0 {
 		fmt.Printf("wrong result, unexpected errors: %v", result.Errors)

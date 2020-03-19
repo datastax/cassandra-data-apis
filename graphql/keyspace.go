@@ -46,11 +46,11 @@ var keyspaceType = graphql.NewObject(graphql.ObjectConfig{
 	},
 })
 
-func BuildKeyspaceSchema(dbClient *db.Db) (graphql.Schema, error) {
+func (sg *SchemaGenerator) BuildKeyspaceSchema() (graphql.Schema, error) {
 	return graphql.NewSchema(
 		graphql.SchemaConfig{
-			Query:    buildKeyspaceQuery(dbClient),
-			Mutation: buildKeyspaceMutation(dbClient),
+			Query:    sg.buildKeyspaceQuery(),
+			Mutation: sg.buildKeyspaceMutation(),
 		})
 }
 
@@ -83,7 +83,7 @@ func buildKeyspaceValue(keyspace *gocql.KeyspaceMetadata) ksValue {
 	return ksValue{keyspace.Name, dcs}
 }
 
-func buildKeyspaceQuery(dbClient *db.Db) *graphql.Object {
+func (sg *SchemaGenerator) buildKeyspaceQuery() *graphql.Object {
 	return graphql.NewObject(graphql.ObjectConfig{
 		Name: "KeyspaceQuery",
 		Fields: graphql.Fields{
@@ -96,7 +96,7 @@ func buildKeyspaceQuery(dbClient *db.Db) *graphql.Object {
 				},
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) {
 					ksName := params.Args["name"].(string)
-					keyspace, err := dbClient.Keyspace(ksName)
+					keyspace, err := sg.dbClient.Keyspace(ksName)
 					if err != nil {
 						return nil, err
 					}
@@ -107,14 +107,14 @@ func buildKeyspaceQuery(dbClient *db.Db) *graphql.Object {
 			"keyspaces": &graphql.Field{
 				Type: graphql.NewList(keyspaceType),
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) {
-					ksNames, err := dbClient.Keyspaces()
+					ksNames, err := sg.dbClient.Keyspaces()
 					if err != nil {
 						return nil, err
 					}
 
 					ksValues := make([]ksValue, 0)
 					for _, ksName := range ksNames {
-						keyspace, err := dbClient.Keyspace(ksName)
+						keyspace, err := sg.dbClient.Keyspace(ksName)
 						if err != nil {
 							return nil, err
 						}
@@ -128,7 +128,7 @@ func buildKeyspaceQuery(dbClient *db.Db) *graphql.Object {
 	})
 }
 
-func buildKeyspaceMutation(dbClient *db.Db) *graphql.Object {
+func (sg *SchemaGenerator) buildKeyspaceMutation() *graphql.Object {
 	return graphql.NewObject(graphql.ObjectConfig{
 		Name: "KeyspaceMutation",
 		Fields: graphql.Fields{
@@ -156,7 +156,7 @@ func buildKeyspaceMutation(dbClient *db.Db) *graphql.Object {
 					if err != nil {
 						return nil, err
 					}
-					return dbClient.CreateKeyspace(ksName, dcReplicas, db.NewQueryOptions().WithUserOrRole(userOrRole))
+					return sg.dbClient.CreateKeyspace(ksName, dcReplicas, db.NewQueryOptions().WithUserOrRole(userOrRole))
 				},
 			},
 			"dropKeyspace": &graphql.Field{
@@ -173,7 +173,7 @@ func buildKeyspaceMutation(dbClient *db.Db) *graphql.Object {
 					if err != nil {
 						return nil, err
 					}
-					return dbClient.DropKeyspace(ksName, db.NewQueryOptions().WithUserOrRole(userOrRole))
+					return sg.dbClient.DropKeyspace(ksName, db.NewQueryOptions().WithUserOrRole(userOrRole))
 				},
 			},
 		},

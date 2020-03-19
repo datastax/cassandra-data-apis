@@ -1,6 +1,7 @@
 package endpoint // TODO: Change package name?
 
 import (
+	"github.com/riptano/data-endpoints/config"
 	"github.com/riptano/data-endpoints/db"
 	"github.com/riptano/data-endpoints/graphql"
 	"time"
@@ -12,35 +13,35 @@ type DataEndpointConfig struct {
 	DbPassword           string
 	ExcludedKeyspaces    []string
 	SchemaUpdateInterval time.Duration
+	Naming               config.NamingConvention
 }
 
 type DataEndpoint struct {
-	db  *db.Db
-	cfg DataEndpointConfig
+	graphQLRouteGen *graphql.RouteGenerator
 }
 
 func NewEndpointConfig(hosts ...string) *DataEndpointConfig {
 	return &DataEndpointConfig{
 		DbHosts:              hosts,
 		SchemaUpdateInterval: 10 * time.Second,
+		Naming:               config.NewDefaultNaming(),
 	}
 }
 
 func (cfg *DataEndpointConfig) NewEndpoint() (*DataEndpoint, error) {
-	db, err := db.NewDb(cfg.DbUsername, cfg.DbPassword, cfg.DbHosts...)
+	dbClient, err := db.NewDb(cfg.DbUsername, cfg.DbPassword, cfg.DbHosts...)
 	if err != nil {
 		return nil, err
 	}
 	return &DataEndpoint{
-		db:  db,
-		cfg: *cfg,
+		graphQLRouteGen: graphql.NewRouteGenerator(dbClient, cfg.ExcludedKeyspaces, cfg.SchemaUpdateInterval, cfg.Naming),
 	}, nil
 }
 
-func (pnt *DataEndpoint) RoutesGql(pattern string) ([]graphql.Route, error) {
-	return graphql.Routes(pattern, pnt.cfg.ExcludedKeyspaces, pnt.db, pnt.cfg.SchemaUpdateInterval)
+func (e *DataEndpoint) RoutesGraphQL(pattern string) ([]graphql.Route, error) {
+	return e.graphQLRouteGen.Routes(pattern)
 }
 
-func (pnt *DataEndpoint) RoutesKeyspaceGql(pattern string, ksName string) ([]graphql.Route, error) {
-	return graphql.RoutesKeyspace(pattern, ksName, pnt.db, pnt.cfg.SchemaUpdateInterval)
+func (e *DataEndpoint) RoutesKeyspaceGraphQL(pattern string, ksName string) ([]graphql.Route, error) {
+	return e.graphQLRouteGen.RoutesKeyspace(pattern, ksName)
 }
