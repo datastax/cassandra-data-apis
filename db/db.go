@@ -42,16 +42,14 @@ func (db *Db) Keyspace(keyspace string) (*gocql.KeyspaceMetadata, error) {
 
 // Keyspaces Retrieves all the keyspace names
 func (db *Db) Keyspaces() ([]string, error) {
-	iter := db.session.ExecuteIter("SELECT keyspace_name FROM system_schema.keyspaces", nil)
+	iter, err := db.session.ExecuteIter("SELECT keyspace_name FROM system_schema.keyspaces", nil)
+	if err != nil {
+		return nil, err
+	}
 
 	var keyspaces []string
-
-	var name string
-	for iter.Scan(&name) {
-		keyspaces = append(keyspaces, name)
-	}
-	if err := iter.Close(); err != nil {
-		return nil, err
+	for _, row := range iter.Values() {
+		keyspaces = append(keyspaces, *row["keyspace_name"].(*string))
 	}
 
 	return keyspaces, nil

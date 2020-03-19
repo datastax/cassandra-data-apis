@@ -1,10 +1,8 @@
 package db
 
 import (
-	"encoding/hex"
 	"fmt"
 	"github.com/gocql/gocql"
-	"github.com/iancoleman/strcase"
 	"github.com/riptano/data-endpoints/types"
 	"reflect"
 	"strings"
@@ -86,13 +84,13 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 			value = reflect.Indirect(reflect.ValueOf(value)).Interface()
 		}
 
-		mapped[strcase.ToLowerCamel(column.Name)] = value
+		mapped[column.Name] = value
 	}
 
 	return mapped, nil
 }
 
-func (db *Db) Select(info *SelectInfo, options *QueryOptions) (*types.QueryResult, error) {
+func (db *Db) Select(info *SelectInfo, options *QueryOptions) (ResultSet, error) {
 	values := make([]interface{}, 0, len(info.Columns))
 	whereClause := ""
 	for i := 0; i < len(info.Columns); i++ {
@@ -122,30 +120,7 @@ func (db *Db) Select(info *SelectInfo, options *QueryOptions) (*types.QueryResul
 		}
 	}
 
-	iter := db.session.ExecuteIter(query, options, values...)
-
-	pageState := hex.EncodeToString(iter.PageState())
-	columns := iter.Columns()
-	scanner := iter.Scanner()
-
-	items := make([]map[string]interface{}, 0)
-
-	for scanner.Next() {
-		row, err := mapScan(scanner, columns)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, row)
-	}
-
-	if err := iter.Close(); err != nil {
-		return nil, err
-	}
-
-	return &types.QueryResult{
-		PageState: pageState,
-		Values:    items,
-	}, nil
+	return db.session.ExecuteIter(query, options, values...)
 }
 
 func (db *Db) Insert(info *InsertInfo, options *QueryOptions) (*types.ModificationResult, error) {

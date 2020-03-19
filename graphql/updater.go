@@ -49,23 +49,21 @@ func NewUpdater(ksName string, dbClient *db.Db, updateInterval time.Duration) (*
 func (su *SchemaUpdater) Start() {
 	su.ctx, su.cancel = context.WithCancel(context.Background())
 	for {
-		iter := su.dbClient.Execute("SELECT schema_version FROM system.local", nil)
+		result, err := su.dbClient.Execute("SELECT schema_version FROM system.local", nil)
+
+		if err != nil {
+			// TODO: Log error
+			fmt.Fprintf(os.Stderr, "error attempting to determine schema version: %s", err)
+		}
 
 		shouldUpdate := false
-		row := make(map[string]interface{})
-		for iter.MapScan(row) {
+		for _, row := range result.Values() {
 			if schemaVersion, ok := row["schema_version"].(gocql.UUID); ok {
 				if schemaVersion != su.schemaVersion {
 					shouldUpdate = true
 					su.schemaVersion = schemaVersion
 				}
 			}
-		}
-
-		err := iter.Close()
-		if  err != nil {
-			// TODO: Log error
-			fmt.Fprintf(os.Stderr, "error attempting to determine schema version: %s", err)
 		}
 
 		if shouldUpdate {

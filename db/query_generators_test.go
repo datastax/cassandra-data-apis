@@ -83,13 +83,9 @@ func TestInsertGeneration(t *testing.T) {
 
 func TestSelectGeneration(t *testing.T) {
 	resultMock := &ResultMock{}
-	scannerMock := &ScannerMock{}
 	resultMock.
-		On("PageState").Return([]byte{}).
-		On("Columns").Return([]gocql.ColumnInfo{}).
-		On("Scanner").Return(scannerMock).
-		On("Close").Return(nil)
-	scannerMock.On("Next").Return(false)
+		On("PageState").Return("").
+		On("Values").Return([]map[string]interface{}{}, nil)
 
 	items := []struct {
 		columnNames []string
@@ -113,7 +109,7 @@ func TestSelectGeneration(t *testing.T) {
 		db := &Db{
 			session: &sessionMock,
 		}
-		sessionMock.On("ExecuteIter", mock.Anything, mock.Anything, mock.Anything).Return(resultMock)
+		sessionMock.On("ExecuteIter", mock.Anything, mock.Anything, mock.Anything).Return(resultMock, nil)
 		queryParams := make([]interface{}, 0)
 
 		for _, v := range item.values {
@@ -147,9 +143,9 @@ func (o *SessionMock) Execute(query string, options *QueryOptions, values ...int
 	return args.Error(0)
 }
 
-func (o *SessionMock) ExecuteIter(query string, options *QueryOptions, values ...interface{}) ResultIterator {
+func (o *SessionMock) ExecuteIter(query string, options *QueryOptions, values ...interface{}) (ResultSet, error) {
 	args := o.Called(query, options, values)
-	return args.Get(0).(ResultIterator)
+	return args.Get(0).(ResultSet), args.Error(1)
 }
 
 func (o *SessionMock) KeyspaceMetadata(keyspaceName string) (*gocql.KeyspaceMetadata, error) {
@@ -161,42 +157,11 @@ type ResultMock struct {
 	mock.Mock
 }
 
-type ScannerMock struct {
-	mock.Mock
+func (o ResultMock) PageState() string {
+	return o.Called().String(0)
 }
 
-func (o ScannerMock) Next() bool {
-	return o.Called().Bool(0)
-}
-
-func (o ScannerMock) Scan(dest ...interface{}) error {
-	return o.Called(dest).Error(0)
-}
-
-func (o ScannerMock) Err() error {
-	return o.Called().Error(0)
-}
-
-func (o ResultMock) Close() error {
-	return o.Called().Error(0)
-}
-
-func (o ResultMock) Columns() []gocql.ColumnInfo {
-	return o.Called().Get(0).([]gocql.ColumnInfo)
-}
-
-func (o ResultMock) Scanner() gocql.Scanner {
-	return o.Called().Get(0).(gocql.Scanner)
-}
-
-func (o ResultMock) PageState() []byte {
-	return o.Called().Get(0).([]byte)
-}
-
-func (o ResultMock) Scan(dest ...interface{}) bool {
-	return o.Called(dest).Bool(0)
-}
-
-func (o ResultMock) MapScan(m map[string]interface{}) bool {
-	return o.Called(m).Bool(0)
+func (o ResultMock) Values() []map[string]interface{} {
+	args := o.Called()
+	return args.Get(0).([]map[string]interface{})
 }
