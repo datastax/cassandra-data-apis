@@ -122,6 +122,17 @@ func (sg *SchemaGenerator) buildMutationFields(schema *KeyspaceGraphQLSchema, ta
 			},
 			Resolve: resolve,
 		}
+
+		fields[sg.naming.ToGraphQLOperation(updatePrefix, name)] = &graphql.Field{
+			Type: schema.resultUpdateTypes[table.Name],
+			Args: graphql.FieldConfigArgument{
+				"data":        {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
+				"ifExists":    {Type: graphql.Boolean},
+				"ifCondition": {Type: schema.tableOperatorInputTypes[table.Name]},
+				"options":     {Type: inputMutationOptions},
+			},
+			Resolve: resolve,
+		}
 	}
 	fields["createTable"] = &graphql.Field{
 		Type: graphql.Boolean,
@@ -345,6 +356,23 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 						Columns:     columnNames,
 						QueryParams: queryParams,
 						IfCondition: ifCondition,
+						IfExists:    params.Args["ifExists"] == true}, queryOptions)
+				case updatePrefix:
+					var ifCondition []types.ConditionItem
+					if params.Args["ifCondition"] != nil {
+						ifCondition = sg.adaptCondition(params.Args["ifCondition"].(map[string]interface{}))
+					}
+					ttl := -1
+					if options != nil {
+						ttl = options["ttl"].(int)
+					}
+					return sg.dbClient.Update(&db.UpdateInfo{
+						Keyspace:    keyspace.Name,
+						Table:       table,
+						Columns:     columnNames,
+						QueryParams: queryParams,
+						IfCondition: ifCondition,
+						TTL:         ttl,
 						IfExists:    params.Args["ifExists"] == true}, queryOptions)
 				}
 

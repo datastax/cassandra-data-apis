@@ -105,11 +105,6 @@ func (db *Db) Select(info *SelectInfo, options *QueryOptions) (ResultSet, error)
 	whereClause := buildCondition(info.Where, &values)
 	query := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", info.Keyspace, info.Table, whereClause)
 
-	if info.Options.Limit > 0 {
-		query += " LIMIT ?"
-		values = append(values, info.Options.Limit)
-	}
-
 	if len(info.OrderBy) > 0 {
 		query += " ORDER BY "
 		for i, order := range info.OrderBy {
@@ -118,6 +113,11 @@ func (db *Db) Select(info *SelectInfo, options *QueryOptions) (ResultSet, error)
 			}
 			query += order.Column + " " + order.Order
 		}
+	}
+
+	if info.Options.Limit > 0 {
+		query += " LIMIT ?"
+		values = append(values, info.Options.Limit)
 	}
 
 	return db.session.ExecuteIter(query, options, values...)

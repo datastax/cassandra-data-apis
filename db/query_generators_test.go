@@ -169,7 +169,7 @@ func TestSelectGeneration(t *testing.T) {
 		{[]types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, []ColumnOrder{{"c", "DESC"}},
 			"SELECT * FROM ks1.tbl1 WHERE a = ? ORDER BY c DESC"},
 		{[]types.ConditionItem{{"a", "=", "z"}}, &types.QueryOptions{Limit: 1}, []ColumnOrder{{"c", "ASC"}},
-			"SELECT * FROM ks1.tbl1 WHERE a = ? LIMIT ? ORDER BY c ASC"},
+			"SELECT * FROM ks1.tbl1 WHERE a = ? ORDER BY c ASC LIMIT ?"},
 	}
 
 	for _, item := range items {
