@@ -53,6 +53,57 @@ func TestDeleteGeneration(t *testing.T) {
 	}
 }
 
+func TestUpdateGeneration(t *testing.T) {
+	table := &gocql.TableMetadata{
+		Name:              "tbl1",
+		PartitionKey:      []*gocql.ColumnMetadata{{Name: "pk1"}, {Name: "pk2"}},
+		ClusteringColumns: []*gocql.ColumnMetadata{{Name: "ck1"}},
+	}
+
+	items := []struct {
+		columnNames    []string
+		queryParams    []interface{}
+		ifExists       bool
+		ifCondition    []types.ConditionItem
+		ttl            int
+		query          string
+		expectedParams []interface{}
+	}{
+		{[]string{"ck1", "a", "b", "pk2", "pk1"}, []interface{}{1, 2, 3, 4, 5}, false, nil, -1,
+			"UPDATE ks1.tbl1 SET a = ?, b = ? WHERE ck1 = ? AND pk2 = ? AND pk1 = ?", []interface{}{2, 3, 1, 4, 5}},
+		{[]string{"a", "ck1", "pk1", "pk2"}, []interface{}{1, 2, 3, 4}, true, nil, 60,
+			"UPDATE ks1.tbl1 USING TTL ? SET a = ? WHERE ck1 = ? AND pk1 = ? AND pk2 = ? IF EXISTS",
+			[]interface{}{60, 1, 2, 3, 4}},
+		{[]string{"a", "ck1", "pk1", "pk2"}, []interface{}{1, 2, 3, 4}, false,
+			[]types.ConditionItem{{"c", ">", 100}}, -1,
+			"UPDATE ks1.tbl1 SET a = ? WHERE ck1 = ? AND pk1 = ? AND pk2 = ? IF c > ?",
+			[]interface{}{1, 2, 3, 4, 100}},
+	}
+
+	for _, item := range items {
+		sessionMock := SessionMock{}
+		db := &Db{
+			session: &sessionMock,
+		}
+
+		sessionMock.On("Execute", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+		_, err := db.Update(&UpdateInfo{
+			Keyspace:    "ks1",
+			Table:       table,
+			Columns:     item.columnNames,
+			QueryParams: item.queryParams,
+			IfExists:    item.ifExists,
+			IfCondition: item.ifCondition,
+			TTL:         item.ttl,
+		}, nil)
+		assert.Nil(t, err)
+
+		sessionMock.AssertCalled(t, "Execute", item.query, mock.Anything, item.expectedParams)
+		sessionMock.AssertExpectations(t)
+	}
+}
+
 func TestInsertGeneration(t *testing.T) {
 	items := []struct {
 		columnNames []string
@@ -113,6 +164,8 @@ func TestSelectGeneration(t *testing.T) {
 			"SELECT * FROM ks1.tbl1 WHERE a = ?"},
 		{[]types.ConditionItem{{"a", "=", 1}, {"b", ">", 2}}, &types.QueryOptions{}, nil,
 			"SELECT * FROM ks1.tbl1 WHERE a = ? AND b > ?"},
+		{[]types.ConditionItem{{"a", "=", 1}, {"b", ">", 2}, {"b", "<=", 5}}, &types.QueryOptions{}, nil,
+			"SELECT * FROM ks1.tbl1 WHERE a = ? AND b > ? AND b <= ?"},
 		{[]types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, []ColumnOrder{{"c", "DESC"}},
 			"SELECT * FROM ks1.tbl1 WHERE a = ? ORDER BY c DESC"},
 		{[]types.ConditionItem{{"a", "=", "z"}}, &types.QueryOptions{Limit: 1}, []ColumnOrder{{"c", "ASC"}},

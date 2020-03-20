@@ -1,6 +1,7 @@
 package db
 
 import (
+	"errors"
 	"fmt"
 	"github.com/gocql/gocql"
 	"github.com/riptano/data-endpoints/types"
@@ -32,6 +33,16 @@ type DeleteInfo struct {
 	QueryParams []interface{}
 	IfCondition []types.ConditionItem
 	IfExists    bool
+}
+
+type UpdateInfo struct {
+	Keyspace    string
+	Table       *gocql.TableMetadata
+	Columns     []string
+	QueryParams []interface{}
+	IfCondition []types.ConditionItem
+	IfExists    bool
+	TTL         int
 }
 
 type ColumnOrder struct {
@@ -142,6 +153,70 @@ func (db *Db) Delete(info *DeleteInfo, options *QueryOptions) (*types.Modificati
 	query := fmt.Sprintf("DELETE FROM %s.%s WHERE %s", info.Keyspace, info.Table, whereClause)
 	queryParameters := make([]interface{}, len(info.QueryParams))
 	copy(queryParameters, info.QueryParams)
+
+	if info.IfExists {
+		query += " IF EXISTS"
+	} else if len(info.IfCondition) > 0 {
+		query += " IF " + buildCondition(info.IfCondition, &queryParameters)
+	}
+
+	err := db.session.Execute(query, options, queryParameters...)
+	return &types.ModificationResult{Applied: err == nil}, err
+}
+
+func (db *Db) Update(info *UpdateInfo, options *QueryOptions) (*types.ModificationResult, error) {
+	// We have to differentiate between WHERE and SET clauses
+	setClause := ""
+	whereClause := ""
+	setParameters := make([]interface{}, 0, len(info.QueryParams))
+	whereParameters := make([]interface{}, 0, len(info.QueryParams))
+
+	keys := make(map[string]bool)
+	for _, c := range info.Table.PartitionKey {
+		keys[c.Name] = true
+	}
+	for _, c := range info.Table.ClusteringColumns {
+		keys[c.Name] = true
+	}
+
+	for i, columnName := range info.Columns {
+		if keys[columnName] {
+			whereClause += fmt.Sprintf(" AND %s = ?", columnName)
+			whereParameters = append(whereParameters, info.QueryParams[i])
+		} else {
+			setClause += fmt.Sprintf(", %s = ?", columnName)
+			setParameters = append(setParameters, info.QueryParams[i])
+		}
+	}
+
+	if len(whereClause) == 0 {
+		return nil, errors.New("Partition and clustering keys must be included in query")
+	}
+	if len(setClause) == 0 {
+		return nil, errors.New("Query must include columns to update")
+	}
+
+	queryParameters := make([]interface{}, 0, len(info.QueryParams))
+
+	ttl := ""
+	if info.TTL >= 0 {
+		ttl = " USING TTL ?"
+		queryParameters = append(queryParameters, info.TTL)
+	}
+
+	for _, v := range setParameters {
+		queryParameters = append(queryParameters, v)
+	}
+	for _, v := range whereParameters {
+		queryParameters = append(queryParameters, v)
+	}
+
+	// Remove the initial AND operator
+	whereClause = whereClause[5:]
+	// Remove the initial , operator
+	setClause = setClause[2:]
+
+	query := fmt.Sprintf("UPDATE %s.%s%s SET %s WHERE %s", info.Keyspace, info.Table.Name, ttl, setClause, whereClause)
 
 	if info.IfExists {
 		query += " IF EXISTS"
