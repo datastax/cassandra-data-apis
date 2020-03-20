@@ -50,11 +50,11 @@ func (s *KeyspaceGraphQLSchema) buildOrderEnums(keyspace *gocql.KeyspaceMetadata
 	for _, table := range keyspace.Tables {
 		values := make(map[string]*graphql.EnumValueConfig, len(table.Columns))
 		for _, column := range table.Columns {
-			values[naming.ToGraphQLEnum(column.Name)+"_ASC"] = &graphql.EnumValueConfig{
+			values[naming.ToGraphQLEnumValue(column.Name)+"_ASC"] = &graphql.EnumValueConfig{
 				Value:       column.Name + "_ASC",
 				Description: fmt.Sprintf("Order %s by %s in a	scending order", table.Name, column.Name),
 			}
-			values[naming.ToGraphQLEnum(column.Name)+"_DESC"] = &graphql.EnumValueConfig{
+			values[naming.ToGraphQLEnumValue(column.Name)+"_DESC"] = &graphql.EnumValueConfig{
 				Value:       column.Name + "_DESC",
 				Description: fmt.Sprintf("Order %s by %s in descending order", table.Name, column.Name),
 			}
