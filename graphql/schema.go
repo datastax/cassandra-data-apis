@@ -5,6 +5,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/riptano/data-endpoints/config"
 	"github.com/riptano/data-endpoints/types"
+	"log"
 	"strings"
 
 	"github.com/gocql/gocql"
@@ -12,10 +13,11 @@ import (
 	"github.com/riptano/data-endpoints/db"
 )
 
-// TODO: could be done with enums
-const insertPrefix = "insert"
-const deletePrefix = "delete"
-const updatePrefix = "update"
+const (
+	insertPrefix = "insert"
+	deletePrefix = "delete"
+	updatePrefix = "update"
+)
 
 const AuthUserOrRole = "userOrRole"
 
@@ -24,24 +26,24 @@ type SchemaGenerator struct {
 	naming   config.NamingConvention
 }
 
-func buildType(typeInfo gocql.TypeInfo) graphql.Output {
+func buildType(typeInfo gocql.TypeInfo) (graphql.Output, error) {
 	switch typeInfo.Type() {
 	case gocql.TypeInt, gocql.TypeTinyInt, gocql.TypeSmallInt:
-		return graphql.Int
+		return graphql.Int, nil
 	case gocql.TypeFloat, gocql.TypeDouble:
-		return graphql.Float
+		return graphql.Float, nil
 	case gocql.TypeText, gocql.TypeVarchar, gocql.TypeBigInt, gocql.TypeDecimal:
-		return graphql.String
+		return graphql.String, nil
 	case gocql.TypeBoolean:
-		return graphql.Boolean
+		return graphql.Boolean, nil
 	case gocql.TypeUUID:
-		return uuid
+		return uuid, nil
 	case gocql.TypeTimeUUID:
-		return graphql.String
+		return graphql.String, nil
 	case gocql.TypeTimestamp:
-		return timestamp
+		return timestamp, nil
 	default:
-		panic("Unsupported type " + typeInfo.Type().String())
+		return nil, fmt.Errorf("Unsupported type %s", typeInfo.Type().String())
 	}
 }
 
@@ -55,6 +57,10 @@ func NewSchemaGenerator(dbClient *db.Db, naming config.NamingConvention) *Schema
 func (sg *SchemaGenerator) buildQueriesFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
 	fields := graphql.Fields{}
 	for name, table := range tables {
+		if schema.ignoredTables[table.Name] {
+			continue
+		}
+
 		fields[sg.naming.ToGraphQLOperation("", name)] = &graphql.Field{
 			Type: schema.resultSelectTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
@@ -102,6 +108,9 @@ func (sg *SchemaGenerator) buildQuery(schema *KeyspaceGraphQLSchema, tables map[
 func (sg *SchemaGenerator) buildMutationFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
 	fields := graphql.Fields{}
 	for name, table := range tables {
+		if schema.ignoredTables[table.Name] {
+			continue
+		}
 		fields[sg.naming.ToGraphQLOperation(insertPrefix, name)] = &graphql.Field{
 			Type: schema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
@@ -179,7 +188,11 @@ func (sg *SchemaGenerator) BuildSchema(keyspaceName string) (graphql.Schema, err
 		return graphql.Schema{}, err
 	}
 
-	keyspaceSchema := &KeyspaceGraphQLSchema{}
+	log.Printf("Building schema for %s", keyspace.Name)
+
+	keyspaceSchema := &KeyspaceGraphQLSchema{
+		ignoredTables: make(map[string]bool),
+	}
 	if err := keyspaceSchema.BuildTypes(keyspace, sg.naming); err != nil {
 		return graphql.Schema{}, err
 	}
