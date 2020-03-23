@@ -30,6 +30,8 @@ var operatorsInputTypes = map[gocql.Type]*graphql.InputObject{
 	gocql.TypeDouble:    floatOperatorType,
 	gocql.TypeUUID:      operatorType(uuid),
 	gocql.TypeTimestamp: operatorType(timestamp),
+	gocql.TypeTimeUUID:  operatorType(timeuuid),
+	gocql.TypeInet:      operatorType(ip),
 }
 
 func operatorType(graphqlType graphql.Type) *graphql.InputObject {

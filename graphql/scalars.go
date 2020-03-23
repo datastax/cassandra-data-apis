@@ -5,25 +5,36 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/language/ast"
+	"net"
 	"time"
 )
 
-var timestamp = graphql.NewScalar(graphql.ScalarConfig{
-	Name: "Timestamp",
-	Description: "The `Timestamp` scalar type represents a DateTime." +
+var timestamp = newStringScalar(
+	"Timestamp", "The `Timestamp` scalar type represents a DateTime."+
 		" The Timestamp is serialized as an RFC 3339 quoted string",
-	Serialize:    serializeTimestamp,
-	ParseValue:   deserializeTimestamp,
-	ParseLiteral: parseLiteralFromStringHandler(deserializeTimestamp),
-})
+	serializeTimestamp,
+	deserializeTimestamp)
 
-var uuid = graphql.NewScalar(graphql.ScalarConfig{
-	Name:         "Uuid",
-	Description:  "The `Uuid` scalar type represents a CQL uuid as a string.",
-	Serialize:    serializeUuid,
-	ParseValue:   deserializeUuid,
-	ParseLiteral: parseLiteralFromStringHandler(deserializeUuid),
-})
+var uuid = newStringScalar(
+	"Uuid", "The `Uuid` scalar type represents a CQL uuid as a string.", serializeUuid, deserializeUuid)
+
+var timeuuid = newStringScalar(
+	"TimeUuid", "The `TimeUuid` scalar type represents a CQL timeuuid as a string.", serializeUuid, deserializeUuid)
+
+var ip = newStringScalar(
+	"Inet", "The `Inet` scalar type represents a CQL inet as a string.", serializeIp, deserializeIp)
+
+func newStringScalar(
+	name string, description string, serializeFn graphql.SerializeFn, deserializeFn graphql.ParseValueFn,
+) *graphql.Scalar {
+	return graphql.NewScalar(graphql.ScalarConfig{
+		Name:         name,
+		Description:  description,
+		Serialize:    serializeFn,
+		ParseValue:   deserializeFn,
+		ParseLiteral: parseLiteralFromStringHandler(deserializeFn),
+	})
+}
 
 var deserializeUuid = deserializeFromUnmarshaler(func() encoding.TextUnmarshaler {
 	return &gocql.UUID{}
@@ -31,6 +42,10 @@ var deserializeUuid = deserializeFromUnmarshaler(func() encoding.TextUnmarshaler
 
 var deserializeTimestamp = deserializeFromUnmarshaler(func() encoding.TextUnmarshaler {
 	return &time.Time{}
+})
+
+var deserializeIp = deserializeFromUnmarshaler(func() encoding.TextUnmarshaler {
+	return &net.IP{}
 })
 
 func parseLiteralFromStringHandler(parser graphql.ParseValueFn) graphql.ParseLiteralFn {
@@ -74,17 +89,9 @@ func deserializeFromUnmarshaler(factory func() encoding.TextUnmarshaler) graphql
 func serializeTimestamp(value interface{}) interface{} {
 	switch value := value.(type) {
 	case time.Time:
-		buff, err := value.MarshalText()
-		if err != nil {
-			return nil
-		}
-
-		return string(buff)
+		return marshalText(value)
 	case *time.Time:
-		if value == nil {
-			return nil
-		}
-		return serializeTimestamp(*value)
+		return marshalText(value)
 	default:
 		return nil
 	}
@@ -93,18 +100,31 @@ func serializeTimestamp(value interface{}) interface{} {
 func serializeUuid(value interface{}) interface{} {
 	switch value := value.(type) {
 	case gocql.UUID:
-		buff, err := value.MarshalText()
-		if err != nil {
-			return nil
-		}
-
-		return string(buff)
+		return marshalText(value)
 	case *gocql.UUID:
-		if value == nil {
-			return nil
-		}
-		return serializeUuid(*value)
+		return marshalText(value)
 	default:
 		return nil
 	}
+}
+
+func serializeIp(value interface{}) interface{} {
+	switch value := value.(type) {
+	case net.IP:
+		return marshalText(value)
+	case *net.IP:
+		return marshalText(value)
+	default:
+		return nil
+	}
+}
+
+func marshalText(value encoding.TextMarshaler) *string {
+	buff, err := value.MarshalText()
+	if err != nil {
+		return nil
+	}
+
+	var s = string(buff)
+	return &s
 }

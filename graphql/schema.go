@@ -39,9 +39,11 @@ func buildType(typeInfo gocql.TypeInfo) (graphql.Output, error) {
 	case gocql.TypeUUID:
 		return uuid, nil
 	case gocql.TypeTimeUUID:
-		return graphql.String, nil
+		return timeuuid, nil
 	case gocql.TypeTimestamp:
 		return timestamp, nil
+	case gocql.TypeInet:
+		return ip, nil
 	default:
 		return nil, fmt.Errorf("Unsupported type %s", typeInfo.Type().String())
 	}

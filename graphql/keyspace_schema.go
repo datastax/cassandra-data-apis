@@ -92,8 +92,15 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 
 			fields[fieldName] = &graphql.Field{Type: fieldType}
 			inputFields[fieldName] = &graphql.InputObjectFieldConfig{Type: fieldType}
+
+			t := operatorsInputTypes[column.Type.Type()]
+			if t == nil {
+				// Exit: this is a bug as no operator type was defined for a type
+				log.Fatalf("No operator input type found for %s", column.Type.Type())
+			}
+
 			inputOperatorFields[fieldName] = &graphql.InputObjectFieldConfig{
-				Type: operatorsInputTypes[column.Type.Type()],
+				Type: t,
 			}
 		}
 
