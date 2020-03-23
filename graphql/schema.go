@@ -32,8 +32,12 @@ func buildType(typeInfo gocql.TypeInfo) (graphql.Output, error) {
 		return graphql.Int, nil
 	case gocql.TypeFloat, gocql.TypeDouble:
 		return graphql.Float, nil
-	case gocql.TypeText, gocql.TypeVarchar, gocql.TypeBigInt, gocql.TypeDecimal:
+	case gocql.TypeText, gocql.TypeVarchar:
 		return graphql.String, nil
+	case gocql.TypeBigInt:
+		return bigint, nil
+	case gocql.TypeDecimal:
+		return decimal, nil
 	case gocql.TypeBoolean:
 		return graphql.Boolean, nil
 	case gocql.TypeUUID:
