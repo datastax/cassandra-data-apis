@@ -113,7 +113,7 @@ func deserializeFromUnmarshaler(factory func() encoding.TextUnmarshaler) graphql
 			}
 			return fn([]byte(*value))
 		default:
-			return nil
+			return value
 		}
 	}
 
@@ -127,7 +127,7 @@ func serializeTimestamp(value interface{}) interface{} {
 	case *time.Time:
 		return marshalText(value)
 	default:
-		return nil
+		return value
 	}
 }
 
@@ -138,7 +138,7 @@ func serializeUuid(value interface{}) interface{} {
 	case *gocql.UUID:
 		return marshalText(value)
 	default:
-		return nil
+		return value
 	}
 }
 
@@ -149,7 +149,7 @@ func serializeIp(value interface{}) interface{} {
 	case *net.IP:
 		return marshalText(value)
 	default:
-		return nil
+		return value
 	}
 }
 
@@ -160,7 +160,7 @@ func serializeBigInt(value interface{}) interface{} {
 	case *int64:
 		return strconv.FormatInt(*value, 10)
 	default:
-		return nil
+		return value
 	}
 }
 
@@ -171,7 +171,7 @@ func serializeDecimal(value interface{}) interface{} {
 	case *inf.Dec:
 		return value.String()
 	default:
-		return nil
+		return value
 	}
 }
 

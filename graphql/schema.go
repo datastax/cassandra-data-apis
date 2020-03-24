@@ -48,6 +48,12 @@ func buildType(typeInfo gocql.TypeInfo) (graphql.Output, error) {
 		return timestamp, nil
 	case gocql.TypeInet:
 		return ip, nil
+	case gocql.TypeList:
+		elem, err := buildType(typeInfo.(gocql.CollectionType).Elem)
+		if err != nil {
+			return nil, err
+		}
+		return graphql.NewList(elem), nil
 	default:
 		return nil, fmt.Errorf("Unsupported type %s", typeInfo.Type().String())
 	}
@@ -240,15 +246,15 @@ func (sg *SchemaGenerator) queryFieldResolver(keyspace *gocql.KeyspaceMetadata) 
 						Value:    value,
 					})
 				}
-			} else {
-				if strings.HasSuffix(fieldName, "Filter") {
-					table, tableFound = keyspace.Tables[sg.naming.ToCQLTable(strings.TrimSuffix(fieldName, "Filter"))]
-					if !tableFound {
-						return nil, fmt.Errorf("unable to find table '%s'", params.Info.FieldName)
-					}
-
-					whereClause = sg.adaptCondition(data)
+			} else if strings.HasSuffix(fieldName, "Filter") {
+				table, tableFound = keyspace.Tables[sg.naming.ToCQLTable(strings.TrimSuffix(fieldName, "Filter"))]
+				if !tableFound {
+					return nil, fmt.Errorf("unable to find table '%s'", params.Info.FieldName)
 				}
+
+				whereClause = sg.adaptCondition(data)
+			} else {
+				return nil, fmt.Errorf("Unable to find table for '%s'", params.Info.FieldName)
 			}
 
 			var orderBy []interface{}

@@ -56,8 +56,7 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 	for i := range values {
 		typeInfo := columns[i].TypeInfo
 		switch typeInfo.Type() {
-		case gocql.TypeVarchar, gocql.TypeAscii, gocql.TypeInet, gocql.TypeText,
-			gocql.TypeBigInt, gocql.TypeCounter:
+		case gocql.TypeVarchar, gocql.TypeAscii, gocql.TypeInet, gocql.TypeText, gocql.TypeBigInt, gocql.TypeCounter:
 			values[i] = new(*string)
 		case gocql.TypeBoolean:
 			values[i] = new(*bool)
@@ -73,8 +72,10 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 			values[i] = new(*int8)
 		case gocql.TypeTimeUUID, gocql.TypeUUID:
 			values[i] = new(*gocql.UUID)
+		case gocql.TypeList:
+			values[i] = new([]int)
 		default:
-			values[i] = columns[i].TypeInfo.New()
+			panic("Support for CQL type not found: " + typeInfo.Type().String())
 		}
 	}
 
