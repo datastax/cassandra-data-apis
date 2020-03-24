@@ -3,11 +3,13 @@ language: go
 go:
   - "1.14"
 
+
 before_install:
+  - git config --global url."git@github.com:".insteadOf "https://github.com/" 
   - sudo rm -rf /var/lib/cassandra/*
   - wget https://downloads.apache.org/cassandra/3.11.6/apache-cassandra-3.11.6-bin.tar.gz && tar -xvzf apache-cassandra-3.11.6-bin.tar.gz && sh apache-cassandra-3.11.6/bin/cassandra
 
 env:
   - CASSANDRA_VERSION=3.11.6
 
-script: go test -v ./...
+script: GOPRIVATE="github.com/riptano/*" go test -v ./...
