@@ -8,7 +8,7 @@ environment:
     - CCM_VERSION: "3.11.6"
 
 install:
-  - source ./install.sh
+  - source ./ci/ubuntu_tools.sh
 
 before_test:
   - ccm create test -v $CCM_VERSION
