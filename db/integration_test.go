@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"github.com/riptano/data-endpoints/internal/testutil"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -9,19 +8,23 @@ import (
 
 type IntegrationTestSuite struct {
 	suite.Suite
+	db *Db
 }
 
 func (suite *IntegrationTestSuite) SetupSuite() {
-	fmt.Println("Running setup suite")
-	testutil.SetupIntegrationTestFixture()
+	session := testutil.SetupIntegrationTestFixture()
+	err := session.Query("CREATE KEYSPACE ks1 WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 1}").Exec()
+	if err != nil {
+		panic(err)
+	}
+	suite.db = &Db{session: &GoCqlSession{ref: session}}
 }
 
 func (suite *IntegrationTestSuite) TearDownSuite() {
-	fmt.Println("Running teardown suite")
 	testutil.TearDownIntegrationTestFixture()
 }
 
-func TestExampleTestSuite(t *testing.T) {
+func TestDbIntegrationTestSuite(t *testing.T) {
 	if testutil.IntegrationTestsEnabled() {
 		suite.Run(t, new(IntegrationTestSuite))
 	}

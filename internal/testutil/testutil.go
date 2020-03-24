@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"fmt"
+	"github.com/gocql/gocql"
 	"os"
 	"os/exec"
 )
@@ -49,12 +50,25 @@ func cassandraVersion() string {
 	return version
 }
 
-func SetupIntegrationTestFixture() {
+func SetupIntegrationTestFixture() *gocql.Session {
 	if !IntegrationTestsEnabled() {
-		return
+		return nil
 	}
 
 	startCassandra()
+
+	cluster := gocql.NewCluster("127.0.0.1")
+
+	var (
+		session *gocql.Session
+		err     error
+	)
+
+	if session, err = cluster.CreateSession(); err != nil {
+		panic(err)
+	}
+
+	return session
 }
 
 func TearDownIntegrationTestFixture() {
