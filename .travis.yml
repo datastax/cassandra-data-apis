@@ -5,7 +5,7 @@ go:
 
 
 before_install:
-  - echo -e "machine github.com\n  login $CI_USER_TOKEN" > ~/.netrc
+  - git config --global url."git@github.com:".insteadOf "https://github.com/" 
   - sudo rm -rf /var/lib/cassandra/*
   - wget https://downloads.apache.org/cassandra/3.11.6/apache-cassandra-3.11.6-bin.tar.gz && tar -xvzf apache-cassandra-3.11.6-bin.tar.gz && sh apache-cassandra-3.11.6/bin/cassandra
 
