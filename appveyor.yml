@@ -1,0 +1,18 @@
+image: Ubuntu
+stack: jdk 8, go 1.14, python 2
+build: off
+
+environment:
+  RUN_INTEGRATION_TESTS: "1"
+  matrix:
+    - CCM_VERSION: "3.11.6"
+
+install:
+  - source ./ci/ubuntu_tools.sh
+
+before_test:
+  - ccm create test -v $CCM_VERSION
+  - ccm remove
+
+test_script:
+  - go test -v ./...
