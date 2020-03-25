@@ -57,11 +57,14 @@ func (su *SchemaUpdater) Start() {
 
 		shouldUpdate := false
 		for _, row := range result.Values() {
-			if schemaVersion, ok := row["schema_version"].(gocql.UUID); ok {
-				if schemaVersion != su.schemaVersion {
+			if schemaVersion, ok := row["schema_version"].(*gocql.UUID); ok && schemaVersion != nil {
+				if *schemaVersion != su.schemaVersion {
 					shouldUpdate = true
-					su.schemaVersion = schemaVersion
+					su.schemaVersion = *schemaVersion
 				}
+			} else {
+				// TODO: Log error
+				fmt.Fprintf(os.Stderr, "schema version value is invalid: %v", row)
 			}
 		}
 
