@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gocql/gocql"
 	"github.com/riptano/data-endpoints/types"
+	"gopkg.in/inf.v0"
 	"reflect"
 	"strings"
 )
@@ -56,13 +57,20 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 	for i := range values {
 		typeInfo := columns[i].TypeInfo
 		switch typeInfo.Type() {
-		case gocql.TypeVarchar, gocql.TypeAscii, gocql.TypeInet, gocql.TypeText, gocql.TypeBigInt, gocql.TypeCounter:
+		case gocql.TypeVarchar, gocql.TypeAscii, gocql.TypeInet, gocql.TypeText:
 			values[i] = new(*string)
+		case gocql.TypeBigInt, gocql.TypeCounter:
+			// We try to use types that have graphql/json representation
+			values[i] = new(*string)
+		case gocql.TypeDecimal:
+			values[i] = new(*inf.Dec)
 		case gocql.TypeBoolean:
 			values[i] = new(*bool)
 		case gocql.TypeFloat:
+			// Mapped to a json Number
 			values[i] = new(*float32)
 		case gocql.TypeDouble:
+			// Mapped to a json Number
 			values[i] = new(*float64)
 		case gocql.TypeInt:
 			values[i] = new(*int)
