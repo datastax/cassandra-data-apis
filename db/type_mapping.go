@@ -82,7 +82,8 @@ func allocateForType(info gocql.TypeInfo) interface{} {
 	case gocql.TypeTinyInt:
 		return new(*int8)
 	case gocql.TypeTimeUUID, gocql.TypeUUID:
-		return new(*gocql.UUID)
+		// Mapped to a json string
+		return new(*string)
 	case gocql.TypeList, gocql.TypeSet:
 		listInfo, ok := info.(gocql.CollectionType)
 		if !ok {

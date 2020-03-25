@@ -48,7 +48,7 @@ func buildType(typeInfo gocql.TypeInfo) (graphql.Output, error) {
 		return timestamp, nil
 	case gocql.TypeInet:
 		return ip, nil
-	case gocql.TypeList:
+	case gocql.TypeList, gocql.TypeSet:
 		elem, err := buildType(typeInfo.(gocql.CollectionType).Elem)
 		if err != nil {
 			return nil, err

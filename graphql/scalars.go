@@ -17,6 +17,7 @@ var timestamp = newStringScalar(
 	serializeTimestamp,
 	deserializeTimestamp)
 
+// TODO: Uuid, bigint and ip types are serialized as strings (allowed by the driver), we should simplify scalar parsing
 var uuid = newStringScalar(
 	"Uuid", "The `Uuid` scalar type represents a CQL uuid as a string.", serializeUuid, deserializeUuid)
 
