@@ -35,7 +35,7 @@ func (suite *IntegrationTestSuite) TestNumericCqlTypeMapping() {
 	assertPointerValue(suite.T(), new(float64), 1.1, row["double_value"])
 	assertPointerValue(suite.T(), new(int16), int16(1), row["smallint_value"])
 	assertPointerValue(suite.T(), new(int8), int8(1), row["tinyint_value"])
-	assertPointerValue(suite.T(), new(*inf.Dec), inf.NewDec(125, 2), row["decimal_value"])
+	assertPointerValue(suite.T(), new(inf.Dec), *inf.NewDec(125, 2), row["decimal_value"])
 
 	// Assert nil values
 	rs, err = suite.db.session.ExecuteIter("SELECT * FROM ks1.tbl_numerics WHERE id = ?", nil, 100)
@@ -46,8 +46,38 @@ func (suite *IntegrationTestSuite) TestNumericCqlTypeMapping() {
 	assertNilPointer(suite.T(), new(float64), row["double_value"])
 	assertNilPointer(suite.T(), new(int16), row["smallint_value"])
 	assertNilPointer(suite.T(), new(int8), row["tinyint_value"])
-	assert.IsType(suite.T(), new(*inf.Dec), row["decimal_value"])
-	assert.Nil(suite.T(), reflect.ValueOf(row["decimal_value"]).Elem().Interface())
+	assertNilPointer(suite.T(), new(inf.Dec), row["decimal_value"])
+}
+
+func (suite *IntegrationTestSuite) TestCollectionCqlTypeMapping() {
+	queries := []string{
+		"CREATE TABLE ks1.tbl_lists (id int PRIMARY KEY, int_value list<int>, bigint_value list<bigint>," +
+			" float_value list<float>, double_value list<double>, bool_value list<boolean>, text_value list<text>)",
+		"INSERT INTO ks1.tbl_lists (id, int_value, bigint_value, float_value, double_value" +
+			", bool_value, text_value) VALUES (1, [1], [1], [1.1], [2.1], [true], ['hello'])",
+		"INSERT INTO ks1.tbl_lists (id) VALUES (100)",
+	}
+
+	for _, query := range queries {
+		err := suite.db.session.Execute(query, nil)
+		assert.Nil(suite.T(), err)
+	}
+
+	var (
+		rs  ResultSet
+		err error
+		row map[string]interface{}
+	)
+
+	rs, err = suite.db.session.ExecuteIter("SELECT * FROM ks1.tbl_lists WHERE id = ?", nil, 1)
+	assert.Nil(suite.T(), err)
+	row = rs.Values()[0]
+	assertPointerValue(suite.T(), new([]int), []int{1}, row["int_value"])
+	assertPointerValue(suite.T(), new([]string), []string{"1"}, row["bigint_value"])
+	assertPointerValue(suite.T(), new([]float32), []float32{1.1}, row["float_value"])
+	assertPointerValue(suite.T(), new([]float64), []float64{2.1}, row["double_value"])
+	assertPointerValue(suite.T(), new([]bool), []bool{true}, row["bool_value"])
+	assertPointerValue(suite.T(), new([]string), []string{"hello"}, row["text_value"])
 }
 
 func assertPointerValue(t *testing.T, expectedType interface{}, expected interface{}, actual interface{}) {
