@@ -14,4 +14,4 @@ require (
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 )
 
-replace github.com/graphql-go/graphql => github.com/riptano/graphql v0.7.9-null
+replace github.com/graphql-go/graphql => github.com/datastax/graphql v0.7.9-null
