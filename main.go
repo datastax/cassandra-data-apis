@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/riptano/data-endpoints/config"
 	"github.com/riptano/data-endpoints/endpoint"
 	"github.com/riptano/data-endpoints/graphql"
 	"log"
@@ -27,6 +28,13 @@ func main() {
 	cfg := endpoint.NewEndpointConfig(strings.Split(hosts, ",")...)
 	cfg.DbUsername = os.Getenv("DB_USERNAME");
 	cfg.DbPassword = os.Getenv("DB_PASSWORD");
+
+	supportedOps := os.Getenv("SUPPORTED_OPERATIONS")
+	if supportedOps == "" {
+		cfg.SupportedOperations.Set(config.TableCreate | config.KeyspaceCreate)
+	} else {
+		cfg.SupportedOperations.Add(strings.Split(supportedOps, ",")...)
+	}
 
 	endpoint, err := cfg.NewEndpoint()
 	if err != nil {

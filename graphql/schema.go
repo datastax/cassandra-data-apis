@@ -22,8 +22,9 @@ const (
 const AuthUserOrRole = "userOrRole"
 
 type SchemaGenerator struct {
-	dbClient *db.Db
-	naming   config.NamingConvention
+	dbClient     *db.Db
+	naming       config.NamingConvention
+	supportedOps config.Operations
 }
 
 func buildType(typeInfo gocql.TypeInfo) (graphql.Output, error) {
@@ -59,10 +60,11 @@ func buildType(typeInfo gocql.TypeInfo) (graphql.Output, error) {
 	}
 }
 
-func NewSchemaGenerator(dbClient *db.Db, naming config.NamingConvention) *SchemaGenerator {
+func NewSchemaGenerator(dbClient *db.Db, naming config.NamingConvention, supportedOps config.Operations) *SchemaGenerator {
 	return &SchemaGenerator{
 		dbClient: dbClient,
 		naming:   naming,
+		supportedOps: supportedOps,
 	}
 }
 
@@ -155,32 +157,64 @@ func (sg *SchemaGenerator) buildMutationFields(schema *KeyspaceGraphQLSchema, ta
 			Resolve: resolve,
 		}
 	}
-	fields["createTable"] = &graphql.Field{
-		Type: graphql.Boolean,
-		Args: graphql.FieldConfigArgument{
-			"name": &graphql.ArgumentConfig{
-				Type: graphql.NewNonNull(graphql.String),
+	if sg.supportedOps.IsSupported(config.TableCreate) {
+		fields["createTable"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Args: graphql.FieldConfigArgument{
+				"name": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"partitionKeys": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.NewList(columnInput)),
+				},
+				"clusteringKeys": &graphql.ArgumentConfig{
+					Type: graphql.NewList(clusteringKeyInput),
+				},
+				"values": &graphql.ArgumentConfig{
+					Type: graphql.NewList(columnInput),
+				},
 			},
-			"partitionKeys": &graphql.ArgumentConfig{
-				Type: graphql.NewNonNull(graphql.NewList(columnInput)),
-			},
-			"clusteringKeys": &graphql.ArgumentConfig{
-				Type: graphql.NewList(clusteringKeyInput),
-			},
-			"values": &graphql.ArgumentConfig{
-				Type: graphql.NewList(columnInput),
-			},
-		},
-		Resolve: resolve,
+			Resolve: resolve,
+		}
 	}
-	fields["dropTable"] = &graphql.Field{
-		Type: graphql.Boolean,
-		Args: graphql.FieldConfigArgument{
-			"name": &graphql.ArgumentConfig{
-				Type: graphql.NewNonNull(graphql.String),
+	if sg.supportedOps.IsSupported(config.TableAlterAdd) {
+		fields["alterTableAdd"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Args: graphql.FieldConfigArgument{
+				"name": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"toAdd": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.NewList(columnInput)),
+				},
 			},
-		},
-		Resolve: resolve,
+			Resolve: resolve,
+		}
+	}
+	if sg.supportedOps.IsSupported(config.TableAlterDrop) {
+		fields["alterTableDrop"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Args: graphql.FieldConfigArgument{
+				"name": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"toDrop": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.NewList(graphql.String)),
+				},
+			},
+			Resolve: resolve,
+		}
+	}
+	if sg.supportedOps.IsSupported(config.TableDrop) {
+		fields["dropTable"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Args: graphql.FieldConfigArgument{
+				"name": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+			},
+			Resolve: resolve,
+		}
 	}
 	return fields
 }
@@ -330,6 +364,10 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 		switch fieldName {
 		case "createTable":
 			return sg.createTable(keyspace.Name, params)
+		case "alterTableAdd":
+			return sg.alterTableAdd(keyspace.Name, params)
+		case "alterTableDrop":
+			return sg.alterTableDrop(keyspace.Name, params)
 		case "dropTable":
 			return sg.dropTable(keyspace.Name, params)
 		default:

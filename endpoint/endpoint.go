@@ -14,6 +14,7 @@ type DataEndpointConfig struct {
 	ExcludedKeyspaces    []string
 	SchemaUpdateInterval time.Duration
 	Naming               config.NamingConvention
+	SupportedOperations  config.Operations
 }
 
 type DataEndpoint struct {
@@ -34,7 +35,8 @@ func (cfg *DataEndpointConfig) NewEndpoint() (*DataEndpoint, error) {
 		return nil, err
 	}
 	return &DataEndpoint{
-		graphQLRouteGen: graphql.NewRouteGenerator(dbClient, cfg.ExcludedKeyspaces, cfg.SchemaUpdateInterval, cfg.Naming),
+		graphQLRouteGen: graphql.NewRouteGenerator(dbClient, cfg.ExcludedKeyspaces, cfg.SchemaUpdateInterval,
+			cfg.Naming, cfg.SupportedOperations),
 	}, nil
 }
 

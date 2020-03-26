@@ -3,23 +3,35 @@ package db
 import (
 	"fmt"
 	"github.com/gocql/gocql"
+	"strings"
 )
 
 type CreateTableInfo struct {
-	Keyspace string
-	Table string
-	PartitionKeys []*gocql.ColumnMetadata
+	Keyspace       string
+	Table          string
+	PartitionKeys  []*gocql.ColumnMetadata
 	ClusteringKeys []*gocql.ColumnMetadata
-	Values []*gocql.ColumnMetadata
+	Values         []*gocql.ColumnMetadata
+}
+
+type AlterTableAddInfo struct {
+	Keyspace string
+	Table    string
+	ToAdd    []*gocql.ColumnMetadata
+}
+
+type AlterTableDropInfo struct {
+	Keyspace string
+	Table    string
+	ToDrop   []string
 }
 
 type DropTableInfo struct {
 	Keyspace string
-	Table string
+	Table    string
 }
 
-func (db *Db) CreateTable(info* CreateTableInfo, options *QueryOptions) (bool, error) {
-
+func (db *Db) CreateTable(info *CreateTableInfo, options *QueryOptions) (bool, error) {
 	columns := ""
 	primaryKeys := ""
 	clusteringOrder := ""
@@ -65,7 +77,27 @@ func (db *Db) CreateTable(info* CreateTableInfo, options *QueryOptions) (bool, e
 	return err == nil, err
 }
 
-func (db *Db) DropTable(info* DropTableInfo, options *QueryOptions) (bool, error) {
+func (db *Db) AlterTableAdd(info *AlterTableAddInfo, options *QueryOptions) (bool, error) {
+	query := fmt.Sprintf("ALTER TABLE %s.%s ADD(", info.Keyspace, info.Table)
+	for i, c := range info.ToAdd {
+		if i > 0 {
+			query += ", ";
+		}
+		query += fmt.Sprintf("%s %s", c.Name, c.Type)
+	}
+	query += ")"
+	err := db.session.Execute(query, options)
+	return err == nil, err
+}
+
+func (db *Db) AlterTableDrop(info *AlterTableDropInfo, options *QueryOptions) (bool, error) {
+	query := fmt.Sprintf("ALTER TABLE %s.%s DROP ", info.Keyspace, info.Table)
+	query += strings.Join(info.ToDrop, ", ")
+	err := db.session.Execute(query, options)
+	return err == nil, err
+}
+
+func (db *Db) DropTable(info *DropTableInfo, options *QueryOptions) (bool, error) {
 	// TODO: Escape keyspace/table name?
 	query := fmt.Sprintf("DROP TABLE %s.%s", info.Table, info.Keyspace)
 	err := db.session.Execute(query, options)

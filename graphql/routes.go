@@ -41,12 +41,13 @@ type requestBody struct {
 	Query string `json:"query"`
 }
 
-func NewRouteGenerator(dbClient *db.Db, ksExcluded []string, updateInterval time.Duration, naming config.NamingConvention) *RouteGenerator {
+func NewRouteGenerator(dbClient *db.Db, ksExcluded []string, updateInterval time.Duration,
+	naming config.NamingConvention, supportedOps config.Operations) *RouteGenerator {
 	return &RouteGenerator{
 		dbClient:       dbClient,
 		ksExcluded:     ksExcluded,
 		updateInterval: updateInterval,
-		schemaGen:      NewSchemaGenerator(dbClient, naming),
+		schemaGen:      NewSchemaGenerator(dbClient, naming, supportedOps),
 	}
 }
 

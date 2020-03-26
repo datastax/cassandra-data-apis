@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
+	"github.com/riptano/data-endpoints/config"
 	"github.com/riptano/data-endpoints/db"
 	"os"
 	"strconv"
@@ -129,53 +130,62 @@ func (sg *SchemaGenerator) buildKeyspaceQuery() *graphql.Object {
 }
 
 func (sg *SchemaGenerator) buildKeyspaceMutation() *graphql.Object {
+	fields := graphql.Fields{}
+
+	if sg.supportedOps.IsSupported(config.KeyspaceCreate) {
+		fields["createKeyspace"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Args: graphql.FieldConfigArgument{
+				"name": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"dcs": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.NewList(dataCenterInput)),
+				},
+			},
+			Resolve: func(params graphql.ResolveParams) (interface{}, error) {
+				ksName := params.Args["name"].(string)
+				dcs := params.Args["dcs"].([]interface{})
+
+				dcReplicas := make(map[string]int)
+				for _, dc := range dcs {
+					dcReplica := dc.(map[string]interface{})
+					dcReplicas[dcReplica["name"].(string)] = dcReplica["replicas"].(int)
+				}
+
+				userOrRole, err := checkAuthUserOrRole(params)
+				if err != nil {
+					return nil, err
+				}
+				return sg.dbClient.CreateKeyspace(ksName, dcReplicas, db.NewQueryOptions().WithUserOrRole(userOrRole))
+			},
+		}
+	}
+
+	if sg.supportedOps.IsSupported(config.KeyspaceDrop) {
+		fields["dropKeyspace"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Args: graphql.FieldConfigArgument{
+				"name": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+			},
+			Resolve: func(params graphql.ResolveParams) (interface{}, error) {
+				ksName := params.Args["name"].(string)
+
+				userOrRole, err := checkAuthUserOrRole(params)
+				if err != nil {
+					return nil, err
+				}
+				return sg.dbClient.DropKeyspace(ksName, db.NewQueryOptions().WithUserOrRole(userOrRole))
+			},
+		}
+
+	}
+
+
 	return graphql.NewObject(graphql.ObjectConfig{
 		Name: "KeyspaceMutation",
-		Fields: graphql.Fields{
-			"createKeyspace": &graphql.Field{
-				Type: graphql.Boolean,
-				Args: graphql.FieldConfigArgument{
-					"name": &graphql.ArgumentConfig{
-						Type: graphql.NewNonNull(graphql.String),
-					},
-					"dcs": &graphql.ArgumentConfig{
-						Type: graphql.NewNonNull(graphql.NewList(dataCenterInput)),
-					},
-				},
-				Resolve: func(params graphql.ResolveParams) (interface{}, error) {
-					ksName := params.Args["name"].(string)
-					dcs := params.Args["dcs"].([]interface{})
-
-					dcReplicas := make(map[string]int)
-					for _, dc := range dcs {
-						dcReplica := dc.(map[string]interface{})
-						dcReplicas[dcReplica["name"].(string)] = dcReplica["replicas"].(int)
-					}
-
-					userOrRole, err := checkAuthUserOrRole(params)
-					if err != nil {
-						return nil, err
-					}
-					return sg.dbClient.CreateKeyspace(ksName, dcReplicas, db.NewQueryOptions().WithUserOrRole(userOrRole))
-				},
-			},
-			"dropKeyspace": &graphql.Field{
-				Type: graphql.Boolean,
-				Args: graphql.FieldConfigArgument{
-					"name": &graphql.ArgumentConfig{
-						Type: graphql.NewNonNull(graphql.String),
-					},
-				},
-				Resolve: func(params graphql.ResolveParams) (interface{}, error) {
-					ksName := params.Args["name"].(string)
-
-					userOrRole, err := checkAuthUserOrRole(params)
-					if err != nil {
-						return nil, err
-					}
-					return sg.dbClient.DropKeyspace(ksName, db.NewQueryOptions().WithUserOrRole(userOrRole))
-				},
-			},
-		},
+		Fields: fields,
 	})
 }

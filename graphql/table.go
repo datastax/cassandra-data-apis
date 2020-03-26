@@ -204,7 +204,7 @@ func (sg *SchemaGenerator) getTables(keyspace *gocql.KeyspaceMetadata) (interfac
 	return tableValues, nil
 }
 
-func decodeColumns(columns []interface{}) ([]*gocql.ColumnMetadata, error) {
+func (sg *SchemaGenerator) decodeColumns(columns []interface{}) ([]*gocql.ColumnMetadata, error) {
 	columnValues := make([]*gocql.ColumnMetadata, 0)
 	for _, column := range columns {
 		var value columnValue
@@ -214,7 +214,7 @@ func decodeColumns(columns []interface{}) ([]*gocql.ColumnMetadata, error) {
 
 		// Adapt from GraphQL column to gocql column
 		cqlColumn := &gocql.ColumnMetadata{
-			Name: value.Name,
+			Name: sg.naming.ToCQLColumn(value.Name),
 			Kind: toDbColumnKind(value.Kind),
 			Type: toDbColumnType(value.Type),
 		}
@@ -250,16 +250,16 @@ func (sg *SchemaGenerator) createTable(ksName string, params graphql.ResolvePara
 	var values []*gocql.ColumnMetadata = nil
 	var clusteringKeys []*gocql.ColumnMetadata = nil
 	args := params.Args
-	name := args["name"].(string)
+	name := sg.naming.ToCQLTable(args["name"].(string))
 
-	partitionKeys, err := decodeColumns(args["partitionKeys"].([]interface{}))
+	partitionKeys, err := sg.decodeColumns(args["partitionKeys"].([]interface{}))
 
 	if err != nil {
 		return false, err
 	}
 
 	if args["values"] != nil {
-		if values, err = decodeColumns(args["values"].([]interface{})); err != nil {
+		if values, err = sg.decodeColumns(args["values"].([]interface{})); err != nil {
 			return nil, err
 		}
 	}
@@ -275,11 +275,63 @@ func (sg *SchemaGenerator) createTable(ksName string, params graphql.ResolvePara
 		return nil, err
 	}
 	return sg.dbClient.CreateTable(&db.CreateTableInfo{
-		Keyspace: ksName,
-		Table: name,
-		PartitionKeys: partitionKeys,
+		Keyspace:       ksName,
+		Table:          name,
+		PartitionKeys:  partitionKeys,
 		ClusteringKeys: clusteringKeys,
-		Values: values}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+		Values:         values}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+}
+
+func (sg *SchemaGenerator) alterTableAdd(ksName string, params graphql.ResolveParams) (interface{}, error) {
+	var err error
+	var toAdd []*gocql.ColumnMetadata
+
+	args := params.Args
+	name := sg.naming.ToCQLTable(args["name"].(string))
+
+	if toAdd, err = sg.decodeColumns(args["toAdd"].([]interface{})); err != nil {
+		return nil, err
+	}
+
+	if len(toAdd) == 0 {
+		return nil, fmt.Errorf("at least one column required")
+	}
+
+	userOrRole, err := checkAuthUserOrRole(params)
+	if err != nil {
+		return nil, err
+	}
+	return sg.dbClient.AlterTableAdd(&db.AlterTableAddInfo{
+		Keyspace: ksName,
+		Table:    name,
+		ToAdd:    toAdd,
+	}, db.NewQueryOptions().WithUserOrRole(userOrRole));
+}
+
+func (sg *SchemaGenerator) alterTableDrop(ksName string, params graphql.ResolveParams) (interface{}, error) {
+	args := params.Args
+	name := sg.naming.ToCQLTable(args["name"].(string))
+
+	toDropArg := args["toDrop"].([]interface{})
+	toDrop := make([]string, 0, len(toDropArg))
+
+	for _, column := range toDropArg {
+		toDrop = append(toDrop, sg.naming.ToCQLColumn(column.(string)))
+	}
+
+	if len(toDrop) == 0 {
+		return nil, fmt.Errorf("at least one column required")
+	}
+
+	userOrRole, err := checkAuthUserOrRole(params)
+	if err != nil {
+		return nil, err
+	}
+	return sg.dbClient.AlterTableDrop(&db.AlterTableDropInfo{
+		Keyspace: ksName,
+		Table:    name,
+		ToDrop:   toDrop,
+	}, db.NewQueryOptions().WithUserOrRole(userOrRole));
 }
 
 func (sg *SchemaGenerator) dropTable(ksName string, params graphql.ResolveParams) (interface{}, error) {
@@ -290,7 +342,7 @@ func (sg *SchemaGenerator) dropTable(ksName string, params graphql.ResolveParams
 	}
 	return sg.dbClient.DropTable(&db.DropTableInfo{
 		Keyspace: ksName,
-		Table: name}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+		Table:    name}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 }
 
 func toColumnKind(kind gocql.ColumnKind) int {
