@@ -22,9 +22,10 @@ const (
 const AuthUserOrRole = "userOrRole"
 
 type SchemaGenerator struct {
-	dbClient     *db.Db
-	naming       config.NamingConvention
-	supportedOps config.Operations
+	dbClient          *db.Db
+	naming            config.NamingConvention
+	supportedOps      config.Operations
+	useUserOrRoleAuth bool
 }
 
 func buildType(typeInfo gocql.TypeInfo) (graphql.Output, error) {
@@ -60,11 +61,12 @@ func buildType(typeInfo gocql.TypeInfo) (graphql.Output, error) {
 	}
 }
 
-func NewSchemaGenerator(dbClient *db.Db, naming config.NamingConvention, supportedOps config.Operations) *SchemaGenerator {
+func NewSchemaGenerator(dbClient *db.Db, cfg config.Config) *SchemaGenerator {
 	return &SchemaGenerator{
-		dbClient: dbClient,
-		naming:   naming,
-		supportedOps: supportedOps,
+		dbClient:          dbClient,
+		naming:            cfg.Naming(),
+		supportedOps:      cfg.SupportedOperations(),
+		useUserOrRoleAuth: cfg.UseUserOrRoleAuth(),
 	}
 }
 
@@ -301,7 +303,7 @@ func (sg *SchemaGenerator) queryFieldResolver(keyspace *gocql.KeyspaceMetadata) 
 				orderBy = params.Args["orderBy"].([]interface{})
 			}
 
-			userOrRole, err := checkAuthUserOrRole(params)
+			userOrRole, err := sg.checkUserOrRoleAuth(params)
 			if err != nil {
 				return nil, err
 			}
@@ -388,7 +390,7 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 					options = params.Args["options"].(map[string]interface{})
 				}
 
-				userOrRole, err := checkAuthUserOrRole(params)
+				userOrRole, err := sg.checkUserOrRoleAuth(params)
 				if err != nil {
 					return nil, err
 				}
@@ -475,11 +477,10 @@ func parseColumnOrder(values []interface{}) []db.ColumnOrder {
 	return result
 }
 
-func checkAuthUserOrRole(params graphql.ResolveParams) (string, error) {
-	// TODO: Return an error if we're expecting a user/role, but one isn't provided
+func (sg *SchemaGenerator) checkUserOrRoleAuth(params graphql.ResolveParams) (string, error) {
 	value := params.Context.Value(AuthUserOrRole)
-	if value == nil {
-		return "", nil
+	if value == nil && sg.useUserOrRoleAuth {
+		return "", fmt.Errorf("expected user or role for this operation")
 	}
 	return value.(string), nil
 }

@@ -270,7 +270,7 @@ func (sg *SchemaGenerator) createTable(ksName string, params graphql.ResolvePara
 		}
 	}
 
-	userOrRole, err := checkAuthUserOrRole(params)
+	userOrRole, err := sg.checkUserOrRoleAuth(params)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +297,7 @@ func (sg *SchemaGenerator) alterTableAdd(ksName string, params graphql.ResolvePa
 		return nil, fmt.Errorf("at least one column required")
 	}
 
-	userOrRole, err := checkAuthUserOrRole(params)
+	userOrRole, err := sg.checkUserOrRoleAuth(params)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +305,7 @@ func (sg *SchemaGenerator) alterTableAdd(ksName string, params graphql.ResolvePa
 		Keyspace: ksName,
 		Table:    name,
 		ToAdd:    toAdd,
-	}, db.NewQueryOptions().WithUserOrRole(userOrRole));
+	}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 }
 
 func (sg *SchemaGenerator) alterTableDrop(ksName string, params graphql.ResolveParams) (interface{}, error) {
@@ -323,7 +323,7 @@ func (sg *SchemaGenerator) alterTableDrop(ksName string, params graphql.ResolveP
 		return nil, fmt.Errorf("at least one column required")
 	}
 
-	userOrRole, err := checkAuthUserOrRole(params)
+	userOrRole, err := sg.checkUserOrRoleAuth(params)
 	if err != nil {
 		return nil, err
 	}
@@ -331,12 +331,12 @@ func (sg *SchemaGenerator) alterTableDrop(ksName string, params graphql.ResolveP
 		Keyspace: ksName,
 		Table:    name,
 		ToDrop:   toDrop,
-	}, db.NewQueryOptions().WithUserOrRole(userOrRole));
+	}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 }
 
 func (sg *SchemaGenerator) dropTable(ksName string, params graphql.ResolveParams) (interface{}, error) {
 	name := sg.naming.ToCQLTable(params.Args["name"].(string))
-	userOrRole, err := checkAuthUserOrRole(params)
+	userOrRole, err := sg.checkUserOrRoleAuth(params)
 	if err != nil {
 		return nil, err
 	}

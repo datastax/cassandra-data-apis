@@ -15,7 +15,7 @@ type SchemaUpdater struct {
 	mutex          sync.Mutex
 	updateInterval time.Duration
 	schema         *graphql.Schema
-	schemaGen	   *SchemaGenerator
+	schemaGen      *SchemaGenerator
 	ksName         string
 	schemaVersion  string
 }

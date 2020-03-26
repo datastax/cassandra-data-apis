@@ -16,6 +16,12 @@ const (
 	KeyspaceDrop
 )
 
+func Ops(ops ...string) Operations {
+	var o Operations
+	o.Add(ops...)
+	return o
+}
+
 func (o *Operations) Set(ops Operations) { *o |= ops; }
 func (o *Operations) Clear(ops Operations) { *o &= ^ops; }
 func (o Operations) IsSupported(ops Operations) bool { return o & ops != 0; }

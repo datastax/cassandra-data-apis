@@ -153,7 +153,7 @@ func (sg *SchemaGenerator) buildKeyspaceMutation() *graphql.Object {
 					dcReplicas[dcReplica["name"].(string)] = dcReplica["replicas"].(int)
 				}
 
-				userOrRole, err := checkAuthUserOrRole(params)
+				userOrRole, err := sg.checkUserOrRoleAuth(params)
 				if err != nil {
 					return nil, err
 				}
@@ -173,7 +173,7 @@ func (sg *SchemaGenerator) buildKeyspaceMutation() *graphql.Object {
 			Resolve: func(params graphql.ResolveParams) (interface{}, error) {
 				ksName := params.Args["name"].(string)
 
-				userOrRole, err := checkAuthUserOrRole(params)
+				userOrRole, err := sg.checkUserOrRoleAuth(params)
 				if err != nil {
 					return nil, err
 				}
@@ -183,9 +183,8 @@ func (sg *SchemaGenerator) buildKeyspaceMutation() *graphql.Object {
 
 	}
 
-
 	return graphql.NewObject(graphql.ObjectConfig{
-		Name: "KeyspaceMutation",
+		Name:   "KeyspaceMutation",
 		Fields: fields,
 	})
 }

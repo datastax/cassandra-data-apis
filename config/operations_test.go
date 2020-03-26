@@ -22,6 +22,7 @@ func TestOperationsSetAndClear(t *testing.T) {
 
 func TestOperationsAdd(t *testing.T) {
 	var op Operations
+
 	assert.Equal(t, op, Operations(0))
 
 	op.Add("TableCreate", "TableDrop", "TableAlterAdd", "TableAlterDrop", "KeyspaceCreate", "KeyspaceDrop")

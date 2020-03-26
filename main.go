@@ -26,14 +26,14 @@ func main() {
 	singleKsName := os.Getenv("SINGLE_KEYSPACE")
 
 	cfg := endpoint.NewEndpointConfig(strings.Split(hosts, ",")...)
-	cfg.DbUsername = os.Getenv("DB_USERNAME");
-	cfg.DbPassword = os.Getenv("DB_PASSWORD");
+	cfg.SetDbUsername(os.Getenv("DB_USERNAME"))
+	cfg.SetDbPassword(os.Getenv("DB_PASSWORD"))
 
 	supportedOps := os.Getenv("SUPPORTED_OPERATIONS")
 	if supportedOps == "" {
-		cfg.SupportedOperations.Set(config.TableCreate | config.KeyspaceCreate)
+		cfg.SetSupportedOperations(config.TableCreate | config.KeyspaceCreate)
 	} else {
-		cfg.SupportedOperations.Add(strings.Split(supportedOps, ",")...)
+		cfg.SetSupportedOperations(config.Ops(strings.Split(supportedOps, ",")...))
 	}
 
 	endpoint, err := cfg.NewEndpoint()
@@ -53,7 +53,7 @@ func main() {
 	}
 
 	router := httprouter.New()
-	for  _, route := range routes {
+	for _, route := range routes {
 		router.HandlerFunc(route.Method, route.Pattern, route.HandlerFunc)
 	}
 

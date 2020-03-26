@@ -8,13 +8,72 @@ import (
 )
 
 type DataEndpointConfig struct {
-	DbHosts              []string
-	DbUsername           string
-	DbPassword           string
-	ExcludedKeyspaces    []string
-	SchemaUpdateInterval time.Duration
-	Naming               config.NamingConvention
-	SupportedOperations  config.Operations
+	dbHosts           []string
+	dbUsername        string
+	dbPassword        string
+	ksExcluded        []string
+	updateInterval    time.Duration
+	naming            config.NamingConvention
+	supportedOps      config.Operations
+	useUserOrRoleAuth bool
+}
+
+func (cfg DataEndpointConfig) ExcludedKeyspaces() []string {
+	return cfg.ksExcluded
+}
+
+func (cfg DataEndpointConfig) SchemaUpdateInterval() time.Duration {
+	return cfg.updateInterval
+}
+
+func (cfg DataEndpointConfig) Naming() config.NamingConvention {
+	return cfg.naming
+}
+
+func (cfg DataEndpointConfig) SupportedOperations() config.Operations {
+	return cfg.supportedOps
+}
+
+func (cfg DataEndpointConfig) UseUserOrRoleAuth() bool {
+	return cfg.useUserOrRoleAuth
+}
+
+func (cfg *DataEndpointConfig) SetExcludedKeyspaces(ksExcluded []string) {
+	cfg.ksExcluded = ksExcluded
+}
+
+func (cfg *DataEndpointConfig) SetSchemaUpdateInterval(updateInterval time.Duration) {
+	cfg.updateInterval = updateInterval
+}
+
+func (cfg *DataEndpointConfig) SetNaming(naming config.NamingConvention) {
+	cfg.naming = naming
+}
+
+func (cfg *DataEndpointConfig) SetSupportedOperations(supportedOps config.Operations) {
+	cfg.supportedOps = supportedOps
+}
+
+func (cfg *DataEndpointConfig) SetUseUserOrRoleAuth(useUserOrRowAuth bool) {
+	cfg.useUserOrRoleAuth = useUserOrRowAuth
+}
+
+func (cfg *DataEndpointConfig) SetDbUsername(dbUsername string) {
+	cfg.dbUsername = dbUsername
+}
+
+func (cfg *DataEndpointConfig) SetDbPassword(dbPassword string) {
+	cfg.dbPassword = dbPassword
+}
+
+func (cfg DataEndpointConfig) NewEndpoint() (*DataEndpoint, error) {
+	dbClient, err := db.NewDb(cfg.dbUsername, cfg.dbPassword, cfg.dbHosts...)
+	if err != nil {
+		return nil, err
+	}
+	return &DataEndpoint{
+		graphQLRouteGen: graphql.NewRouteGenerator(dbClient, cfg),
+	}, nil
 }
 
 type DataEndpoint struct {
@@ -23,21 +82,10 @@ type DataEndpoint struct {
 
 func NewEndpointConfig(hosts ...string) *DataEndpointConfig {
 	return &DataEndpointConfig{
-		DbHosts:              hosts,
-		SchemaUpdateInterval: 10 * time.Second,
-		Naming:               config.DefaultNaming,
+		dbHosts:        hosts,
+		updateInterval: 10 * time.Second,
+		naming:         config.DefaultNaming,
 	}
-}
-
-func (cfg *DataEndpointConfig) NewEndpoint() (*DataEndpoint, error) {
-	dbClient, err := db.NewDb(cfg.DbUsername, cfg.DbPassword, cfg.DbHosts...)
-	if err != nil {
-		return nil, err
-	}
-	return &DataEndpoint{
-		graphQLRouteGen: graphql.NewRouteGenerator(dbClient, cfg.ExcludedKeyspaces, cfg.SchemaUpdateInterval,
-			cfg.Naming, cfg.SupportedOperations),
-	}, nil
 }
 
 func (e *DataEndpoint) RoutesGraphQL(pattern string) ([]graphql.Route, error) {
