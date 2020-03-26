@@ -3,7 +3,6 @@ package graphql
 import (
 	"context"
 	"fmt"
-	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
 	"os"
 	"sync"
@@ -18,7 +17,7 @@ type SchemaUpdater struct {
 	schema         *graphql.Schema
 	schemaGen	   *SchemaGenerator
 	ksName         string
-	schemaVersion  gocql.UUID
+	schemaVersion  string
 }
 
 func (su *SchemaUpdater) Schema() *graphql.Schema {
@@ -57,7 +56,7 @@ func (su *SchemaUpdater) Start() {
 
 		shouldUpdate := false
 		for _, row := range result.Values() {
-			if schemaVersion, ok := row["schema_version"].(*gocql.UUID); ok && schemaVersion != nil {
+			if schemaVersion, ok := row["schema_version"].(*string); ok && schemaVersion != nil {
 				if *schemaVersion != su.schemaVersion {
 					shouldUpdate = true
 					su.schemaVersion = *schemaVersion
