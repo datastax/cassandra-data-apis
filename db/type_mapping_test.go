@@ -69,6 +69,7 @@ func (suite *IntegrationTestSuite) TestCollectionCqlTypeMapping() {
 		row map[string]interface{}
 	)
 
+	//TODO: Test nulls and sets
 	rs, err = suite.db.session.ExecuteIter("SELECT * FROM ks1.tbl_lists WHERE id = ?", nil, 1)
 	assert.Nil(suite.T(), err)
 	row = rs.Values()[0]
@@ -78,6 +79,37 @@ func (suite *IntegrationTestSuite) TestCollectionCqlTypeMapping() {
 	assertPointerValue(suite.T(), new([]float64), []float64{2.1}, row["double_value"])
 	assertPointerValue(suite.T(), new([]bool), []bool{true}, row["bool_value"])
 	assertPointerValue(suite.T(), new([]string), []string{"hello"}, row["text_value"])
+}
+
+func (suite *IntegrationTestSuite) TestMapCqlTypeMapping() {
+	queries := []string{
+		"CREATE TABLE ks1.tbl_maps (id int PRIMARY KEY, m1 map<text, int>, m2 map<bigint, double>," +
+			" m3 map<uuid, frozen<list<int>>>,  m4 map<smallint, varchar>)",
+		"INSERT INTO ks1.tbl_maps (id, m1, m2, m3, m4) VALUES (1, {'a': 1}, {1: 1.1}" +
+			", {e639af03-7851-49d7-a711-5ba81a0ff9c5: [1, 2]}, {4: 'four'})",
+		"INSERT INTO ks1.tbl_maps (id) VALUES (100)",
+	}
+
+	for _, query := range queries {
+		err := suite.db.session.Execute(query, nil)
+		assert.Nil(suite.T(), err)
+	}
+
+	var (
+		rs  ResultSet
+		err error
+		row map[string]interface{}
+	)
+
+	rs, err = suite.db.session.ExecuteIter("SELECT * FROM ks1.tbl_maps WHERE id = ?", nil, 1)
+	assert.Nil(suite.T(), err)
+	row = rs.Values()[0]
+	assertPointerValue(suite.T(), new(map[string]int), map[string]int{"a": 1}, row["m1"])
+	assertPointerValue(suite.T(), new(map[string]float64), map[string]float64{"1": 1.1}, row["m2"])
+	assertPointerValue(suite.T(),
+		new(map[string][]int), map[string][]int{"e639af03-7851-49d7-a711-5ba81a0ff9c5": {1, 2}}, row["m3"])
+	assertPointerValue(suite.T(),
+		new(map[int16]string), map[int16]string{int16(4): "four"}, row["m4"])
 }
 
 func assertPointerValue(t *testing.T, expectedType interface{}, expected interface{}, actual interface{}) {
