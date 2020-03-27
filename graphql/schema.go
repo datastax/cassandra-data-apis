@@ -28,39 +28,6 @@ type SchemaGenerator struct {
 	useUserOrRoleAuth bool
 }
 
-func buildType(typeInfo gocql.TypeInfo) (graphql.Output, error) {
-	switch typeInfo.Type() {
-	case gocql.TypeInt, gocql.TypeTinyInt, gocql.TypeSmallInt:
-		return graphql.Int, nil
-	case gocql.TypeFloat, gocql.TypeDouble:
-		return graphql.Float, nil
-	case gocql.TypeText, gocql.TypeVarchar:
-		return graphql.String, nil
-	case gocql.TypeBigInt:
-		return bigint, nil
-	case gocql.TypeDecimal:
-		return decimal, nil
-	case gocql.TypeBoolean:
-		return graphql.Boolean, nil
-	case gocql.TypeUUID:
-		return uuid, nil
-	case gocql.TypeTimeUUID:
-		return timeuuid, nil
-	case gocql.TypeTimestamp:
-		return timestamp, nil
-	case gocql.TypeInet:
-		return ip, nil
-	case gocql.TypeList, gocql.TypeSet:
-		elem, err := buildType(typeInfo.(gocql.CollectionType).Elem)
-		if err != nil {
-			return nil, err
-		}
-		return graphql.NewList(elem), nil
-	default:
-		return nil, fmt.Errorf("Unsupported type %s", typeInfo.Type().String())
-	}
-}
-
 func NewSchemaGenerator(dbClient *db.Db, cfg config.Config) *SchemaGenerator {
 	return &SchemaGenerator{
 		dbClient:          dbClient,
@@ -279,7 +246,7 @@ func (sg *SchemaGenerator) queryFieldResolver(keyspace *gocql.KeyspaceMetadata) 
 					whereClause = append(whereClause, types.ConditionItem{
 						Column:   sg.naming.ToCQLColumn(key),
 						Operator: "=",
-						Value:    value,
+						Value:    adaptParameterValue(value),
 					})
 				}
 			} else if strings.HasSuffix(fieldName, "Filter") {
@@ -340,7 +307,7 @@ func (sg *SchemaGenerator) adaptCondition(data map[string]interface{}) []types.C
 			result = append(result, types.ConditionItem{
 				Column:   sg.naming.ToCQLColumn(key),
 				Operator: cqlOperators[operatorName],
-				Value:    itemValue,
+				Value:    adaptParameterValue(itemValue),
 			})
 		}
 	}
@@ -381,7 +348,7 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 
 				for key, value := range data {
 					columnNames = append(columnNames, sg.naming.ToCQLColumn(key))
-					queryParams = append(queryParams, value)
+					queryParams = append(queryParams, adaptParameterValue(value))
 				}
 
 				var options map[string]interface{}
@@ -450,6 +417,22 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 	}
 }
 
+func adaptParameterValue(value interface{}) interface{} {
+	if value == nil {
+		return nil
+	}
+
+	switch value.(type) {
+	case int8, int16, int, float32, float64, string, bool:
+		// Avoid using reflection for common scalars
+		// Ideally, the algorithm should function without this optimization
+		return value
+	}
+
+	//TODO: Adapt maps
+	return value
+}
+
 func mutationPrefix(value string) (string, string) {
 	mutationPrefixes := []string{insertPrefix, deletePrefix, updatePrefix}
 
@@ -479,8 +462,12 @@ func parseColumnOrder(values []interface{}) []db.ColumnOrder {
 
 func (sg *SchemaGenerator) checkUserOrRoleAuth(params graphql.ResolveParams) (string, error) {
 	value := params.Context.Value(AuthUserOrRole)
-	if value == nil && sg.useUserOrRoleAuth {
-		return "", fmt.Errorf("expected user or role for this operation")
+	if value == nil {
+		if sg.useUserOrRoleAuth {
+			return "", fmt.Errorf("expected user or role for this operation")
+		} else {
+			return "", nil
+		}
 	}
 	return value.(string), nil
 }

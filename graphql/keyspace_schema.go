@@ -23,6 +23,8 @@ type KeyspaceGraphQLSchema struct {
 	resultUpdateTypes map[string]*graphql.Object
 	// A map containing the order enum by table name
 	orderEnums map[string]*graphql.Enum
+	// A map containing key/value types for maps
+	keyValueTypes map[string]graphql.Output
 }
 
 var inputQueryOptions = graphql.NewInputObject(graphql.InputObjectConfig{
@@ -40,6 +42,119 @@ var inputMutationOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 		"ttl": {Type: graphql.Int},
 	},
 })
+
+func (s *KeyspaceGraphQLSchema) buildType(typeInfo gocql.TypeInfo, isInput bool) (graphql.Output, error) {
+	switch typeInfo.Type() {
+	case gocql.TypeInt, gocql.TypeTinyInt, gocql.TypeSmallInt:
+		return graphql.Int, nil
+	case gocql.TypeFloat, gocql.TypeDouble:
+		return graphql.Float, nil
+	case gocql.TypeText, gocql.TypeVarchar:
+		return graphql.String, nil
+	case gocql.TypeBigInt:
+		return bigint, nil
+	case gocql.TypeDecimal:
+		return decimal, nil
+	case gocql.TypeBoolean:
+		return graphql.Boolean, nil
+	case gocql.TypeUUID:
+		return uuid, nil
+	case gocql.TypeTimeUUID:
+		return timeuuid, nil
+	case gocql.TypeTimestamp:
+		return timestamp, nil
+	case gocql.TypeInet:
+		return ip, nil
+	case gocql.TypeList, gocql.TypeSet:
+		elem, err := s.buildType(typeInfo.(gocql.CollectionType).Elem, isInput)
+		if err != nil {
+			return nil, err
+		}
+		return graphql.NewList(elem), nil
+	case gocql.TypeMap:
+		key, err := s.buildType(typeInfo.(gocql.CollectionType).Key, isInput)
+		if err != nil {
+			return nil, err
+		}
+		value, err := s.buildType(typeInfo.(gocql.CollectionType).Elem, isInput)
+		if err != nil {
+			return nil, err
+		}
+		kvType := s.buildKeyValueType(key, value, isInput)
+		if kvType == nil {
+			return nil, fmt.Errorf("Type for %s could not be created", typeInfo.Type().String())
+		}
+		return graphql.NewList(kvType), nil
+	default:
+		return nil, fmt.Errorf("Unsupported type %s", typeInfo.Type().String())
+	}
+}
+
+func (s *KeyspaceGraphQLSchema) buildKeyValueType(key graphql.Output, value graphql.Output, isInput bool) graphql.Output {
+	keyName := getTypeName(key)
+	valueName := getTypeName(value)
+	if keyName == "" || valueName == "" {
+		return nil
+	}
+
+	typeName := fmt.Sprintf("Key%sValue%s", keyName, valueName)
+
+	if isInput {
+		typeName = "Input" + typeName
+	}
+
+	t := s.keyValueTypes[typeName]
+
+	if t == nil {
+		if isInput {
+			t = graphql.NewInputObject(graphql.InputObjectConfig{
+				Name: typeName,
+				Fields: graphql.InputObjectConfigFieldMap{
+					"key": &graphql.InputObjectFieldConfig{
+						Type: graphql.NewNonNull(key),
+					},
+					"value": &graphql.InputObjectFieldConfig{
+						Type: value,
+					},
+				},
+			})
+		} else {
+			t = graphql.NewObject(graphql.ObjectConfig{
+				Name: typeName,
+				Fields: graphql.Fields{
+					"key": &graphql.Field{
+						Type: graphql.NewNonNull(key),
+					},
+					"value": &graphql.Field{
+						Type: value,
+					},
+				},
+			})
+		}
+
+		s.keyValueTypes[typeName] = t
+	}
+
+	return t
+}
+
+func getTypeName(t graphql.Output) string {
+	switch specType := t.(type) {
+	case *graphql.Scalar:
+		return t.Name()
+	case *graphql.Object, *graphql.InputObject:
+		// Its a map key value: use the existing composite name
+		return t.Name()
+	case *graphql.List:
+		elemName := getTypeName(specType.OfType)
+		if elemName == "" {
+			return ""
+		}
+		return fmt.Sprintf("List%s", elemName)
+	}
+
+	return ""
+}
 
 func (s *KeyspaceGraphQLSchema) BuildTypes(keyspace *gocql.KeyspaceMetadata, naming config.NamingConvention) error {
 	s.buildOrderEnums(keyspace, naming)
@@ -71,6 +186,7 @@ func (s *KeyspaceGraphQLSchema) buildOrderEnums(keyspace *gocql.KeyspaceMetadata
 }
 
 func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata, naming config.NamingConvention) {
+	s.keyValueTypes = make(map[string]graphql.Output)
 	s.tableValueTypes = make(map[string]*graphql.Object, len(keyspace.Tables))
 	s.tableScalarInputTypes = make(map[string]*graphql.InputObject, len(keyspace.Tables))
 	s.tableOperatorInputTypes = make(map[string]*graphql.InputObject, len(keyspace.Tables))
@@ -83,15 +199,21 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 
 		for name, column := range table.Columns {
 			var fieldType graphql.Output
+			var inputFieldType graphql.Output
 			fieldName := naming.ToGraphQLField(name)
-			fieldType, err = buildType(column.Type)
+			fieldType, err = s.buildType(column.Type, false)
+			if err != nil {
+				log.Println(err)
+				break
+			}
+			inputFieldType, err = s.buildType(column.Type, true)
 			if err != nil {
 				log.Println(err)
 				break
 			}
 
 			fields[fieldName] = &graphql.Field{Type: fieldType}
-			inputFields[fieldName] = &graphql.InputObjectFieldConfig{Type: fieldType}
+			inputFields[fieldName] = &graphql.InputObjectFieldConfig{Type: inputFieldType}
 
 			t := operatorsInputTypes[column.Type.Type()]
 			if t != nil {
