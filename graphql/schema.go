@@ -6,6 +6,7 @@ import (
 	"github.com/riptano/data-endpoints/config"
 	"github.com/riptano/data-endpoints/types"
 	"log"
+	"reflect"
 	"strings"
 
 	"github.com/gocql/gocql"
@@ -289,7 +290,7 @@ func (sg *SchemaGenerator) queryFieldResolver(keyspace *gocql.KeyspaceMetadata) 
 
 			return &types.QueryResult{
 				PageState: result.PageState(),
-				Values:    sg.adaptResultValues(result.Values()),
+				Values:    sg.adaptResult(result.Values()),
 			}, nil
 		}
 	}
@@ -314,14 +315,47 @@ func (sg *SchemaGenerator) adaptCondition(data map[string]interface{}) []types.C
 	return result
 }
 
-func (sg *SchemaGenerator) adaptResultValues(values []map[string]interface{}) []map[string]interface{} {
+func (sg *SchemaGenerator) adaptResult(values []map[string]interface{}) []map[string]interface{} {
 	result := make([]map[string]interface{}, 0, len(values))
 	for _, item := range values {
 		resultItem := make(map[string]interface{})
 		for k, v := range item {
-			resultItem[sg.naming.ToGraphQLField(k)] = v
+			resultItem[sg.naming.ToGraphQLField(k)] = adaptResultValue(v)
 		}
 		result = append(result, resultItem)
+	}
+
+	return result
+}
+
+func adaptResultValue(value interface{}) interface{} {
+	if value == nil {
+		return nil
+	}
+
+	switch value.(type) {
+	case *int8, *int16, *int, *float32, *int32, *string, *bool:
+		// Minor optimization to avoid reflection
+		return value
+	}
+
+	rv := reflect.ValueOf(value)
+	if !(rv.Type().Kind() == reflect.Ptr && rv.Elem().Type().Kind() == reflect.Map) {
+		return value
+	}
+
+	rv = rv.Elem()
+
+	// Maps should be adapted to a slice of maps, each map containing 2 keys: 'key' and 'value'
+	result := make([]map[string]interface{}, 0, rv.Len())
+	iter := rv.MapRange()
+	for iter.Next() {
+		key := iter.Key()
+		value := iter.Value()
+		result = append(result, map[string]interface{}{
+			"key":   key.Interface(),
+			"value": value.Interface(),
+		})
 	}
 
 	return result
@@ -429,7 +463,35 @@ func adaptParameterValue(value interface{}) interface{} {
 		return value
 	}
 
-	//TODO: Adapt maps
+	return adaptCollectionParameter(value)
+}
+
+func adaptCollectionParameter(value interface{}) interface{} {
+	rv := reflect.ValueOf(value)
+	switch rv.Type().Kind() {
+	case reflect.Slice:
+		// Type element (rv.Type().Elem()) is an interface{}
+		// We have to inspect the first value
+		length := rv.Len()
+		if length == 0 {
+			return value
+		}
+		firstElement := rv.Index(0)
+		if reflect.TypeOf(firstElement.Interface()).Kind() != reflect.Map {
+			return value
+		}
+
+		result := make(map[interface{}]interface{})
+		// It's a slice of maps that only contains two keys: 'key' and 'value'
+		// It's the graphql representation of a map: [KeyValueType]
+		for i := 0; i < length; i++ {
+			element := rv.Index(i).Interface().(map[string]interface{})
+			result[element["key"]] = adaptParameterValue(element["value"])
+		}
+
+		return result
+	}
+
 	return value
 }
 
