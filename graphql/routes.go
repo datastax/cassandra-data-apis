@@ -37,7 +37,7 @@ type Config struct {
 	ksExcluded []string
 }
 
-type requestBody struct {
+type RequestBody struct {
 	Query string `json:"query"`
 }
 
@@ -127,7 +127,7 @@ func routesForSchema(pattern string, execute executeQueryFunc) []Route {
 					return
 				}
 
-				var body requestBody
+				var body RequestBody
 				err := json.NewDecoder(r.Body).Decode(&body)
 				if err != nil {
 					http.Error(w, "Request body is invalid", 400)

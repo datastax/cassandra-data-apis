@@ -6,7 +6,7 @@ import (
 
 // Db represents a connection to a db
 type Db struct {
-	session DbSession
+	session Session
 }
 
 // NewDb Gets a pointer to a db
@@ -28,10 +28,13 @@ func NewDb(username string, password string, hosts ...string) (*Db, error) {
 	if session, err = cluster.CreateSession(); err != nil {
 		return nil, err
 	}
+	return NewDbWithSession(&GoCqlSession{ref: session}), nil
+}
 
+func NewDbWithSession(session Session) *Db {
 	return &Db{
-		session: &GoCqlSession{ref: session},
-	}, nil
+		session: session,
+	}
 }
 
 // Keyspace Retrieves a keyspace

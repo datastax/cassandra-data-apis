@@ -71,9 +71,13 @@ func (cfg DataEndpointConfig) NewEndpoint() (*DataEndpoint, error) {
 	if err != nil {
 		return nil, err
 	}
+	return cfg.newEndpointWithDb(dbClient), nil
+}
+
+func (cfg DataEndpointConfig) newEndpointWithDb(dbClient* db.Db) *DataEndpoint {
 	return &DataEndpoint{
 		graphQLRouteGen: graphql.NewRouteGenerator(dbClient, cfg),
-	}, nil
+	}
 }
 
 type DataEndpoint struct {
