@@ -2,10 +2,12 @@ package graphql
 
 import (
 	"encoding"
+	"encoding/base64"
 	"fmt"
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/language/ast"
 	"gopkg.in/inf.v0"
+	"math/big"
 	"time"
 )
 
@@ -21,6 +23,14 @@ var bigint = newStringNativeScalar(
 var decimal = newStringScalar(
 	"Decimal", "The `Decimal` scalar type represents a CQL decimal as a string.",
 	serializeStringer, deserializeDecimal)
+
+var varint = newStringScalar(
+	"Varint", "The `Varint` scalar type represents a CQL varint as a string.",
+	serializeStringer, deserializeVarint)
+
+var blob = newStringScalar(
+	"Blob", "The `Blob` scalar type represents a CQL blob as a base64 encoded byte array.",
+	serializeBlob, deserializeBlob)
 
 var timestamp = newStringScalar(
 	"Timestamp", "The `Timestamp` scalar type represents a DateTime."+
@@ -67,6 +77,10 @@ var deserializeDecimal = deserializeFromUnmarshaler(func() encoding.TextUnmarsha
 	return &inf.Dec{}
 })
 
+var deserializeVarint = deserializeFromUnmarshaler(func() encoding.TextUnmarshaler {
+	return &big.Int{}
+})
+
 func deserializeFromUnmarshaler(factory func() encoding.TextUnmarshaler) graphql.ParseValueFn {
 	var fn func(value interface{}) interface{}
 
@@ -108,6 +122,28 @@ func serializeStringer(value interface{}) interface{} {
 	switch value := value.(type) {
 	case fmt.Stringer:
 		return value.String()
+	default:
+		return value
+	}
+}
+
+func serializeBlob(value interface{}) interface{} {
+	switch value := value.(type) {
+	case *[]byte:
+		return base64.StdEncoding.EncodeToString(*value)
+	default:
+		return value
+	}
+}
+
+func deserializeBlob(value interface{}) interface{} {
+	switch value := value.(type) {
+	case string:
+		blob, err := base64.StdEncoding.DecodeString(value)
+		if err != nil {
+			return nil
+		}
+		return blob
 	default:
 		return value
 	}

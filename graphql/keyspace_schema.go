@@ -55,6 +55,8 @@ func (s *KeyspaceGraphQLSchema) buildType(typeInfo gocql.TypeInfo, isInput bool)
 		return bigint, nil
 	case gocql.TypeDecimal:
 		return decimal, nil
+	case gocql.TypeVarint:
+		return varint, nil
 	case gocql.TypeBoolean:
 		return graphql.Boolean, nil
 	case gocql.TypeUUID:
@@ -65,6 +67,8 @@ func (s *KeyspaceGraphQLSchema) buildType(typeInfo gocql.TypeInfo, isInput bool)
 		return timestamp, nil
 	case gocql.TypeInet:
 		return ip, nil
+	case gocql.TypeBlob:
+		return blob, nil
 	case gocql.TypeList, gocql.TypeSet:
 		elem, err := s.buildType(typeInfo.(gocql.CollectionType).Elem, isInput)
 		if err != nil {
