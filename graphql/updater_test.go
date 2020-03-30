@@ -18,10 +18,10 @@ func TestSchemaUpdater_Update(t *testing.T) {
 		Twice() // Called by `NewUpdater()` and the first `updater.update()`
 
 	// Initial schema
-	sessionMock.On("KeyspaceMetadata", "store").Once().Return(db.NewKeyspaceMock(
+	sessionMock.AddKeyspace(db.NewKeyspaceMock(
 		"store", map[string][]*gocql.ColumnMetadata{
 			"books": db.BooksColumnsMock,
-		}), nil)
+		})).Once()
 
 	updater, err := NewUpdater(schemaGen, "store", 10 * time.Second)
 	assert.NoError(t, err, "unable to create updater")
@@ -30,23 +30,23 @@ func TestSchemaUpdater_Update(t *testing.T) {
 	assert.NotContains(t, updater.Schema().QueryType().Fields(), "newTable1")
 
 	// Add new table
-	sessionMock.On("KeyspaceMetadata", "store").Once().Return(db.NewKeyspaceMock(
+	sessionMock.AddKeyspace(db.NewKeyspaceMock(
 		"store", map[string][]*gocql.ColumnMetadata{
 			"books": db.BooksColumnsMock,
 			"newTable1": db.BooksColumnsMock,
-		}), nil)
+		})).Once()
 
 	updater.update() // Schema version is not set
 	assert.Contains(t, updater.Schema().QueryType().Fields(), "newTable1")
 	assert.NotContains(t, updater.Schema().QueryType().Fields(), "newTable2")
 
 	// Add new another table
-	sessionMock.On("KeyspaceMetadata", "store").Once().Return(db.NewKeyspaceMock(
+	sessionMock.AddKeyspace(db.NewKeyspaceMock(
 		"store", map[string][]*gocql.ColumnMetadata{
 			"books": db.BooksColumnsMock,
 			"newTable1": db.BooksColumnsMock,
 			"newTable2": db.BooksColumnsMock,
-		}), nil)
+		})).Once()
 
 	updater.update() // Schema version is the same
 	assert.NotContains(t, updater.Schema().QueryType().Fields(), "newTable2")
