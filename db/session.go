@@ -26,7 +26,7 @@ func (q *QueryOptions) WithConsistency(userOrRole string) *QueryOptions {
 	return q
 }
 
-type DbSession interface {
+type Session interface {
 	// Execute executes a statement without returning row results
 	Execute(query string, options *QueryOptions, values ...interface{}) error
 

@@ -47,38 +47,7 @@ func NewUpdater(schemaGen *SchemaGenerator, ksName string, updateInterval time.D
 func (su *SchemaUpdater) Start() {
 	su.ctx, su.cancel = context.WithCancel(context.Background())
 	for {
-		result, err := su.schemaGen.dbClient.Execute("SELECT schema_version FROM system.local", nil)
-
-		if err != nil {
-			// TODO: Log error
-			fmt.Fprintf(os.Stderr, "error attempting to determine schema version: %s", err)
-		}
-
-		shouldUpdate := false
-		for _, row := range result.Values() {
-			if schemaVersion, ok := row["schema_version"].(*string); ok && schemaVersion != nil {
-				if *schemaVersion != su.schemaVersion {
-					shouldUpdate = true
-					su.schemaVersion = *schemaVersion
-				}
-			} else {
-				// TODO: Log error
-				fmt.Fprintf(os.Stderr, "schema version value is invalid: %v", row)
-			}
-		}
-
-		if shouldUpdate {
-			schema, err := su.schemaGen.BuildSchema(su.ksName)
-			if err != nil {
-				// TODO: Log error
-				fmt.Fprintf(os.Stderr, "error trying to build graphql schema for keyspace '%s': %s", su.ksName, err)
-			} else {
-				su.mutex.Lock()
-				su.schema = &schema
-				su.mutex.Unlock()
-			}
-		}
-
+		su.update()
 		if !su.sleep() {
 			return
 		}
@@ -87,6 +56,40 @@ func (su *SchemaUpdater) Start() {
 
 func (su *SchemaUpdater) Stop() {
 	su.cancel()
+}
+
+func (su *SchemaUpdater) update() {
+	result, err := su.schemaGen.dbClient.Execute("SELECT schema_version FROM system.local", nil)
+
+	if err != nil {
+		// TODO: Log error
+		fmt.Fprintf(os.Stderr, "error attempting to determine schema version: %s", err)
+	}
+
+	shouldUpdate := false
+	for _, row := range result.Values() {
+		if schemaVersion, ok := row["schema_version"].(*string); ok && schemaVersion != nil {
+			if *schemaVersion != su.schemaVersion {
+				shouldUpdate = true
+				su.schemaVersion = *schemaVersion
+			}
+		} else {
+			// TODO: Log error
+			fmt.Fprintf(os.Stderr, "schema version value is invalid: %v", row)
+		}
+	}
+
+	if shouldUpdate {
+		schema, err := su.schemaGen.BuildSchema(su.ksName)
+		if err != nil {
+			// TODO: Log error
+			fmt.Fprintf(os.Stderr, "error trying to build graphql schema for keyspace '%s': %s", su.ksName, err)
+		} else {
+			su.mutex.Lock()
+			su.schema = &schema
+			su.mutex.Unlock()
+		}
+	}
 }
 
 func (su *SchemaUpdater) sleep() bool {
