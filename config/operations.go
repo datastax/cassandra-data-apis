@@ -41,7 +41,7 @@ func (o *Operations) Add(ops ...string) error {
 		case "KeyspaceDrop":
 			o.Set(KeyspaceDrop)
 		default:
-			return fmt.Errorf("Invalid operation: %s\n", op)
+			return fmt.Errorf("invalid operation: %s", op)
 		}
 	}
 	return nil

@@ -48,7 +48,7 @@ func main() {
 	} else {
 		ops, err := config.Ops(strings.Split(supportedOps, ",")...)
 		if err != nil {
-			logger.Fatal("invalid supported operation", "operations", supportedOps)
+			logger.Fatal("invalid supported operation", "operations", supportedOps, "error", err)
 		}
 		cfg.SetSupportedOperations(ops)
 	}
