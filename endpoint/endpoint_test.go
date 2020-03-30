@@ -98,7 +98,9 @@ func executePost(routes []graphql.Route, target string, body graphql.RequestBody
 func createRoutes(t *testing.T, pattern string, ksName string) (*db.SessionMock, []graphql.Route) {
 	sessionMock := db.NewSessionMock().Default()
 
-	cfg := NewEndpointConfig(host)
+	cfg, err := NewEndpointConfig(host)
+	assert.NoError(t, err, "error creating endpoint config")
+
 	endpoint := cfg.newEndpointWithDb(db.NewDbWithSession(sessionMock))
 	routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", "store")
 

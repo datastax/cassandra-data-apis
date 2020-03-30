@@ -5,6 +5,7 @@ import (
 	"github.com/riptano/data-endpoints/db"
 	"github.com/riptano/data-endpoints/graphql"
 	"github.com/riptano/data-endpoints/log"
+	"go.uber.org/zap"
 	"time"
 )
 
@@ -94,12 +95,17 @@ type DataEndpoint struct {
 	graphQLRouteGen *graphql.RouteGenerator
 }
 
-func NewEndpointConfig(hosts ...string) *DataEndpointConfig {
+func NewEndpointConfig(hosts ...string) (*DataEndpointConfig, error) {
+	logger, err := zap.NewProduction()
+	if err != nil {
+		return nil, err
+	}
 	return &DataEndpointConfig{
 		dbHosts:        hosts,
 		updateInterval: 10 * time.Second,
 		naming:         config.DefaultNaming,
-	}
+		logger:         log.NewZapLogger(logger),
+	}, nil
 }
 
 func (e *DataEndpoint) RoutesGraphQL(pattern string) ([]graphql.Route, error) {

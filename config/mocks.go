@@ -1,7 +1,9 @@
 package config
 
 import (
+	"github.com/riptano/data-endpoints/log"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/zap"
 	"time"
 )
 
@@ -19,6 +21,7 @@ func (o *ConfigMock) Default() *ConfigMock {
 	o.On("Naming").Return(DefaultNaming)
 	o.On("SupportedOperations").Return(Operations(0))
 	o.On("UseUserOrRoleAuth").Return(false)
+	o.On("Logger").Return(log.NewZapLogger(zap.NewExample()))
 	return o
 }
 
@@ -45,4 +48,9 @@ func (o *ConfigMock) SupportedOperations() Operations {
 func (o *ConfigMock) UseUserOrRoleAuth() bool {
 	args := o.Called()
 	return args.Get(0).(bool)
+}
+
+func (o *ConfigMock) Logger() log.Logger {
+	args := o.Called()
+	return args.Get(0).(log.Logger)
 }

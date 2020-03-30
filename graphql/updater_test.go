@@ -4,7 +4,9 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/riptano/data-endpoints/config"
 	"github.com/riptano/data-endpoints/db"
+	"github.com/riptano/data-endpoints/log"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 	"testing"
 	"time"
 )
@@ -23,7 +25,7 @@ func TestSchemaUpdater_Update(t *testing.T) {
 			"books": db.BooksColumnsMock,
 		})).Once()
 
-	updater, err := NewUpdater(schemaGen, "store", 10*time.Second)
+	updater, err := NewUpdater(schemaGen, "store", 10*time.Second, log.NewZapLogger(zap.NewExample()))
 	assert.NoError(t, err, "unable to create updater")
 
 	assert.Contains(t, updater.Schema().QueryType().Fields(), "books")

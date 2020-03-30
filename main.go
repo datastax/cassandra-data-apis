@@ -6,7 +6,6 @@ import (
 	"github.com/riptano/data-endpoints/endpoint"
 	"github.com/riptano/data-endpoints/graphql"
 	"github.com/riptano/data-endpoints/log"
-	"go.uber.org/zap"
 	log2 "log"
 	"net/http"
 	"os"
@@ -23,24 +22,19 @@ func getEnvOrDefault(key string, defaultValue string) string {
 	return value
 }
 
-func initLogger() *zap.Logger {
-	logger, err := zap.NewProduction()
-	if err != nil {
-		log2.Panicf("unable to create logger: %s", err)
-	}
-	return logger
-}
-
 func main() {
-	logger := log.NewZapLogger(initLogger())
 	hosts := getEnvOrDefault("DB_HOSTS", "127.0.0.1")
 	singleKsName := os.Getenv("SINGLE_KEYSPACE")
 
-	cfg := endpoint.NewEndpointConfig(strings.Split(hosts, ",")...)
+	cfg, err := endpoint.NewEndpointConfig(strings.Split(hosts, ",")...)
+	if err != nil {
+		log2.Fatalf("unable to initialize endpoint config: %s", err)
+	}
+
+	logger := cfg.Logger()
+
 	cfg.SetDbUsername(os.Getenv("DB_USERNAME"))
 	cfg.SetDbPassword(os.Getenv("DB_PASSWORD"))
-
-	cfg.SetLogger(logger)
 
 	supportedOps := os.Getenv("SUPPORTED_OPERATIONS")
 	if supportedOps == "" {
@@ -89,6 +83,6 @@ func listenAndServe(router *httprouter.Router, port int, logger log.Logger) {
 	if err != nil {
 		logger.Fatal("unable to start server",
 			"port", port,
-			"error", err,)
+			"error", err, )
 	}
 }
