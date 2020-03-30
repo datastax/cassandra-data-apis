@@ -87,7 +87,7 @@ func listenAndServe(router *httprouter.Router, port int, logger log.Logger) {
 		"port", port)
 	err := http.ListenAndServe(fmt.Sprintf(":%d", port), router)
 	if err != nil {
-		logger.Fatal("unable start server",
+		logger.Fatal("unable to start server",
 			"port", port,
 			"error", err,)
 	}
