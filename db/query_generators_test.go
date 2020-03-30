@@ -2,6 +2,7 @@ package db
 
 import (
 	"github.com/gocql/gocql"
+	"github.com/riptano/data-endpoints/db/mocks"
 	"github.com/riptano/data-endpoints/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -199,36 +200,4 @@ func TestSelectGeneration(t *testing.T) {
 		sessionMock.AssertCalled(t, "ExecuteIter", item.query, mock.Anything, queryParams)
 		sessionMock.AssertExpectations(t)
 	}
-}
-
-type SessionMock struct {
-	mock.Mock
-}
-
-func (o *SessionMock) Execute(query string, options *QueryOptions, values ...interface{}) error {
-	args := o.Called(query, options, values)
-	return args.Error(0)
-}
-
-func (o *SessionMock) ExecuteIter(query string, options *QueryOptions, values ...interface{}) (ResultSet, error) {
-	args := o.Called(query, options, values)
-	return args.Get(0).(ResultSet), args.Error(1)
-}
-
-func (o *SessionMock) KeyspaceMetadata(keyspaceName string) (*gocql.KeyspaceMetadata, error) {
-	args := o.Called(keyspaceName)
-	return args.Get(0).(*gocql.KeyspaceMetadata), args.Error(1)
-}
-
-type ResultMock struct {
-	mock.Mock
-}
-
-func (o ResultMock) PageState() string {
-	return o.Called().String(0)
-}
-
-func (o ResultMock) Values() []map[string]interface{} {
-	args := o.Called()
-	return args.Get(0).([]map[string]interface{})
 }
