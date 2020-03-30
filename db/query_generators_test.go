@@ -2,7 +2,6 @@ package db
 
 import (
 	"github.com/gocql/gocql"
-	"github.com/riptano/data-endpoints/db/mocks"
 	"github.com/riptano/data-endpoints/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
