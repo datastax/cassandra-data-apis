@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gocql/gocql"
 	"gopkg.in/inf.v0"
+	"math/big"
 	"reflect"
 )
 
@@ -16,6 +17,7 @@ var typeForCqlType = map[gocql.Type]reflect.Type{
 	gocql.TypeBigInt:    reflect.TypeOf("0"),
 	gocql.TypeCounter:   reflect.TypeOf("0"),
 	gocql.TypeDecimal:   reflect.TypeOf(new(inf.Dec)),
+	gocql.TypeVarint:    reflect.TypeOf(new(big.Int)),
 	gocql.TypeText:      reflect.TypeOf("0"),
 	gocql.TypeVarchar:   reflect.TypeOf("0"),
 	gocql.TypeAscii:     reflect.TypeOf("0"),
@@ -51,7 +53,7 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 			gocql.TypeCounter, gocql.TypeBoolean,
 			gocql.TypeTimeUUID, gocql.TypeUUID,
 			gocql.TypeFloat, gocql.TypeDouble,
-			gocql.TypeDecimal:
+			gocql.TypeDecimal, gocql.TypeVarint:
 			value = reflect.Indirect(reflect.ValueOf(value)).Interface()
 		}
 
@@ -68,8 +70,6 @@ func allocateForType(info gocql.TypeInfo) interface{} {
 	case gocql.TypeBigInt, gocql.TypeCounter:
 		// We try to use types that have graphql/json representation
 		return new(*string)
-	case gocql.TypeDecimal:
-		return new(*inf.Dec)
 	case gocql.TypeBoolean:
 		return new(*bool)
 	case gocql.TypeFloat:
@@ -84,6 +84,10 @@ func allocateForType(info gocql.TypeInfo) interface{} {
 		return new(*int16)
 	case gocql.TypeTinyInt:
 		return new(*int8)
+	case gocql.TypeDecimal:
+		return new(*inf.Dec)
+	case gocql.TypeVarint:
+		return new(*big.Int)
 	case gocql.TypeTimeUUID, gocql.TypeUUID:
 		// Mapped to a json string
 		return new(*string)
