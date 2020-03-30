@@ -6,6 +6,7 @@ import (
 	"gopkg.in/inf.v0"
 	"math/big"
 	"reflect"
+	"time"
 )
 
 var typeForCqlType = map[gocql.Type]reflect.Type{
@@ -25,7 +26,8 @@ var typeForCqlType = map[gocql.Type]reflect.Type{
 	gocql.TypeInet:      reflect.TypeOf("0"),
 	gocql.TypeUUID:      reflect.TypeOf("0"),
 	gocql.TypeTimeUUID:  reflect.TypeOf("0"),
-	gocql.TypeTimestamp: reflect.TypeOf("0"),
+	gocql.TypeTimestamp: reflect.TypeOf(new(time.Time)),
+	gocql.TypeBlob:      reflect.TypeOf(new([]byte)),
 }
 
 func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]interface{}, error) {
@@ -53,7 +55,7 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 			gocql.TypeCounter, gocql.TypeBoolean,
 			gocql.TypeTimeUUID, gocql.TypeUUID,
 			gocql.TypeFloat, gocql.TypeDouble,
-			gocql.TypeDecimal, gocql.TypeVarint:
+			gocql.TypeDecimal, gocql.TypeVarint, gocql.TypeTimestamp, gocql.TypeBlob:
 			value = reflect.Indirect(reflect.ValueOf(value)).Interface()
 		}
 
@@ -91,6 +93,10 @@ func allocateForType(info gocql.TypeInfo) interface{} {
 	case gocql.TypeTimeUUID, gocql.TypeUUID:
 		// Mapped to a json string
 		return new(*string)
+	case gocql.TypeTimestamp:
+		return new(*time.Time)
+	case gocql.TypeBlob:
+		return new(*[]byte)
 	case gocql.TypeList, gocql.TypeSet:
 		subTypeInfo, ok := info.(gocql.CollectionType)
 		if !ok {

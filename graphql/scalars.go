@@ -2,39 +2,32 @@ package graphql
 
 import (
 	"encoding"
-	"github.com/gocql/gocql"
+	"fmt"
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/language/ast"
 	"gopkg.in/inf.v0"
-	"net"
-	"strconv"
 	"time"
 )
+
+var uuid = newStringNativeScalar("Uuid", "The `Uuid` scalar type represents a CQL uuid as a string.")
+
+var timeuuid = newStringNativeScalar("TimeUuid", "The `TimeUuid` scalar type represents a CQL timeuuid as a string.")
+
+var ip = newStringNativeScalar("Inet", "The `Inet` scalar type represents a CQL inet as a string.")
+
+var bigint = newStringNativeScalar(
+	"BigInt", "The `BigInt` scalar type represents a CQL bigint (64-bit signed integer) as a string.")
+
+var decimal = newStringScalar(
+	"Decimal", "The `Decimal` scalar type represents a CQL decimal as a string.",
+	serializeStringer, deserializeDecimal)
 
 var timestamp = newStringScalar(
 	"Timestamp", "The `Timestamp` scalar type represents a DateTime."+
 		" The Timestamp is serialized as an RFC 3339 quoted string",
-	serializeTimestamp,
-	deserializeTimestamp)
+	serializeTimestamp, deserializeTimestamp)
 
-// TODO: Uuid, bigint and ip types are serialized as strings (allowed by the driver), we should simplify scalar parsing
-var uuid = newStringScalar(
-	"Uuid", "The `Uuid` scalar type represents a CQL uuid as a string.", serializeUuid, deserializeUuid)
-
-var timeuuid = newStringScalar(
-	"TimeUuid", "The `TimeUuid` scalar type represents a CQL timeuuid as a string.", serializeUuid, deserializeUuid)
-
-var ip = newStringScalar(
-	"Inet", "The `Inet` scalar type represents a CQL inet as a string.", serializeIp, deserializeIp)
-
-var bigint = newStringScalar(
-	"BigInt", "The `BigInt` scalar type represents a CQL bigint (64-bit signed integer) as a string.",
-	serializeBigInt, deserializeBigInt)
-
-var decimal = newStringScalar(
-	"Decimal", "The `Decimal` scalar type represents a CQL decimal as a string.",
-	serializeDecimal, deserializeDecimal)
-
+// newStringNativeScalar Creates an string-based scalar with custom serialization functions
 func newStringScalar(
 	name string, description string, serializeFn graphql.SerializeFn, deserializeFn graphql.ParseValueFn,
 ) *graphql.Scalar {
@@ -47,21 +40,14 @@ func newStringScalar(
 	})
 }
 
-var deserializeUuid = deserializeFromUnmarshaler(func() encoding.TextUnmarshaler {
-	return &gocql.UUID{}
-})
+// newStringNativeScalar Creates an string-based scalar that has native representation in gocql (no parsing or needed)
+func newStringNativeScalar(name string, description string) *graphql.Scalar {
+	return newStringScalar(name, description, identityFn, identityFn)
+}
 
-var deserializeTimestamp = deserializeFromUnmarshaler(func() encoding.TextUnmarshaler {
-	return &time.Time{}
-})
-
-var deserializeIp = deserializeFromUnmarshaler(func() encoding.TextUnmarshaler {
-	return &net.IP{}
-})
-
-var deserializeDecimal = deserializeFromUnmarshaler(func() encoding.TextUnmarshaler {
-	return &inf.Dec{}
-})
+func identityFn(value interface{}) interface{} {
+	return value
+}
 
 func parseLiteralFromStringHandler(parser graphql.ParseValueFn) graphql.ParseLiteralFn {
 	return func(valueAST ast.Value) interface{} {
@@ -73,25 +59,13 @@ func parseLiteralFromStringHandler(parser graphql.ParseValueFn) graphql.ParseLit
 	}
 }
 
-func deserializeBigInt(value interface{}) interface{} {
-	switch value := value.(type) {
-	case []byte:
-		return deserializeBigInt(string(value))
-	case string:
-		intValue, err := strconv.ParseInt(value, 10, 64)
-		if err != nil {
-			return nil
-		}
-		return intValue
-	case *string:
-		if value == nil {
-			return nil
-		}
-		return deserializeBigInt(*value)
-	default:
-		return nil
-	}
-}
+var deserializeTimestamp = deserializeFromUnmarshaler(func() encoding.TextUnmarshaler {
+	return &time.Time{}
+})
+
+var deserializeDecimal = deserializeFromUnmarshaler(func() encoding.TextUnmarshaler {
+	return &inf.Dec{}
+})
 
 func deserializeFromUnmarshaler(factory func() encoding.TextUnmarshaler) graphql.ParseValueFn {
 	var fn func(value interface{}) interface{}
@@ -123,8 +97,6 @@ func deserializeFromUnmarshaler(factory func() encoding.TextUnmarshaler) graphql
 
 func serializeTimestamp(value interface{}) interface{} {
 	switch value := value.(type) {
-	case time.Time:
-		return marshalText(value)
 	case *time.Time:
 		return marshalText(value)
 	default:
@@ -132,44 +104,9 @@ func serializeTimestamp(value interface{}) interface{} {
 	}
 }
 
-func serializeUuid(value interface{}) interface{} {
+func serializeStringer(value interface{}) interface{} {
 	switch value := value.(type) {
-	case gocql.UUID:
-		return marshalText(value)
-	case *gocql.UUID:
-		return marshalText(value)
-	default:
-		return value
-	}
-}
-
-func serializeIp(value interface{}) interface{} {
-	switch value := value.(type) {
-	case net.IP:
-		return marshalText(value)
-	case *net.IP:
-		return marshalText(value)
-	default:
-		return value
-	}
-}
-
-func serializeBigInt(value interface{}) interface{} {
-	switch value := value.(type) {
-	case int64:
-		return strconv.FormatInt(value, 10)
-	case *int64:
-		return strconv.FormatInt(*value, 10)
-	default:
-		return value
-	}
-}
-
-func serializeDecimal(value interface{}) interface{} {
-	switch value := value.(type) {
-	case inf.Dec:
-		return value.String()
-	case *inf.Dec:
+	case fmt.Stringer:
 		return value.String()
 	default:
 		return value

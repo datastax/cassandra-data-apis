@@ -5,9 +5,12 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/riptano/data-endpoints/config"
 	"github.com/riptano/data-endpoints/types"
+	"gopkg.in/inf.v0"
 	"log"
+	"math/big"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
@@ -334,13 +337,20 @@ func adaptResultValue(value interface{}) interface{} {
 	}
 
 	switch value.(type) {
-	case *int8, *int16, *int, *float32, *int32, *string, *bool:
-		// Minor optimization to avoid reflection
+	case *int8, *int16, *int, *float32, *float64, *int32, *string, *bool,
+		*time.Time, *inf.Dec, *big.Int, *gocql.UUID, *[]byte:
+		// Avoid reflection whenever possible
 		return value
 	}
 
 	rv := reflect.ValueOf(value)
-	if !(rv.Type().Kind() == reflect.Ptr && rv.Elem().Type().Kind() == reflect.Map) {
+	typeKind := rv.Type().Kind()
+
+	if typeKind == reflect.Ptr && rv.IsNil() {
+		return nil
+	}
+
+	if !(typeKind == reflect.Ptr && rv.Elem().Type().Kind() == reflect.Map) {
 		return value
 	}
 

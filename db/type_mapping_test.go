@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func (suite *IntegrationTestSuite) TestNumericCqlTypeMapping() {
@@ -115,7 +116,7 @@ func (suite *IntegrationTestSuite) TestMapCqlTypeMapping() {
 func (suite *IntegrationTestSuite) TestScalarMapping() {
 	queries := []string{
 		"CREATE TABLE ks1.tbl_scalars (id int PRIMARY KEY, inet_value inet, uuid_value uuid, timeuuid_value timeuuid," +
-			" blob_value blob)",
+			" timestamp_value timestamp, blob_value blob)",
 		"INSERT INTO ks1.tbl_scalars (id) VALUES (100)",
 	}
 
@@ -125,11 +126,15 @@ func (suite *IntegrationTestSuite) TestScalarMapping() {
 	}
 
 	id := 1
+	timeValue := time.Time{}
+	_ = timeValue.UnmarshalText([]byte("2019-12-31T23:59:59.999Z"))
 	values := map[string]interface{}{
-		"id":             id,
-		"inet_value":     "10.10.150.1",
-		"uuid_value":     "d2b99a72-4482-4064-8f96-ca7aba39a1ca",
-		"timeuuid_value": "308f185c-7272-11ea-bc55-0242ac130003",
+		"id":              id,
+		"inet_value":      "10.10.150.1",
+		"uuid_value":      "d2b99a72-4482-4064-8f96-ca7aba39a1ca",
+		"timeuuid_value":  "308f185c-7272-11ea-bc55-0242ac130003",
+		"timestamp_value": timeValue,
+		"blob_value":      []byte{1, 2, 3, 4},
 	}
 	columns := make([]string, 0)
 	parameters := make([]interface{}, 0)
@@ -138,7 +143,8 @@ func (suite *IntegrationTestSuite) TestScalarMapping() {
 		parameters = append(parameters, v)
 	}
 
-	insertQuery := fmt.Sprintf("INSERT INTO ks1.tbl_scalars (%s) VALUES (?, ?, ?, ?)", strings.Join(columns, ", "))
+	insertQuery := fmt.Sprintf("INSERT INTO ks1.tbl_scalars (%s) VALUES (?%s)",
+		strings.Join(columns, ", "), strings.Repeat(", ?", len(columns)-1))
 	_, err := suite.db.session.ExecuteIter(insertQuery, nil, parameters...)
 	assert.Nil(suite.T(), err)
 
