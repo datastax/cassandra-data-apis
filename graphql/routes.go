@@ -89,7 +89,7 @@ func (rg *RouteGenerator) RoutesKeyspaceManagement(pattern string) ([]Route, err
 }
 
 func (rg *RouteGenerator) RoutesKeyspace(pattern string, ksName string) ([]Route, error) {
-	updater, err := NewUpdater(rg.schemaGen, ksName, rg.updateInterval)
+	updater, err := NewUpdater(rg.schemaGen, ksName, rg.updateInterval, rg.schemaGen.logger)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build graphql schema for keyspace '%s': %s", ksName, err)
 	}

@@ -1,6 +1,9 @@
 package config
 
-import "time"
+import (
+	"github.com/riptano/data-endpoints/log"
+	"time"
+)
 
 type Config interface {
 	ExcludedKeyspaces() []string
@@ -8,4 +11,5 @@ type Config interface {
 	Naming() NamingConvention
 	SupportedOperations() Operations
 	UseUserOrRoleAuth() bool
+	Logger() log.Logger
 }

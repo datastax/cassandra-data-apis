@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"os"
 )
 
 type Operations int
@@ -16,17 +15,17 @@ const (
 	KeyspaceDrop
 )
 
-func Ops(ops ...string) Operations {
+func Ops(ops ...string) (Operations, error) {
 	var o Operations
-	o.Add(ops...)
-	return o
+	err := o.Add(ops...)
+	return o, err
 }
 
 func (o *Operations) Set(ops Operations) { *o |= ops; }
 func (o *Operations) Clear(ops Operations) { *o &= ^ops; }
 func (o Operations) IsSupported(ops Operations) bool { return o & ops != 0; }
 
-func (o *Operations) Add(ops ...string) {
+func (o *Operations) Add(ops ...string) error {
 	for _, op := range ops {
 		switch op {
 		case "TableCreate":
@@ -42,8 +41,8 @@ func (o *Operations) Add(ops ...string) {
 		case "KeyspaceDrop":
 			o.Set(KeyspaceDrop)
 		default:
-			// TODO: Log
-			fmt.Fprintf(os.Stderr, "Invalid operation: %s\n", op)
+			return fmt.Errorf("Invalid operation: %s\n", op)
 		}
 	}
+	return nil
 }

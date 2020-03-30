@@ -5,7 +5,9 @@ import (
 	"github.com/riptano/data-endpoints/config"
 	"github.com/riptano/data-endpoints/endpoint"
 	"github.com/riptano/data-endpoints/graphql"
-	"log"
+	"github.com/riptano/data-endpoints/log"
+	"go.uber.org/zap"
+	log2 "log"
 	"net/http"
 	"os"
 	"strings"
@@ -21,7 +23,16 @@ func getEnvOrDefault(key string, defaultValue string) string {
 	return value
 }
 
+func initLogger() *zap.Logger {
+	logger, err := zap.NewProduction()
+	if err != nil {
+		log2.Panicf("unable to create logger: %s", err)
+	}
+	return logger
+}
+
 func main() {
+	logger := log.NewZapLogger(initLogger())
 	hosts := getEnvOrDefault("DB_HOSTS", "127.0.0.1")
 	singleKsName := os.Getenv("SINGLE_KEYSPACE")
 
@@ -29,16 +40,23 @@ func main() {
 	cfg.SetDbUsername(os.Getenv("DB_USERNAME"))
 	cfg.SetDbPassword(os.Getenv("DB_PASSWORD"))
 
+	cfg.SetLogger(logger)
+
 	supportedOps := os.Getenv("SUPPORTED_OPERATIONS")
 	if supportedOps == "" {
 		cfg.SetSupportedOperations(config.TableCreate | config.KeyspaceCreate)
 	} else {
-		cfg.SetSupportedOperations(config.Ops(strings.Split(supportedOps, ",")...))
+		ops, err := config.Ops(strings.Split(supportedOps, ",")...)
+		if err != nil {
+			logger.Fatal("invalid supported operation", "operations", supportedOps)
+		}
+		cfg.SetSupportedOperations(ops)
 	}
 
 	endpoint, err := cfg.NewEndpoint()
 	if err != nil {
-		log.Fatalf("unable create new endpoint: %s", err)
+		logger.Fatal("unable create new endpoint",
+			"error", err)
 	}
 
 	var routes []graphql.Route
@@ -49,7 +67,8 @@ func main() {
 	}
 
 	if err != nil {
-		log.Fatalf("unable to generate graphql routes: %s", err)
+		logger.Fatal("unable to generate graphql routes",
+			"error", err)
 	}
 
 	router := httprouter.New()
@@ -58,12 +77,18 @@ func main() {
 	}
 
 	finish := make(chan bool)
-	go listenAndServe(router, 8080)
+	go listenAndServe(router, 8080, logger)
 	// go listenAndServe(rest.ApiRouter(dbClient), 8081)
 	<-finish
 }
 
-func listenAndServe(router *httprouter.Router, port int) {
-	fmt.Printf("Start listening on %d\n", port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), router))
+func listenAndServe(router *httprouter.Router, port int, logger log.Logger) {
+	logger.Info("server listening",
+		"port", port)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", port), router)
+	if err != nil {
+		logger.Fatal("unable start server",
+			"port", port,
+			"error", err,)
+	}
 }

@@ -98,7 +98,6 @@ func (db *Db) AlterTableDrop(info *AlterTableDropInfo, options *QueryOptions) (b
 }
 
 func (db *Db) DropTable(info *DropTableInfo, options *QueryOptions) (bool, error) {
-	// TODO: Escape keyspace/table name?
 	query := fmt.Sprintf("DROP TABLE %s.%s", info.Table, info.Keyspace)
 	err := db.session.Execute(query, options)
 	return err == nil, err

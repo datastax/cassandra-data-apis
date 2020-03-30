@@ -5,6 +5,7 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
 	"github.com/riptano/data-endpoints/config"
+	"github.com/riptano/data-endpoints/log"
 	"github.com/riptano/data-endpoints/types"
 	"log"
 )
@@ -189,10 +190,10 @@ func getTypeName(t graphql.Output) string {
 	return ""
 }
 
-func (s *KeyspaceGraphQLSchema) BuildTypes(keyspace *gocql.KeyspaceMetadata, naming config.NamingConvention) error {
+func (s *KeyspaceGraphQLSchema) BuildTypes(keyspace *gocql.KeyspaceMetadata, naming config.NamingConvention, logger log.Logger) error {
 	s.buildOrderEnums(keyspace, naming)
-	s.buildTableTypes(keyspace, naming)
-	s.buildResultTypes(keyspace, naming)
+	s.buildTableTypes(keyspace, naming, logger)
+	s.buildResultTypes(keyspace, naming, logger)
 	return nil
 }
 
@@ -218,7 +219,7 @@ func (s *KeyspaceGraphQLSchema) buildOrderEnums(keyspace *gocql.KeyspaceMetadata
 	}
 }
 
-func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata, naming config.NamingConvention) {
+func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata, naming config.NamingConvention, logger log.Logger) {
 	s.keyValueTypes = make(map[string]graphql.Output)
 	s.tableValueTypes = make(map[string]*graphql.Object, len(keyspace.Tables))
 	s.tableScalarInputTypes = make(map[string]*graphql.InputObject, len(keyspace.Tables))
@@ -236,12 +237,18 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 			fieldName := naming.ToGraphQLField(name)
 			fieldType, err = s.buildType(column.Type, false)
 			if err != nil {
-				log.Println(err)
+				logger.Error("unable to build graphql type for column",
+					"columnName", column.Name,
+					"type", column.Type,
+					"error", err)
 				break
 			}
 			inputFieldType, err = s.buildType(column.Type, true)
 			if err != nil {
-				log.Println(err)
+				logger.Error("unable to build graphql input type for column",
+					"columnName", column.Name,
+					"type", column.Type,
+					"error", err)
 				break
 			}
 
@@ -258,7 +265,9 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 		}
 
 		if err != nil {
-			log.Printf("Ignoring table %s", table.Name)
+			logger.Info("ignoring table",
+				"tableName", table.Name,
+				"error", err)
 			s.ignoredTables[table.Name] = true
 			err = nil
 			continue
@@ -281,7 +290,7 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 	}
 }
 
-func (s *KeyspaceGraphQLSchema) buildResultTypes(keyspace *gocql.KeyspaceMetadata, naming config.NamingConvention) {
+func (s *KeyspaceGraphQLSchema) buildResultTypes(keyspace *gocql.KeyspaceMetadata, naming config.NamingConvention, logger log.Logger) {
 	s.resultSelectTypes = make(map[string]*graphql.Object, len(keyspace.Tables))
 	s.resultUpdateTypes = make(map[string]*graphql.Object, len(keyspace.Tables))
 
@@ -293,7 +302,7 @@ func (s *KeyspaceGraphQLSchema) buildResultTypes(keyspace *gocql.KeyspaceMetadat
 		itemType, ok := s.tableValueTypes[table.Name]
 
 		if !ok {
-			panic(fmt.Sprintf("Table value type for table '%s' not found", table.Name))
+			logger.Fatal("table value type not found", "tableName", table.Name)
 		}
 
 		s.resultSelectTypes[table.Name] = graphql.NewObject(graphql.ObjectConfig{
