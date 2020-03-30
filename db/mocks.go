@@ -38,81 +38,86 @@ func (o ResultMock) Values() []map[string]interface{} {
 	return args.Get(0).([]map[string]interface{})
 }
 
-func NewSessionMock() *SessionMock {
-	sessionMock := &SessionMock{}
+var BooksColumnsMock = []*gocql.ColumnMetadata{
+	&gocql.ColumnMetadata{
+		Name: "title",
+		Kind: gocql.ColumnPartitionKey,
+		Type: gocql.NewNativeType(0, gocql.TypeText, ""),
+	},
+	&gocql.ColumnMetadata{
+		Name: "pages",
+		Kind: gocql.ColumnRegular,
+		Type: gocql.NewNativeType(0, gocql.TypeInt, ""),
+	},
+	&gocql.ColumnMetadata{
+		Name: "first_name",
+		Kind: gocql.ColumnRegular,
+		Type: gocql.NewNativeType(0, gocql.TypeText, ""),
+	},
+	&gocql.ColumnMetadata{
+		Name: "last_name",
+		Kind: gocql.ColumnRegular,
+		Type: gocql.NewNativeType(0, gocql.TypeText, ""),
+	},
+}
 
-	columns := map[string]*gocql.ColumnMetadata{
-		"title": &gocql.ColumnMetadata{
-			Keyspace:        "store",
-			Table:           "books",
-			Name:            "title",
-			ComponentIndex:  0,
-			Kind:            gocql.ColumnPartitionKey,
-			Type:            gocql.NewNativeType(0, gocql.TypeText, ""),
-			ClusteringOrder: "",
-			Order:           false,
-		},
-		"pages": &gocql.ColumnMetadata{
-			Keyspace:        "store",
-			Table:           "books",
-			Name:            "pages",
-			ComponentIndex:  1,
-			Kind:            gocql.ColumnRegular,
-			Type:            gocql.NewNativeType(0, gocql.TypeInt, ""),
-			ClusteringOrder: "",
-			Order:           false,
-		},
-		"first_name": &gocql.ColumnMetadata{
-			Keyspace:        "store",
-			Table:           "books",
-			Name:            "first_name",
-			ComponentIndex:  2,
-			Kind:            gocql.ColumnRegular,
-			Type:            gocql.NewNativeType(0, gocql.TypeText, ""),
-			ClusteringOrder: "",
-			Order:           false,
-		},
-		"last_name": &gocql.ColumnMetadata{
-			Keyspace:        "store",
-			Table:           "books",
-			Name:            "last_name",
-			ComponentIndex:  3,
-			Kind:            gocql.ColumnRegular,
-			Type:            gocql.NewNativeType(0, gocql.TypeText, ""),
-			ClusteringOrder: "",
-			Order:           false,
-		},
+func NewKeyspaceMock(ksName string, tables map[string][]*gocql.ColumnMetadata) *gocql.KeyspaceMetadata {
+	tableMap := map[string]*gocql.TableMetadata{}
+
+	for tableName, columns := range tables {
+		tableEntry := &gocql.TableMetadata{
+			Keyspace: ksName,
+			Name:     tableName,
+			Columns:  map[string]*gocql.ColumnMetadata{},
+		}
+		for i, column := range columns {
+			column.Keyspace = ksName
+			column.Table = tableName
+			column.ComponentIndex = i
+			tableEntry.Columns[column.Name] = column
+		}
+		tableEntry.PartitionKey = createKey(tableEntry.Columns, gocql.ColumnPartitionKey)
+		tableEntry.ClusteringColumns = createKey(tableEntry.Columns, gocql.ColumnClusteringKey)
+		tableMap[tableName] = tableEntry
 	}
-	sessionMock.On("KeyspaceMetadata", "store").Return(&gocql.KeyspaceMetadata{
-		Name:          "store",
+
+	return &gocql.KeyspaceMetadata{
+		Name:          ksName,
 		DurableWrites: true,
 		StrategyClass: "NetworkTopologyStrategy",
 		StrategyOptions: map[string]interface{}{
 			"dc1": "3",
 		},
-		Tables: map[string]*gocql.TableMetadata{
-			"books": &gocql.TableMetadata{
-				Keyspace:          "store",
-				Name:              "books",
-				PartitionKey:      createKey(columns, gocql.ColumnPartitionKey),
-				ClusteringColumns: createKey(columns, gocql.ColumnClusteringKey),
-				Columns:           columns,
-			},
-		},
-	}, nil)
+		Tables: tableMap,
+	}
+}
 
-	schemaVersion := "a78bc282-aff7-4c2a-8f23-4ce3584adbb0"
+func NewSessionMock() *SessionMock {
+	return &SessionMock{}
+}
+
+func (o *SessionMock) Default() *SessionMock {
+	o.SetSchemaVersion("a78bc282-aff7-4c2a-8f23-4ce3584adbb0")
+	o.AddKeyspace(NewKeyspaceMock(
+		"store", map[string][]*gocql.ColumnMetadata{
+			"books": BooksColumnsMock,
+		}))
+	return o
+}
+
+func (o *SessionMock) SetSchemaVersion(version string) *mock.Call {
 	schemaVersionResultMock := &ResultMock{}
 	schemaVersionResultMock.
 		On("Values").Return([]map[string]interface{}{
-		map[string]interface{}{"schema_version": &schemaVersion},
+		map[string]interface{}{"schema_version": &version},
 	}, nil)
 
-	sessionMock.
-		On("ExecuteIter", "SELECT schema_version FROM system.local", mock.Anything, mock.Anything).
+	return o.On("ExecuteIter", "SELECT schema_version FROM system.local", mock.Anything, mock.Anything).
 		Return(schemaVersionResultMock, nil)
+}
 
-	return sessionMock
+func (o* SessionMock) AddKeyspace(keyspace *gocql.KeyspaceMetadata) *mock.Call {
+	return o.On("KeyspaceMetadata", keyspace.Name).Return(keyspace, nil)
 }
 
 func createKey(columns map[string]*gocql.ColumnMetadata, kind gocql.ColumnKind) []*gocql.ColumnMetadata {

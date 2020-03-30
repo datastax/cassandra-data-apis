@@ -37,8 +37,8 @@ func TestDataEndpoint_Query(t *testing.T) {
 
 	title := "book1"
 	pages := 42
-	result := &db.ResultMock{}
-	result.
+	resultMock := &db.ResultMock{}
+	resultMock.
 		On("PageState").Return("").
 		On("Values").Return([]map[string]interface{}{
 		map[string]interface{}{"title": &title, "pages": &pages},
@@ -46,7 +46,7 @@ func TestDataEndpoint_Query(t *testing.T) {
 
 	session.
 		On("ExecuteIter", "SELECT * FROM store.books WHERE title = ?", mock.Anything, mock.Anything).
-		Return(result, nil)
+		Return(resultMock, nil)
 
 	body := graphql.RequestBody{
 		Query: `query {
@@ -96,14 +96,14 @@ func executePost(routes []graphql.Route, target string, body graphql.RequestBody
 }
 
 func createRoutes(t *testing.T, pattern string, ksName string) (*db.SessionMock, []graphql.Route) {
-	session := db.NewSessionMock()
+	sessionMock := db.NewSessionMock().Default()
 
 	cfg := NewEndpointConfig(host)
-	endpoint := cfg.newEndpointWithDb(db.NewDbWithSession(session))
+	endpoint := cfg.newEndpointWithDb(db.NewDbWithSession(sessionMock))
 	routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", "store")
 
 	assert.Len(t, routes, 2, "expected GET and POST routes")
 	assert.NoError(t, err, "error getting routes for keyspace")
 
-	return session, routes
+	return sessionMock, routes
 }
