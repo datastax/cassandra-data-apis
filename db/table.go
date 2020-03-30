@@ -81,7 +81,7 @@ func (db *Db) AlterTableAdd(info *AlterTableAddInfo, options *QueryOptions) (boo
 	query := fmt.Sprintf("ALTER TABLE %s.%s ADD(", info.Keyspace, info.Table)
 	for i, c := range info.ToAdd {
 		if i > 0 {
-			query += ", ";
+			query += ", "
 		}
 		query += fmt.Sprintf("%s %s", c.Name, c.Type)
 	}

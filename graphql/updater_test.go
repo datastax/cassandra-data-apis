@@ -23,7 +23,7 @@ func TestSchemaUpdater_Update(t *testing.T) {
 			"books": db.BooksColumnsMock,
 		})).Once()
 
-	updater, err := NewUpdater(schemaGen, "store", 10 * time.Second)
+	updater, err := NewUpdater(schemaGen, "store", 10*time.Second)
 	assert.NoError(t, err, "unable to create updater")
 
 	assert.Contains(t, updater.Schema().QueryType().Fields(), "books")
@@ -32,7 +32,7 @@ func TestSchemaUpdater_Update(t *testing.T) {
 	// Add new table
 	sessionMock.AddKeyspace(db.NewKeyspaceMock(
 		"store", map[string][]*gocql.ColumnMetadata{
-			"books": db.BooksColumnsMock,
+			"books":     db.BooksColumnsMock,
 			"newTable1": db.BooksColumnsMock,
 		})).Once()
 
@@ -43,7 +43,7 @@ func TestSchemaUpdater_Update(t *testing.T) {
 	// Add new another table
 	sessionMock.AddKeyspace(db.NewKeyspaceMock(
 		"store", map[string][]*gocql.ColumnMetadata{
-			"books": db.BooksColumnsMock,
+			"books":     db.BooksColumnsMock,
 			"newTable1": db.BooksColumnsMock,
 			"newTable2": db.BooksColumnsMock,
 		})).Once()

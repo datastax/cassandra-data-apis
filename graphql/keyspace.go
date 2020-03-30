@@ -71,7 +71,7 @@ func buildKeyspaceValue(keyspace *gocql.KeyspaceMetadata) ksValue {
 		for dc, replicas := range keyspace.StrategyOptions {
 			count, err := strconv.Atoi(replicas.(string))
 			if err != nil {
-				// TODO: We need logging
+				// TODO: We need log
 				fmt.Fprintf(os.Stderr, "invalid replicas value ('%s') for keyspace '%s'\n", replicas, keyspace.Name)
 				continue
 			}
