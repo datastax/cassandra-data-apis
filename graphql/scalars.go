@@ -8,6 +8,7 @@ import (
 	"github.com/graphql-go/graphql/language/ast"
 	"gopkg.in/inf.v0"
 	"math/big"
+	"strings"
 	"time"
 )
 
@@ -36,6 +37,11 @@ var timestamp = newStringScalar(
 	"Timestamp", "The `Timestamp` scalar type represents a DateTime."+
 		" The Timestamp is serialized as an RFC 3339 quoted string",
 	serializeTimestamp, deserializeTimestamp)
+
+var localTime = newStringScalar(
+	"Time", "The `Time` scalar type represents a local time."+
+		" Values are represented as strings, such as 13:30:54.234..",
+	serializeLocalTime, deserializeLocalTime)
 
 // newStringNativeScalar Creates an string-based scalar with custom serialization functions
 func newStringScalar(
@@ -113,6 +119,68 @@ func serializeTimestamp(value interface{}) interface{} {
 	switch value := value.(type) {
 	case *time.Time:
 		return marshalText(value)
+	default:
+		return value
+	}
+}
+
+func serializeLocalTime(value interface{}) interface{} {
+	switch value := value.(type) {
+	case *time.Duration:
+		d := *value
+		totalSeconds := d.Truncate(time.Second)
+		remainingNanos := d - totalSeconds
+
+		var (
+			hours   = 0
+			minutes = 0
+		)
+		secs := int(totalSeconds.Seconds())
+
+		if secs >= 60 {
+			minutes = secs / 60
+			secs = secs % 60
+		}
+		if minutes >= 60 {
+			hours = minutes / 60
+			minutes = minutes % 60
+		}
+
+		nanosStr := ""
+		if remainingNanos > 0 {
+			nanosStr = fmt.Sprintf(".%09d", remainingNanos.Nanoseconds())
+		}
+		return fmt.Sprintf("%02d:%02d:%02d%s", hours, minutes, secs, nanosStr)
+	default:
+		return value
+	}
+}
+
+func deserializeLocalTime(value interface{}) interface{} {
+	switch value := value.(type) {
+	case string:
+		parts := strings.Split(value, ":")
+		if len(parts) != 3 {
+			return nil
+		}
+
+		secs := parts[2]
+		nanos := "0"
+		if strings.Contains(parts[2], ".") {
+			secParts := strings.Split(parts[2], ".")
+			secs = secParts[0]
+			nanos = secParts[1]
+			// Pad right zeros
+			if len(nanos) < 9 {
+				nanos = nanos + strings.Repeat("0", 9-len(nanos))
+			}
+		}
+
+		duration, err := time.ParseDuration(fmt.Sprintf("%sh%sm%ss%sns", parts[0], parts[1], secs, nanos))
+		if err != nil {
+			return nil
+		}
+		return duration
 	default:
 		return value
 	}

@@ -69,6 +69,8 @@ func (s *KeyspaceGraphQLSchema) buildType(typeInfo gocql.TypeInfo, isInput bool)
 		return ip, nil
 	case gocql.TypeBlob:
 		return blob, nil
+	case gocql.TypeTime:
+		return localTime, nil
 	case gocql.TypeList, gocql.TypeSet:
 		elem, err := s.buildType(typeInfo.(gocql.CollectionType).Elem, isInput)
 		if err != nil {

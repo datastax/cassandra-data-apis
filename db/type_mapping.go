@@ -28,6 +28,7 @@ var typeForCqlType = map[gocql.Type]reflect.Type{
 	gocql.TypeTimeUUID:  reflect.TypeOf("0"),
 	gocql.TypeTimestamp: reflect.TypeOf(new(time.Time)),
 	gocql.TypeBlob:      reflect.TypeOf(new([]byte)),
+	gocql.TypeTime:      reflect.TypeOf(new(time.Duration)),
 }
 
 func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]interface{}, error) {
@@ -55,7 +56,7 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 			gocql.TypeCounter, gocql.TypeBoolean,
 			gocql.TypeTimeUUID, gocql.TypeUUID,
 			gocql.TypeFloat, gocql.TypeDouble,
-			gocql.TypeDecimal, gocql.TypeVarint, gocql.TypeTimestamp, gocql.TypeBlob:
+			gocql.TypeDecimal, gocql.TypeVarint, gocql.TypeTimestamp, gocql.TypeBlob, gocql.TypeTime:
 			value = reflect.Indirect(reflect.ValueOf(value)).Interface()
 		}
 
@@ -66,6 +67,9 @@ func mapScan(scanner gocql.Scanner, columns []gocql.ColumnInfo) (map[string]inte
 }
 
 func allocateForType(info gocql.TypeInfo) interface{} {
+
+	a := time.Duration(123)
+	a.Nanoseconds()
 	switch info.Type() {
 	case gocql.TypeVarchar, gocql.TypeAscii, gocql.TypeInet, gocql.TypeText:
 		return new(*string)
@@ -97,6 +101,8 @@ func allocateForType(info gocql.TypeInfo) interface{} {
 		return new(*time.Time)
 	case gocql.TypeBlob:
 		return new(*[]byte)
+	case gocql.TypeTime:
+		return new(*time.Duration)
 	case gocql.TypeList, gocql.TypeSet:
 		subTypeInfo, ok := info.(gocql.CollectionType)
 		if !ok {
