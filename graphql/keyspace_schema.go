@@ -5,6 +5,7 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
 	"github.com/riptano/data-endpoints/config"
+	"github.com/riptano/data-endpoints/types"
 	"log"
 )
 
@@ -30,16 +31,35 @@ type KeyspaceGraphQLSchema struct {
 var inputQueryOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 	Name: "QueryOptions",
 	Fields: graphql.InputObjectConfigFieldMap{
-		"limit":     {Type: graphql.Int},
-		"pageSize":  {Type: graphql.Int},
-		"pageState": {Type: graphql.String},
+		"limit":       {Type: graphql.Int},
+		"pageSize":    {Type: graphql.Int},
+		"pageState":   {Type: graphql.String},
+		"consistency": {Type: consistencyEnum, DefaultValue: gocql.LocalQuorum},
 	},
 })
 
 var inputMutationOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 	Name: "UpdateOptions",
 	Fields: graphql.InputObjectConfigFieldMap{
-		"ttl": {Type: graphql.Int},
+		"ttl":         {Type: graphql.Int, DefaultValue: -1},
+		"consistency": {Type: consistencyEnum, DefaultValue: gocql.LocalQuorum},
+	},
+})
+
+var inputQueryOptionsDefault = types.QueryOptions{Consistency: int(gocql.LocalQuorum)}
+var inputMutationOptionsDefault = types.MutationOptions{
+	TTL:         -1,
+	Consistency: int(gocql.LocalQuorum),
+}
+
+var consistencyEnum = graphql.NewEnum(graphql.EnumConfig{
+	Name: "Consistency",
+	Values: graphql.EnumValueConfigMap{
+		"LOCAL_ONE":    {Value: gocql.LocalOne},
+		"LOCAL_QUORUM": {Value: gocql.LocalQuorum},
+		"ALL":          {Value: gocql.All},
+		"SERIAL":       {Value: gocql.Serial},
+		"LOCAL_SERIAL": {Value: gocql.LocalSerial},
 	},
 })
 

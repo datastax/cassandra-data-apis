@@ -21,8 +21,8 @@ func (q *QueryOptions) WithUserOrRole(userOrRole string) *QueryOptions {
 	return q
 }
 
-func (q *QueryOptions) WithConsistency(userOrRole string) *QueryOptions {
-	q.UserOrRole = userOrRole
+func (q *QueryOptions) WithConsistency(consistency gocql.Consistency) *QueryOptions {
+	q.Consistency = consistency
 	return q
 }
 

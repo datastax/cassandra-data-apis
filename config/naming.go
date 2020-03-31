@@ -54,5 +54,5 @@ func (n *defaultNaming) ToGraphQLType(name string) string {
 }
 
 func (n *defaultNaming) ToGraphQLEnumValue(name string) string {
-	return strcase.ToCamel(name)
+	return strcase.ToLowerCamel(name)
 }

@@ -53,7 +53,7 @@ func (sg *SchemaGenerator) buildQueriesFields(schema *KeyspaceGraphQLSchema, tab
 			Args: graphql.FieldConfigArgument{
 				"data":    {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
 				"orderBy": {Type: graphql.NewList(schema.orderEnums[table.Name])},
-				"options": {Type: inputQueryOptions},
+				"options": {Type: inputQueryOptions, DefaultValue: inputQueryOptionsDefault},
 			},
 			Resolve: resolve,
 		}
@@ -63,7 +63,7 @@ func (sg *SchemaGenerator) buildQueriesFields(schema *KeyspaceGraphQLSchema, tab
 			Args: graphql.FieldConfigArgument{
 				"filter":  {Type: graphql.NewNonNull(schema.tableOperatorInputTypes[table.Name])},
 				"orderBy": {Type: graphql.NewList(schema.orderEnums[table.Name])},
-				"options": {Type: inputQueryOptions},
+				"options": {Type: inputQueryOptions, DefaultValue: inputQueryOptionsDefault},
 			},
 			Resolve: resolve,
 		}
@@ -103,7 +103,7 @@ func (sg *SchemaGenerator) buildMutationFields(schema *KeyspaceGraphQLSchema, ta
 			Args: graphql.FieldConfigArgument{
 				"data":        {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
 				"ifNotExists": {Type: graphql.Boolean},
-				"options":     {Type: inputMutationOptions},
+				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
 			},
 			Resolve: resolve,
 		}
@@ -114,7 +114,7 @@ func (sg *SchemaGenerator) buildMutationFields(schema *KeyspaceGraphQLSchema, ta
 				"data":        {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
 				"ifExists":    {Type: graphql.Boolean},
 				"ifCondition": {Type: schema.tableOperatorInputTypes[table.Name]},
-				"options":     {Type: inputMutationOptions},
+				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
 			},
 			Resolve: resolve,
 		}
@@ -125,7 +125,7 @@ func (sg *SchemaGenerator) buildMutationFields(schema *KeyspaceGraphQLSchema, ta
 				"data":        {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
 				"ifExists":    {Type: graphql.Boolean},
 				"ifCondition": {Type: schema.tableOperatorInputTypes[table.Name]},
-				"options":     {Type: inputMutationOptions},
+				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
 			},
 			Resolve: resolve,
 		}
@@ -279,13 +279,17 @@ func (sg *SchemaGenerator) queryFieldResolver(keyspace *gocql.KeyspaceMetadata) 
 				return nil, err
 			}
 
-			result, err := sg.dbClient.Select(&db.SelectInfo{
-				Keyspace: keyspace.Name,
-				Table:    table.Name,
-				Where:    whereClause,
-				OrderBy:  parseColumnOrder(orderBy),
-				Options:  &options,
-			}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+			result, err := sg.dbClient.Select(
+				&db.SelectInfo{
+					Keyspace: keyspace.Name,
+					Table:    table.Name,
+					Where:    whereClause,
+					OrderBy:  parseColumnOrder(orderBy),
+					Options:  &options,
+				},
+				db.NewQueryOptions().
+					WithUserOrRole(userOrRole).
+					WithConsistency(gocql.Consistency(options.Consistency)))
 
 			if err != nil {
 				return nil, err
@@ -395,23 +399,22 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 					queryParams = append(queryParams, adaptParameterValue(value))
 				}
 
-				var options map[string]interface{}
-
-				if params.Args["options"] != nil {
-					options = params.Args["options"].(map[string]interface{})
+				var options types.MutationOptions
+				if err := mapstructure.Decode(params.Args["options"], &options); err != nil {
+					return nil, err
 				}
 
 				userOrRole, err := sg.checkUserOrRoleAuth(params)
 				if err != nil {
 					return nil, err
 				}
-				queryOptions := db.NewQueryOptions().WithUserOrRole(userOrRole)
+
+				queryOptions := db.NewQueryOptions().
+					WithUserOrRole(userOrRole).
+					WithConsistency(gocql.Consistency(options.Consistency))
+
 				switch operation {
 				case insertPrefix:
-					ttl := -1
-					if options != nil {
-						ttl = options["ttl"].(int)
-					}
 					ifNotExists := params.Args["ifNotExists"] == true
 					return sg.dbClient.Insert(&db.InsertInfo{
 						Keyspace:    keyspace.Name,
@@ -419,7 +422,7 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 						Columns:     columnNames,
 						QueryParams: queryParams,
 						IfNotExists: ifNotExists,
-						TTL:         ttl,
+						TTL:         options.TTL,
 					}, queryOptions)
 				case deletePrefix:
 					var ifCondition []types.ConditionItem
@@ -438,17 +441,13 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 					if params.Args["ifCondition"] != nil {
 						ifCondition = sg.adaptCondition(params.Args["ifCondition"].(map[string]interface{}))
 					}
-					ttl := -1
-					if options != nil {
-						ttl = options["ttl"].(int)
-					}
 					return sg.dbClient.Update(&db.UpdateInfo{
 						Keyspace:    keyspace.Name,
 						Table:       table,
 						Columns:     columnNames,
 						QueryParams: queryParams,
 						IfCondition: ifCondition,
-						TTL:         ttl,
+						TTL:         options.TTL,
 						IfExists:    params.Args["ifExists"] == true}, queryOptions)
 				}
 
