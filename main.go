@@ -9,6 +9,7 @@ import (
 	log2 "log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/julienschmidt/httprouter"
@@ -70,16 +71,22 @@ func main() {
 		router.HandlerFunc(route.Method, route.Pattern, route.HandlerFunc)
 	}
 
+	handler := http.Handler(router)
+
+	if doRequestLogging, _ := strconv.ParseBool(os.Getenv("REQUEST_LOGGING")); doRequestLogging {
+		handler = log.NewLoggingHandler(handler, logger)
+	}
+
 	finish := make(chan bool)
-	go listenAndServe(router, 8080, logger)
+	go listenAndServe(handler, 8080, logger)
 	// go listenAndServe(rest.ApiRouter(dbClient), 8081)
 	<-finish
 }
 
-func listenAndServe(router *httprouter.Router, port int, logger log.Logger) {
+func listenAndServe(handler http.Handler, port int, logger log.Logger) {
 	logger.Info("server listening",
 		"port", port)
-	err := http.ListenAndServe(fmt.Sprintf(":%d", port), router)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", port), handler)
 	if err != nil {
 		logger.Fatal("unable to start server",
 			"port", port,
