@@ -19,21 +19,21 @@ func NewZapLogger(log *zap.Logger) ZapLogger {
 }
 
 func (l ZapLogger) Debug(msg string, keyAndValues...interface{}) {
-	l.inner.Debug(msg, keyAndValues)
+	l.inner.Debugw(msg, keyAndValues...)
 }
 
 func (l ZapLogger) Info(msg string, keyAndValues...interface{}) {
-	l.inner.Info(msg, keyAndValues)
+	l.inner.Infow(msg, keyAndValues...)
 }
 
 func (l ZapLogger) Warn(msg string, keyAndValues...interface{}) {
-	l.inner.Warn(msg, keyAndValues)
+	l.inner.Warnw(msg, keyAndValues...)
 }
 
 func (l ZapLogger) Error(msg string, keyAndValues...interface{}) {
-	l.inner.Warn(msg, keyAndValues)
+	l.inner.Errorw(msg, keyAndValues...)
 }
 
 func (l ZapLogger) Fatal(msg string, keyAndValues...interface{}) {
-	l.inner.Fatal(msg, keyAndValues)
+	l.inner.Fatalw(msg, keyAndValues...)
 }
