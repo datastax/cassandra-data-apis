@@ -289,7 +289,8 @@ func (sg *SchemaGenerator) queryFieldResolver(keyspace *gocql.KeyspaceMetadata) 
 				},
 				db.NewQueryOptions().
 					WithUserOrRole(userOrRole).
-					WithConsistency(gocql.Consistency(options.Consistency)))
+					WithConsistency(gocql.Consistency(options.Consistency)).
+					WithSerialConsistency(gocql.SerialConsistency(options.SerialConsistency)))
 
 			if err != nil {
 				return nil, err
@@ -411,7 +412,8 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 
 				queryOptions := db.NewQueryOptions().
 					WithUserOrRole(userOrRole).
-					WithConsistency(gocql.Consistency(options.Consistency))
+					WithConsistency(gocql.Consistency(options.Consistency)).
+					WithSerialConsistency(gocql.SerialConsistency(options.SerialConsistency))
 
 				switch operation {
 				case insertPrefix:

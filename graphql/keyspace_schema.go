@@ -31,25 +31,32 @@ type KeyspaceGraphQLSchema struct {
 var inputQueryOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 	Name: "QueryOptions",
 	Fields: graphql.InputObjectConfigFieldMap{
-		"limit":       {Type: graphql.Int},
-		"pageSize":    {Type: graphql.Int},
-		"pageState":   {Type: graphql.String},
-		"consistency": {Type: consistencyEnum, DefaultValue: gocql.LocalQuorum},
+		"limit":             {Type: graphql.Int},
+		"pageSize":          {Type: graphql.Int},
+		"pageState":         {Type: graphql.String},
+		"consistency":       {Type: consistencyEnum, DefaultValue: gocql.LocalQuorum},
+		"serialConsistency": {Type: consistencyEnum, DefaultValue: gocql.Serial},
 	},
 })
 
 var inputMutationOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 	Name: "UpdateOptions",
 	Fields: graphql.InputObjectConfigFieldMap{
-		"ttl":         {Type: graphql.Int, DefaultValue: -1},
-		"consistency": {Type: consistencyEnum, DefaultValue: gocql.LocalQuorum},
+		"ttl":               {Type: graphql.Int, DefaultValue: -1},
+		"consistency":       {Type: consistencyEnum, DefaultValue: gocql.LocalQuorum},
+		"serialConsistency": {Type: consistencyEnum, DefaultValue: gocql.Serial},
 	},
 })
 
-var inputQueryOptionsDefault = types.QueryOptions{Consistency: int(gocql.LocalQuorum)}
+var inputQueryOptionsDefault = types.QueryOptions{
+	Consistency:       int(gocql.LocalQuorum),
+	SerialConsistency: int(gocql.Serial),
+}
+
 var inputMutationOptionsDefault = types.MutationOptions{
-	TTL:         -1,
-	Consistency: int(gocql.LocalQuorum),
+	TTL:               -1,
+	Consistency:       int(gocql.LocalQuorum),
+	SerialConsistency: int(gocql.Serial),
 }
 
 var consistencyEnum = graphql.NewEnum(graphql.EnumConfig{

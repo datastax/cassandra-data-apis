@@ -2,17 +2,22 @@ package db
 
 import (
 	"encoding/hex"
+	"errors"
 	"github.com/gocql/gocql"
 )
 
 type QueryOptions struct {
-	UserOrRole  string
-	Consistency gocql.Consistency
+	UserOrRole        string
+	Consistency       gocql.Consistency
+	SerialConsistency gocql.SerialConsistency
 }
 
 func NewQueryOptions() *QueryOptions {
 	return &QueryOptions{
-		Consistency: gocql.LocalOne,
+		// Set defaults for queries that are not affected by consistency
+		// But still need the parameters, i.e, DDL queries.
+		Consistency:       gocql.LocalOne,
+		SerialConsistency: gocql.LocalSerial,
 	}
 }
 
@@ -23,6 +28,11 @@ func (q *QueryOptions) WithUserOrRole(userOrRole string) *QueryOptions {
 
 func (q *QueryOptions) WithConsistency(consistency gocql.Consistency) *QueryOptions {
 	q.Consistency = consistency
+	return q
+}
+
+func (q *QueryOptions) WithSerialConsistency(serialConsistency gocql.SerialConsistency) *QueryOptions {
+	q.SerialConsistency = serialConsistency
 	return q
 }
 
@@ -100,6 +110,13 @@ func (session *GoCqlSession) ExecuteIter(query string, options *QueryOptions, va
 	q := session.ref.Query(query, values...)
 	if options != nil {
 		q.Consistency(options.Consistency)
+
+		if options.SerialConsistency != gocql.Serial && options.SerialConsistency != gocql.LocalSerial {
+			return nil, errors.New("Invalid serial consistency")
+		}
+
+		q.SerialConsistency(options.SerialConsistency)
+
 		if options.UserOrRole != "" {
 			q.CustomPayload(map[string][]byte{
 				"ProxyExecute": []byte(options.UserOrRole),
