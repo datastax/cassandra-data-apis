@@ -7,6 +7,7 @@ import (
 	"github.com/graphql-go/graphql"
 	"github.com/riptano/data-endpoints/config"
 	"github.com/riptano/data-endpoints/db"
+	"github.com/riptano/data-endpoints/log"
 	"net/http"
 	"path"
 	"time"
@@ -24,6 +25,7 @@ type RouteGenerator struct {
 	dbClient       *db.Db
 	ksExcluded     []string
 	updateInterval time.Duration
+	logger         log.Logger
 	schemaGen      *SchemaGenerator
 }
 
@@ -46,6 +48,7 @@ func NewRouteGenerator(dbClient *db.Db, cfg config.Config) *RouteGenerator {
 		dbClient:       dbClient,
 		ksExcluded:     cfg.ExcludedKeyspaces(),
 		updateInterval: cfg.SchemaUpdateInterval(),
+		logger:         cfg.Logger(),
 		schemaGen:      NewSchemaGenerator(dbClient, cfg),
 	}
 }
@@ -84,18 +87,18 @@ func (rg *RouteGenerator) RoutesKeyspaceManagement(pattern string) ([]Route, err
 		return nil, fmt.Errorf("unable to build graphql schema for keyspace management: %s", err)
 	}
 	return routesForSchema(pattern, func(query string, ctx context.Context) *graphql.Result {
-		return executeQuery(query, ctx, schema)
+		return rg.executeQuery(query, ctx, schema)
 	}), nil
 }
 
 func (rg *RouteGenerator) RoutesKeyspace(pattern string, ksName string) ([]Route, error) {
-	updater, err := NewUpdater(rg.schemaGen, ksName, rg.updateInterval)
+	updater, err := NewUpdater(rg.schemaGen, ksName, rg.updateInterval, rg.logger)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build graphql schema for keyspace '%s': %s", ksName, err)
 	}
 	go updater.Start()
 	return routesForSchema(pattern, func(query string, ctx context.Context) *graphql.Result {
-		return executeQuery(query, ctx, *updater.Schema())
+		return rg.executeQuery(query, ctx, *updater.Schema())
 	}), nil
 }
 
@@ -141,14 +144,14 @@ func routesForSchema(pattern string, execute executeQueryFunc) []Route {
 	}
 }
 
-func executeQuery(query string, ctx context.Context, schema graphql.Schema) *graphql.Result {
+func (rg *RouteGenerator) executeQuery(query string, ctx context.Context, schema graphql.Schema) *graphql.Result {
 	result := graphql.Do(graphql.Params{
 		Schema:        schema,
 		RequestString: query,
 		Context:       ctx,
 	})
 	if len(result.Errors) > 0 {
-		fmt.Printf("wrong result, unexpected errors: %v", result.Errors)
+		rg.logger.Error("unexpected errors processing graphql query", "errors", result.Errors)
 	}
 	return result
 }

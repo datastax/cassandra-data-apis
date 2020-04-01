@@ -81,7 +81,7 @@ func (db *Db) AlterTableAdd(info *AlterTableAddInfo, options *QueryOptions) (boo
 	query := fmt.Sprintf("ALTER TABLE %s.%s ADD(", info.Keyspace, info.Table)
 	for i, c := range info.ToAdd {
 		if i > 0 {
-			query += ", ";
+			query += ", "
 		}
 		query += fmt.Sprintf("%s %s", c.Name, c.Type)
 	}
@@ -98,7 +98,6 @@ func (db *Db) AlterTableDrop(info *AlterTableDropInfo, options *QueryOptions) (b
 }
 
 func (db *Db) DropTable(info *DropTableInfo, options *QueryOptions) (bool, error) {
-	// TODO: Escape keyspace/table name?
 	query := fmt.Sprintf("DROP TABLE %s.%s", info.Table, info.Keyspace)
 	err := db.session.Execute(query, options)
 	return err == nil, err

@@ -1,12 +1,10 @@
 package graphql
 
 import (
-	"fmt"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
 	"github.com/riptano/data-endpoints/config"
 	"github.com/riptano/data-endpoints/db"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -65,14 +63,15 @@ type ksValue struct {
 	DCs  []dataCenterValue `json:"dcs"`
 }
 
-func buildKeyspaceValue(keyspace *gocql.KeyspaceMetadata) ksValue {
+func (sg *SchemaGenerator) buildKeyspaceValue(keyspace *gocql.KeyspaceMetadata) ksValue {
 	dcs := make([]dataCenterValue, 0)
 	if strings.Contains(keyspace.StrategyClass, "NetworkTopologyStrategy") {
 		for dc, replicas := range keyspace.StrategyOptions {
 			count, err := strconv.Atoi(replicas.(string))
 			if err != nil {
-				// TODO: We need logging
-				fmt.Fprintf(os.Stderr, "invalid replicas value ('%s') for keyspace '%s'\n", replicas, keyspace.Name)
+				sg.logger.Error("invalid replicas value for keyspace",
+					"replicas", replicas,
+					"keyspace", keyspace.Name)
 				continue
 			}
 			dcs = append(dcs, dataCenterValue{
@@ -102,7 +101,7 @@ func (sg *SchemaGenerator) buildKeyspaceQuery() *graphql.Object {
 						return nil, err
 					}
 
-					return buildKeyspaceValue(keyspace), nil
+					return sg.buildKeyspaceValue(keyspace), nil
 				},
 			},
 			"keyspaces": &graphql.Field{
@@ -119,7 +118,7 @@ func (sg *SchemaGenerator) buildKeyspaceQuery() *graphql.Object {
 						if err != nil {
 							return nil, err
 						}
-						ksValues = append(ksValues, buildKeyspaceValue(keyspace))
+						ksValues = append(ksValues, sg.buildKeyspaceValue(keyspace))
 					}
 
 					return ksValues, nil

@@ -5,7 +5,6 @@ import (
 )
 
 func (db *Db) CreateKeyspace(name string, dcReplicas map[string]int, options *QueryOptions) (bool, error) {
-	// TODO: Escape keyspace datacenter names?
 	dcs := ""
 	for name, replicas := range dcReplicas {
 		comma := ""
@@ -23,7 +22,6 @@ func (db *Db) CreateKeyspace(name string, dcReplicas map[string]int, options *Qu
 }
 
 func (db *Db) DropKeyspace(name string, options *QueryOptions) (bool, error) {
-	// TODO: Escape keyspace name?
 	query := fmt.Sprintf("DROP KEYSPACE %s", name)
 	err := db.session.Execute(query, options)
 

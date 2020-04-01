@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"github.com/mitchellh/mapstructure"
 	"github.com/riptano/data-endpoints/config"
+	"github.com/riptano/data-endpoints/log"
 	"github.com/riptano/data-endpoints/types"
 	"gopkg.in/inf.v0"
-	"log"
 	"math/big"
 	"reflect"
 	"strings"
@@ -30,6 +30,7 @@ type SchemaGenerator struct {
 	naming            config.NamingConvention
 	supportedOps      config.Operations
 	useUserOrRoleAuth bool
+	logger            log.Logger
 }
 
 func NewSchemaGenerator(dbClient *db.Db, cfg config.Config) *SchemaGenerator {
@@ -38,6 +39,7 @@ func NewSchemaGenerator(dbClient *db.Db, cfg config.Config) *SchemaGenerator {
 		naming:            cfg.Naming(),
 		supportedOps:      cfg.SupportedOperations(),
 		useUserOrRoleAuth: cfg.UseUserOrRoleAuth(),
+		logger:            cfg.Logger(),
 	}
 }
 
@@ -207,12 +209,14 @@ func (sg *SchemaGenerator) BuildSchema(keyspaceName string) (graphql.Schema, err
 		return graphql.Schema{}, err
 	}
 
-	log.Printf("Building schema for %s", keyspace.Name)
+	sg.logger.Info("building schema",
+		"keyspace", keyspace.Name)
 
 	keyspaceSchema := &KeyspaceGraphQLSchema{
 		ignoredTables: make(map[string]bool),
+		schemaGen:     sg,
 	}
-	if err := keyspaceSchema.BuildTypes(keyspace, sg.naming); err != nil {
+	if err := keyspaceSchema.BuildTypes(keyspace); err != nil {
 		return graphql.Schema{}, err
 	}
 

@@ -2,9 +2,8 @@ package graphql
 
 import (
 	"context"
-	"fmt"
 	"github.com/graphql-go/graphql"
-	"os"
+	"github.com/riptano/data-endpoints/log"
 	"sync"
 	"time"
 )
@@ -18,6 +17,7 @@ type SchemaUpdater struct {
 	schemaGen      *SchemaGenerator
 	ksName         string
 	schemaVersion  string
+	logger 		   log.Logger
 }
 
 func (su *SchemaUpdater) Schema() *graphql.Schema {
@@ -27,7 +27,7 @@ func (su *SchemaUpdater) Schema() *graphql.Schema {
 	return su.schema
 }
 
-func NewUpdater(schemaGen *SchemaGenerator, ksName string, updateInterval time.Duration) (*SchemaUpdater, error) {
+func NewUpdater(schemaGen *SchemaGenerator, ksName string, updateInterval time.Duration, logger log.Logger) (*SchemaUpdater, error) {
 	schema, err := schemaGen.BuildSchema(ksName)
 	if err != nil {
 		return nil, err
@@ -40,6 +40,7 @@ func NewUpdater(schemaGen *SchemaGenerator, ksName string, updateInterval time.D
 		schema:         &schema,
 		schemaGen:      schemaGen,
 		ksName:         ksName,
+		logger:			logger,
 	}
 	return updater, nil
 }
@@ -62,8 +63,8 @@ func (su *SchemaUpdater) update() {
 	result, err := su.schemaGen.dbClient.Execute("SELECT schema_version FROM system.local", nil)
 
 	if err != nil {
-		// TODO: Log error
-		fmt.Fprintf(os.Stderr, "error attempting to determine schema version: %s", err)
+		su.logger.Error("unable to query schema version",
+			"error", err)
 	}
 
 	shouldUpdate := false
@@ -74,16 +75,16 @@ func (su *SchemaUpdater) update() {
 				su.schemaVersion = *schemaVersion
 			}
 		} else {
-			// TODO: Log error
-			fmt.Fprintf(os.Stderr, "schema version value is invalid: %v", row)
+			su.logger.Error("schema version value is invalid",
+				"value", row)
 		}
 	}
 
 	if shouldUpdate {
 		schema, err := su.schemaGen.BuildSchema(su.ksName)
 		if err != nil {
-			// TODO: Log error
-			fmt.Fprintf(os.Stderr, "error trying to build graphql schema for keyspace '%s': %s", su.ksName, err)
+			su.logger.Error("unable to build graphql schema for keyspace",
+				"keyspace", su.ksName, "error", err)
 		} else {
 			su.mutex.Lock()
 			su.schema = &schema
