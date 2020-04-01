@@ -25,7 +25,7 @@ type RouteGenerator struct {
 	dbClient       *db.Db
 	ksExcluded     []string
 	updateInterval time.Duration
-	logger		   log.Logger
+	logger         log.Logger
 	schemaGen      *SchemaGenerator
 }
 
@@ -48,7 +48,7 @@ func NewRouteGenerator(dbClient *db.Db, cfg config.Config) *RouteGenerator {
 		dbClient:       dbClient,
 		ksExcluded:     cfg.ExcludedKeyspaces(),
 		updateInterval: cfg.SchemaUpdateInterval(),
-		logger:			cfg.Logger(),
+		logger:         cfg.Logger(),
 		schemaGen:      NewSchemaGenerator(dbClient, cfg),
 	}
 }
