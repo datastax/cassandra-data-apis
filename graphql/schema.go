@@ -214,8 +214,9 @@ func (sg *SchemaGenerator) BuildSchema(keyspaceName string) (graphql.Schema, err
 
 	keyspaceSchema := &KeyspaceGraphQLSchema{
 		ignoredTables: make(map[string]bool),
+		schemaGen:     sg,
 	}
-	if err := keyspaceSchema.BuildTypes(keyspace, sg.naming, sg.logger); err != nil {
+	if err := keyspaceSchema.BuildTypes(keyspace); err != nil {
 		return graphql.Schema{}, err
 	}
 
