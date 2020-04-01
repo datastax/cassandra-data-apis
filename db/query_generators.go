@@ -72,7 +72,7 @@ func (db *Db) Select(info *SelectInfo, options *QueryOptions) (ResultSet, error)
 	return db.session.ExecuteIter(query, options, values...)
 }
 
-func (db *Db) Insert(info *InsertInfo, options *QueryOptions) (*types.ModificationResult, error) {
+func (db *Db) Insert(info *InsertInfo, options *QueryOptions) (ResultSet, error) {
 
 	placeholders := "?"
 	for i := 1; i < len(info.Columns); i++ {
@@ -92,12 +92,10 @@ func (db *Db) Insert(info *InsertInfo, options *QueryOptions) (*types.Modificati
 		info.QueryParams = append(info.QueryParams, info.TTL)
 	}
 
-	err := db.session.Execute(query, options, info.QueryParams...)
-
-	return &types.ModificationResult{Applied: err == nil}, err
+	return db.session.ExecuteIter(query, options, info.QueryParams...)
 }
 
-func (db *Db) Delete(info *DeleteInfo, options *QueryOptions) (*types.ModificationResult, error) {
+func (db *Db) Delete(info *DeleteInfo, options *QueryOptions) (ResultSet, error) {
 	whereClause := buildWhereClause(info.Columns)
 	query := fmt.Sprintf("DELETE FROM %s.%s WHERE %s", info.Keyspace, info.Table, whereClause)
 	queryParameters := make([]interface{}, len(info.QueryParams))
@@ -109,11 +107,10 @@ func (db *Db) Delete(info *DeleteInfo, options *QueryOptions) (*types.Modificati
 		query += " IF " + buildCondition(info.IfCondition, &queryParameters)
 	}
 
-	err := db.session.Execute(query, options, queryParameters...)
-	return &types.ModificationResult{Applied: err == nil}, err
+	return db.session.ExecuteIter(query, options, queryParameters...)
 }
 
-func (db *Db) Update(info *UpdateInfo, options *QueryOptions) (*types.ModificationResult, error) {
+func (db *Db) Update(info *UpdateInfo, options *QueryOptions) (ResultSet, error) {
 	// We have to differentiate between WHERE and SET clauses
 	setClause := ""
 	whereClause := ""
@@ -173,8 +170,7 @@ func (db *Db) Update(info *UpdateInfo, options *QueryOptions) (*types.Modificati
 		query += " IF " + buildCondition(info.IfCondition, &queryParameters)
 	}
 
-	err := db.session.Execute(query, options, queryParameters...)
-	return &types.ModificationResult{Applied: err == nil}, err
+	return db.session.ExecuteIter(query, options, queryParameters...)
 }
 
 func buildWhereClause(columnNames []string) string {
