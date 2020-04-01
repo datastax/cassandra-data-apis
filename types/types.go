@@ -13,9 +13,17 @@ type QueryResult struct {
 }
 
 type QueryOptions struct {
-	PageState string `json:"pageState"`
-	PageSize  int    `json:"pageSize"`
-	Limit     int    `json:"pageState"`
+	PageState         string `json:"pageState"`
+	PageSize          int    `json:"pageSize"`
+	Limit             int    `json:"limit"`
+	Consistency       int    `json:"consistency"`
+	SerialConsistency int    `json:"serialConsistency"`
+}
+
+type MutationOptions struct {
+	TTL               int `json:"ttl"`
+	Consistency       int `json:"consistency"`
+	SerialConsistency int `json:"serialConsistency"`
 }
 
 type ConditionItem struct {
