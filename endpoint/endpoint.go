@@ -15,7 +15,7 @@ type DataEndpointConfig struct {
 	dbPassword        string
 	ksExcluded        []string
 	updateInterval    time.Duration
-	naming            config.NamingConvention
+	naming            config.NamingConventionFn
 	supportedOps      config.Operations
 	useUserOrRoleAuth bool
 	logger            log.Logger
@@ -29,7 +29,7 @@ func (cfg DataEndpointConfig) SchemaUpdateInterval() time.Duration {
 	return cfg.updateInterval
 }
 
-func (cfg DataEndpointConfig) Naming() config.NamingConvention {
+func (cfg DataEndpointConfig) Naming() config.NamingConventionFn {
 	return cfg.naming
 }
 
@@ -53,7 +53,7 @@ func (cfg *DataEndpointConfig) SetSchemaUpdateInterval(updateInterval time.Durat
 	cfg.updateInterval = updateInterval
 }
 
-func (cfg *DataEndpointConfig) SetNaming(naming config.NamingConvention) {
+func (cfg *DataEndpointConfig) SetNaming(naming config.NamingConventionFn) {
 	cfg.naming = naming
 }
 
@@ -103,8 +103,9 @@ func NewEndpointConfig(hosts ...string) (*DataEndpointConfig, error) {
 	return &DataEndpointConfig{
 		dbHosts:        hosts,
 		updateInterval: 10 * time.Second,
-		naming:         config.DefaultNaming,
-		logger:         log.NewZapLogger(logger),
+		//TODO: Replace with actual factory
+		naming: func(_ config.KeyspaceNamingInfo) config.NamingConvention { return config.DefaultNaming },
+		logger: log.NewZapLogger(logger),
 	}, nil
 }
 

@@ -27,7 +27,7 @@ const AuthUserOrRole = "userOrRole"
 
 type SchemaGenerator struct {
 	dbClient          *db.Db
-	naming            config.NamingConvention
+	namingFn          config.NamingConventionFn
 	supportedOps      config.Operations
 	useUserOrRoleAuth bool
 	logger            log.Logger
@@ -38,35 +38,35 @@ var appliedModificationResult = types.ModificationResult{Applied: true}
 func NewSchemaGenerator(dbClient *db.Db, cfg config.Config) *SchemaGenerator {
 	return &SchemaGenerator{
 		dbClient:          dbClient,
-		naming:            cfg.Naming(),
+		namingFn:          cfg.Naming(),
 		supportedOps:      cfg.SupportedOperations(),
 		useUserOrRoleAuth: cfg.UseUserOrRoleAuth(),
 		logger:            cfg.Logger(),
 	}
 }
 
-func (sg *SchemaGenerator) buildQueriesFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
+func (sg *SchemaGenerator) buildQueriesFields(ksSchema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
 	fields := graphql.Fields{}
 	for name, table := range tables {
-		if schema.ignoredTables[table.Name] {
+		if ksSchema.ignoredTables[table.Name] {
 			continue
 		}
 
-		fields[sg.naming.ToGraphQLOperation("", name)] = &graphql.Field{
-			Type: schema.resultSelectTypes[table.Name],
+		fields[ksSchema.naming.ToGraphQLOperation("", name)] = &graphql.Field{
+			Type: ksSchema.resultSelectTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"data":    {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
-				"orderBy": {Type: graphql.NewList(schema.orderEnums[table.Name])},
+				"data":    {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
+				"orderBy": {Type: graphql.NewList(ksSchema.orderEnums[table.Name])},
 				"options": {Type: inputQueryOptions, DefaultValue: inputQueryOptionsDefault},
 			},
 			Resolve: resolve,
 		}
 
-		fields[sg.naming.ToGraphQLOperation("", name)+"Filter"] = &graphql.Field{
-			Type: schema.resultSelectTypes[table.Name],
+		fields[ksSchema.naming.ToGraphQLOperation("", name)+"Filter"] = &graphql.Field{
+			Type: ksSchema.resultSelectTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"filter":  {Type: graphql.NewNonNull(schema.tableOperatorInputTypes[table.Name])},
-				"orderBy": {Type: graphql.NewList(schema.orderEnums[table.Name])},
+				"filter":  {Type: graphql.NewNonNull(ksSchema.tableOperatorInputTypes[table.Name])},
+				"orderBy": {Type: graphql.NewList(ksSchema.orderEnums[table.Name])},
 				"options": {Type: inputQueryOptions, DefaultValue: inputQueryOptionsDefault},
 			},
 			Resolve: resolve,
@@ -96,39 +96,39 @@ func (sg *SchemaGenerator) buildQuery(schema *KeyspaceGraphQLSchema, tables map[
 		})
 }
 
-func (sg *SchemaGenerator) buildMutationFields(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
+func (sg *SchemaGenerator) buildMutationFields(ksSchema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
 	fields := graphql.Fields{}
 	for name, table := range tables {
-		if schema.ignoredTables[table.Name] {
+		if ksSchema.ignoredTables[table.Name] {
 			continue
 		}
-		fields[sg.naming.ToGraphQLOperation(insertPrefix, name)] = &graphql.Field{
-			Type: schema.resultUpdateTypes[table.Name],
+		fields[ksSchema.naming.ToGraphQLOperation(insertPrefix, name)] = &graphql.Field{
+			Type: ksSchema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"data":        {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
+				"data":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
 				"ifNotExists": {Type: graphql.Boolean},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
 			},
 			Resolve: resolve,
 		}
 
-		fields[sg.naming.ToGraphQLOperation(deletePrefix, name)] = &graphql.Field{
-			Type: schema.resultUpdateTypes[table.Name],
+		fields[ksSchema.naming.ToGraphQLOperation(deletePrefix, name)] = &graphql.Field{
+			Type: ksSchema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"data":        {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
+				"data":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
 				"ifExists":    {Type: graphql.Boolean},
-				"ifCondition": {Type: schema.tableOperatorInputTypes[table.Name]},
+				"ifCondition": {Type: ksSchema.tableOperatorInputTypes[table.Name]},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
 			},
 			Resolve: resolve,
 		}
 
-		fields[sg.naming.ToGraphQLOperation(updatePrefix, name)] = &graphql.Field{
-			Type: schema.resultUpdateTypes[table.Name],
+		fields[ksSchema.naming.ToGraphQLOperation(updatePrefix, name)] = &graphql.Field{
+			Type: ksSchema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"data":        {Type: graphql.NewNonNull(schema.tableScalarInputTypes[table.Name])},
+				"data":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
 				"ifExists":    {Type: graphql.Boolean},
-				"ifCondition": {Type: schema.tableOperatorInputTypes[table.Name]},
+				"ifCondition": {Type: ksSchema.tableOperatorInputTypes[table.Name]},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
 			},
 			Resolve: resolve,
@@ -211,36 +211,42 @@ func (sg *SchemaGenerator) BuildSchema(keyspaceName string) (graphql.Schema, err
 		return graphql.Schema{}, err
 	}
 
-	sg.logger.Info("building schema",
-		"keyspace", keyspace.Name)
+	sg.logger.Info("building schema", "keyspace", keyspace.Name)
 
+	ksNaming := sg.dbClient.KeyspaceNamingInfo(keyspace)
 	keyspaceSchema := &KeyspaceGraphQLSchema{
 		ignoredTables: make(map[string]bool),
 		schemaGen:     sg,
+		naming:        sg.namingFn(ksNaming),
 	}
+
 	if err := keyspaceSchema.BuildTypes(keyspace); err != nil {
 		return graphql.Schema{}, err
 	}
 
+	queryResolveFn := sg.queryFieldResolver(keyspace, keyspaceSchema)
+	mutationResolveFn := sg.mutationFieldResolver(keyspace, keyspaceSchema)
+
 	return graphql.NewSchema(
 		graphql.SchemaConfig{
-			Query:    sg.buildQuery(keyspaceSchema, keyspace.Tables, sg.queryFieldResolver(keyspace)),
-			Mutation: sg.buildMutation(keyspaceSchema, keyspace.Tables, sg.mutationFieldResolver(keyspace)),
+			Query:    sg.buildQuery(keyspaceSchema, keyspace.Tables, queryResolveFn),
+			Mutation: sg.buildMutation(keyspaceSchema, keyspace.Tables, mutationResolveFn),
 		},
 	)
 }
 
-func (sg *SchemaGenerator) queryFieldResolver(keyspace *gocql.KeyspaceMetadata) graphql.FieldResolveFn {
+func (sg *SchemaGenerator) queryFieldResolver(
+	keyspace *gocql.KeyspaceMetadata, ksSchema *KeyspaceGraphQLSchema) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
 		fieldName := params.Info.FieldName
 		switch fieldName {
 		case "table":
-			return sg.getTable(keyspace, params.Args)
+			return ksSchema.getTable(keyspace, params.Args)
 		case "tables":
-			return sg.getTables(keyspace)
+			return ksSchema.getTables(keyspace)
 		default:
 			var table *gocql.TableMetadata
-			table, tableFound := keyspace.Tables[sg.naming.ToCQLTable(fieldName)]
+			table, tableFound := keyspace.Tables[ksSchema.naming.ToCQLTable(fieldName)]
 			var data map[string]interface{}
 			if params.Args["data"] != nil {
 				data = params.Args["data"].(map[string]interface{})
@@ -254,18 +260,18 @@ func (sg *SchemaGenerator) queryFieldResolver(keyspace *gocql.KeyspaceMetadata) 
 				whereClause = make([]types.ConditionItem, 0, len(data))
 				for key, value := range data {
 					whereClause = append(whereClause, types.ConditionItem{
-						Column:   sg.naming.ToCQLColumn(key),
+						Column:   ksSchema.naming.ToCQLColumn(key),
 						Operator: "=",
 						Value:    adaptParameterValue(value),
 					})
 				}
 			} else if strings.HasSuffix(fieldName, "Filter") {
-				table, tableFound = keyspace.Tables[sg.naming.ToCQLTable(strings.TrimSuffix(fieldName, "Filter"))]
+				table, tableFound = keyspace.Tables[ksSchema.naming.ToCQLTable(strings.TrimSuffix(fieldName, "Filter"))]
 				if !tableFound {
 					return nil, fmt.Errorf("unable to find table '%s'", params.Info.FieldName)
 				}
 
-				whereClause = sg.adaptCondition(data)
+				whereClause = ksSchema.adaptCondition(data)
 			} else {
 				return nil, fmt.Errorf("Unable to find table for '%s'", params.Info.FieldName)
 			}
@@ -304,13 +310,13 @@ func (sg *SchemaGenerator) queryFieldResolver(keyspace *gocql.KeyspaceMetadata) 
 
 			return &types.QueryResult{
 				PageState: result.PageState(),
-				Values:    sg.adaptResult(result.Values()),
+				Values:    ksSchema.adaptResult(result.Values()),
 			}, nil
 		}
 	}
 }
 
-func (sg *SchemaGenerator) adaptCondition(data map[string]interface{}) []types.ConditionItem {
+func (s *KeyspaceGraphQLSchema) adaptCondition(data map[string]interface{}) []types.ConditionItem {
 	result := make([]types.ConditionItem, 0, len(data))
 	for key, value := range data {
 		if value == nil {
@@ -320,7 +326,7 @@ func (sg *SchemaGenerator) adaptCondition(data map[string]interface{}) []types.C
 
 		for operatorName, itemValue := range mapValue {
 			result = append(result, types.ConditionItem{
-				Column:   sg.naming.ToCQLColumn(key),
+				Column:   s.naming.ToCQLColumn(key),
 				Operator: cqlOperators[operatorName],
 				Value:    adaptParameterValue(itemValue),
 			})
@@ -329,12 +335,12 @@ func (sg *SchemaGenerator) adaptCondition(data map[string]interface{}) []types.C
 	return result
 }
 
-func (sg *SchemaGenerator) adaptResult(values []map[string]interface{}) []map[string]interface{} {
+func (s *KeyspaceGraphQLSchema) adaptResult(values []map[string]interface{}) []map[string]interface{} {
 	result := make([]map[string]interface{}, 0, len(values))
 	for _, item := range values {
 		resultItem := make(map[string]interface{})
 		for k, v := range item {
-			resultItem[sg.naming.ToGraphQLField(k)] = adaptResultValue(v)
+			resultItem[s.naming.ToGraphQLField(k)] = adaptResultValue(v)
 		}
 		result = append(result, resultItem)
 	}
@@ -382,27 +388,28 @@ func adaptResultValue(value interface{}) interface{} {
 	return result
 }
 
-func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadata) graphql.FieldResolveFn {
+func (sg *SchemaGenerator) mutationFieldResolver(
+	keyspace *gocql.KeyspaceMetadata, ksSchema *KeyspaceGraphQLSchema) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
 		fieldName := params.Info.FieldName
 		switch fieldName {
 		case "createTable":
-			return sg.createTable(keyspace.Name, params)
+			return sg.createTable(keyspace.Name, ksSchema, params)
 		case "alterTableAdd":
-			return sg.alterTableAdd(keyspace.Name, params)
+			return sg.alterTableAdd(keyspace.Name, ksSchema, params)
 		case "alterTableDrop":
-			return sg.alterTableDrop(keyspace.Name, params)
+			return sg.alterTableDrop(keyspace.Name, ksSchema, params)
 		case "dropTable":
-			return sg.dropTable(keyspace.Name, params)
+			return sg.dropTable(keyspace.Name, ksSchema, params)
 		default:
 			operation, typeName := mutationPrefix(fieldName)
-			if table, ok := keyspace.Tables[sg.naming.ToCQLTable(typeName)]; ok {
+			if table, ok := keyspace.Tables[ksSchema.naming.ToCQLTable(typeName)]; ok {
 				data := params.Args["data"].(map[string]interface{})
 				columnNames := make([]string, 0, len(data))
 				queryParams := make([]interface{}, 0, len(data))
 
 				for key, value := range data {
-					columnNames = append(columnNames, sg.naming.ToCQLColumn(key))
+					columnNames = append(columnNames, ksSchema.naming.ToCQLColumn(key))
 					queryParams = append(queryParams, adaptParameterValue(value))
 				}
 
@@ -437,7 +444,7 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 				case deletePrefix:
 					var ifCondition []types.ConditionItem
 					if params.Args["ifCondition"] != nil {
-						ifCondition = sg.adaptCondition(params.Args["ifCondition"].(map[string]interface{}))
+						ifCondition = ksSchema.adaptCondition(params.Args["ifCondition"].(map[string]interface{}))
 					}
 					result, err = sg.dbClient.Delete(&db.DeleteInfo{
 						Keyspace:    keyspace.Name,
@@ -449,7 +456,7 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 				case updatePrefix:
 					var ifCondition []types.ConditionItem
 					if params.Args["ifCondition"] != nil {
-						ifCondition = sg.adaptCondition(params.Args["ifCondition"].(map[string]interface{}))
+						ifCondition = ksSchema.adaptCondition(params.Args["ifCondition"].(map[string]interface{}))
 					}
 					result, err = sg.dbClient.Update(&db.UpdateInfo{
 						Keyspace:    keyspace.Name,

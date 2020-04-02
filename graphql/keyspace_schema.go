@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
+	"github.com/riptano/data-endpoints/config"
 	"github.com/riptano/data-endpoints/types"
 )
 
@@ -26,6 +27,7 @@ type KeyspaceGraphQLSchema struct {
 	keyValueTypes map[string]graphql.Output
 
 	schemaGen *SchemaGenerator
+	naming    config.NamingConvention
 }
 
 var inputQueryOptions = graphql.NewInputObject(graphql.InputObjectConfig{
@@ -201,18 +203,18 @@ func (s *KeyspaceGraphQLSchema) buildOrderEnums(keyspace *gocql.KeyspaceMetadata
 	for _, table := range keyspace.Tables {
 		values := make(map[string]*graphql.EnumValueConfig, len(table.Columns))
 		for _, column := range table.Columns {
-			values[s.schemaGen.naming.ToGraphQLEnumValue(column.Name)+"_ASC"] = &graphql.EnumValueConfig{
-				Value:       column.Name + "_ASC",
+			values[s.naming.ToGraphQLEnumValue(column.Name)+"_ASC"] = &graphql.EnumValueConfig{
+				Value: column.Name + "_ASC",
 				Description: fmt.Sprintf("Order %s by %s in a	scending order", table.Name, column.Name),
 			}
-			values[s.schemaGen.naming.ToGraphQLEnumValue(column.Name)+"_DESC"] = &graphql.EnumValueConfig{
+			values[s.naming.ToGraphQLEnumValue(column.Name)+"_DESC"] = &graphql.EnumValueConfig{
 				Value:       column.Name + "_DESC",
 				Description: fmt.Sprintf("Order %s by %s in descending order", table.Name, column.Name),
 			}
 		}
 
 		s.orderEnums[table.Name] = graphql.NewEnum(graphql.EnumConfig{
-			Name:   s.schemaGen.naming.ToGraphQLType(table.Name + "Order"),
+			Name:   s.naming.ToGraphQLType(table.Name + "Order"),
 			Values: values,
 		})
 	}
@@ -233,7 +235,7 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 		for name, column := range table.Columns {
 			var fieldType graphql.Output
 			var inputFieldType graphql.Output
-			fieldName := s.schemaGen.naming.ToGraphQLField(name)
+			fieldName := s.naming.ToGraphQLField(name)
 			fieldType, err = s.buildType(column.Type, false)
 			if err != nil {
 				s.schemaGen.logger.Error("unable to build graphql type for column",
@@ -273,17 +275,17 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 		}
 
 		s.tableValueTypes[table.Name] = graphql.NewObject(graphql.ObjectConfig{
-			Name:   s.schemaGen.naming.ToGraphQLType(table.Name),
+			Name:   s.naming.ToGraphQLType(table.Name),
 			Fields: fields,
 		})
 
 		s.tableScalarInputTypes[table.Name] = graphql.NewInputObject(graphql.InputObjectConfig{
-			Name:   s.schemaGen.naming.ToGraphQLType(table.Name) + "Input",
+			Name:   s.naming.ToGraphQLType(table.Name) + "Input",
 			Fields: inputFields,
 		})
 
 		s.tableOperatorInputTypes[table.Name] = graphql.NewInputObject(graphql.InputObjectConfig{
-			Name:   s.schemaGen.naming.ToGraphQLType(table.Name) + "FilterInput",
+			Name:   s.naming.ToGraphQLType(table.Name) + "FilterInput",
 			Fields: inputOperatorFields,
 		})
 	}
@@ -305,7 +307,7 @@ func (s *KeyspaceGraphQLSchema) buildResultTypes(keyspace *gocql.KeyspaceMetadat
 		}
 
 		s.resultSelectTypes[table.Name] = graphql.NewObject(graphql.ObjectConfig{
-			Name: s.schemaGen.naming.ToGraphQLType(table.Name + "Result"),
+			Name: s.naming.ToGraphQLType(table.Name + "Result"),
 			Fields: graphql.Fields{
 				"pageState": {Type: graphql.String},
 				"values":    {Type: graphql.NewList(graphql.NewNonNull(itemType))},
@@ -313,7 +315,7 @@ func (s *KeyspaceGraphQLSchema) buildResultTypes(keyspace *gocql.KeyspaceMetadat
 		})
 
 		s.resultUpdateTypes[table.Name] = graphql.NewObject(graphql.ObjectConfig{
-			Name: s.schemaGen.naming.ToGraphQLType(table.Name + "MutationResult"),
+			Name: s.naming.ToGraphQLType(table.Name + "MutationResult"),
 			Fields: graphql.Fields{
 				"applied": {Type: graphql.NewNonNull(graphql.Boolean)},
 				"value":   {Type: itemType},

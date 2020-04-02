@@ -2,6 +2,7 @@ package db
 
 import (
 	"github.com/gocql/gocql"
+	"github.com/riptano/data-endpoints/config"
 )
 
 // Db represents a connection to a db
@@ -41,6 +42,37 @@ func NewDbWithSession(session Session) *Db {
 func (db *Db) Keyspace(keyspace string) (*gocql.KeyspaceMetadata, error) {
 	// We expose gocql types for now, we should wrap them in the future instead
 	return db.session.KeyspaceMetadata(keyspace)
+}
+
+// KeyspaceNamingInfo Retrieves the keyspace naming information
+func (db *Db) KeyspaceNamingInfo(ks *gocql.KeyspaceMetadata) config.KeyspaceNamingInfo {
+	result := keyspaceNamingInfo{
+		name:   ks.Name,
+		tables: make(map[string][]string, 0),
+	}
+
+	for _, table := range ks.Tables {
+		columns := make([]string, 0, len(table.Columns))
+		for k := range table.Columns {
+			columns = append(columns, k)
+		}
+		result.tables[table.Name] = columns
+	}
+
+	return &result
+}
+
+type keyspaceNamingInfo struct {
+	name   string
+	tables map[string][]string
+}
+
+func (k *keyspaceNamingInfo) Name() string {
+	return k.name
+}
+
+func (k *keyspaceNamingInfo) Tables() map[string][]string {
+	return k.tables
 }
 
 // Keyspaces Retrieves all the keyspace names

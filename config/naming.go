@@ -22,6 +22,14 @@ type NamingConvention interface {
 	ToGraphQLEnumValue(name string) string
 }
 
+type NamingConventionFn func(KeyspaceNamingInfo) NamingConvention
+
+type KeyspaceNamingInfo interface {
+	Name() string
+	// A map containing the table names as keys and the column names as values
+	Tables() map[string][]string
+}
+
 type defaultNaming struct{}
 
 // Default naming implementation.
