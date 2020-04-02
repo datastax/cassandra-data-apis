@@ -33,6 +33,8 @@ type SchemaGenerator struct {
 	logger            log.Logger
 }
 
+var appliedModificationResult = types.ModificationResult{Applied: true}
+
 func NewSchemaGenerator(dbClient *db.Db, cfg config.Config) *SchemaGenerator {
 	return &SchemaGenerator{
 		dbClient:          dbClient,
@@ -419,10 +421,12 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 					WithConsistency(gocql.Consistency(options.Consistency)).
 					WithSerialConsistency(gocql.SerialConsistency(options.SerialConsistency))
 
+				var result db.ResultSet
+
 				switch operation {
 				case insertPrefix:
 					ifNotExists := params.Args["ifNotExists"] == true
-					return sg.dbClient.Insert(&db.InsertInfo{
+					result, err = sg.dbClient.Insert(&db.InsertInfo{
 						Keyspace:    keyspace.Name,
 						Table:       table.Name,
 						Columns:     columnNames,
@@ -435,7 +439,7 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 					if params.Args["ifCondition"] != nil {
 						ifCondition = sg.adaptCondition(params.Args["ifCondition"].(map[string]interface{}))
 					}
-					return sg.dbClient.Delete(&db.DeleteInfo{
+					result, err = sg.dbClient.Delete(&db.DeleteInfo{
 						Keyspace:    keyspace.Name,
 						Table:       table.Name,
 						Columns:     columnNames,
@@ -447,7 +451,7 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 					if params.Args["ifCondition"] != nil {
 						ifCondition = sg.adaptCondition(params.Args["ifCondition"].(map[string]interface{}))
 					}
-					return sg.dbClient.Update(&db.UpdateInfo{
+					result, err = sg.dbClient.Update(&db.UpdateInfo{
 						Keyspace:    keyspace.Name,
 						Table:       table,
 						Columns:     columnNames,
@@ -455,15 +459,44 @@ func (sg *SchemaGenerator) mutationFieldResolver(keyspace *gocql.KeyspaceMetadat
 						IfCondition: ifCondition,
 						TTL:         options.TTL,
 						IfExists:    params.Args["ifExists"] == true}, queryOptions)
+				default:
+					return false, fmt.Errorf("operation '%s' not supported", operation)
 				}
 
-				return false, fmt.Errorf("operation '%s' not supported", operation)
+				return sg.getModificationResult(result, err)
 			} else {
 				return nil, fmt.Errorf("unable to find table for type name '%s'", params.Info.FieldName)
 			}
 
 		}
 	}
+}
+
+func (sg *SchemaGenerator) getModificationResult(rs db.ResultSet, err error) (*types.ModificationResult, error) {
+	if err != nil {
+		return nil, err
+	}
+
+	rows := rs.Values()
+
+	if len(rows) == 0 {
+		return &appliedModificationResult, nil
+	}
+
+	result := types.ModificationResult{}
+	row := rows[0]
+	applied := row["[applied]"].(*bool)
+	result.Applied = applied != nil && *applied
+
+	result.Value = make(map[string]interface{})
+	for k, v := range row {
+		if k == "[applied]" {
+			continue
+		}
+		result.Value[sg.naming.ToGraphQLField(k)] = adaptResultValue(v)
+	}
+
+	return &result, nil
 }
 
 func adaptParameterValue(value interface{}) interface{} {

@@ -108,6 +108,12 @@ func (session *GoCqlSession) Execute(query string, options *QueryOptions, values
 
 func (session *GoCqlSession) ExecuteIter(query string, options *QueryOptions, values ...interface{}) (ResultSet, error) {
 	q := session.ref.Query(query, values...)
+
+	// Avoid reusing metadata from the prepared statement
+	// Otherwise, we will not get the [applied] column (https://github.com/gocql/gocql/issues/612)
+	// Or new columns for SELECT *
+	q.NoSkipMetadata()
+
 	if options != nil {
 		q.Consistency(options.Consistency)
 

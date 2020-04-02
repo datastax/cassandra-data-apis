@@ -28,7 +28,7 @@ func TestDeleteGeneration(t *testing.T) {
 			session: &sessionMock,
 		}
 
-		sessionMock.On("Execute", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		sessionMock.On("ExecuteIter", mock.Anything, mock.Anything, mock.Anything).Return(ResultMock{}, nil)
 
 		_, err := db.Delete(&DeleteInfo{
 			Keyspace:    "ks1",
@@ -48,7 +48,7 @@ func TestDeleteGeneration(t *testing.T) {
 				expectedQueryParams = append(expectedQueryParams, condition.Value)
 			}
 		}
-		sessionMock.AssertCalled(t, "Execute", item.query, mock.Anything, expectedQueryParams)
+		sessionMock.AssertCalled(t, "ExecuteIter", item.query, mock.Anything, expectedQueryParams)
 		sessionMock.AssertExpectations(t)
 	}
 }
@@ -86,7 +86,7 @@ func TestUpdateGeneration(t *testing.T) {
 			session: &sessionMock,
 		}
 
-		sessionMock.On("Execute", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		sessionMock.On("ExecuteIter", mock.Anything, mock.Anything, mock.Anything).Return(ResultMock{}, nil)
 
 		_, err := db.Update(&UpdateInfo{
 			Keyspace:    "ks1",
@@ -99,7 +99,7 @@ func TestUpdateGeneration(t *testing.T) {
 		}, nil)
 		assert.Nil(t, err)
 
-		sessionMock.AssertCalled(t, "Execute", item.query, mock.Anything, item.expectedParams)
+		sessionMock.AssertCalled(t, "ExecuteIter", item.query, mock.Anything, item.expectedParams)
 		sessionMock.AssertExpectations(t)
 	}
 }
@@ -125,7 +125,7 @@ func TestInsertGeneration(t *testing.T) {
 			session: &sessionMock,
 		}
 
-		sessionMock.On("Execute", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		sessionMock.On("ExecuteIter", mock.Anything, mock.Anything, mock.Anything).Return(ResultMock{}, nil)
 
 		expectedQueryParams := make([]interface{}, len(item.queryParams))
 		copy(expectedQueryParams, item.queryParams)
@@ -143,7 +143,7 @@ func TestInsertGeneration(t *testing.T) {
 			IfNotExists: item.ifNotExists,
 		}, nil)
 		assert.Nil(t, err)
-		sessionMock.AssertCalled(t, "Execute", item.query, mock.Anything, expectedQueryParams)
+		sessionMock.AssertCalled(t, "ExecuteIter", item.query, mock.Anything, expectedQueryParams)
 		sessionMock.AssertExpectations(t)
 	}
 }
