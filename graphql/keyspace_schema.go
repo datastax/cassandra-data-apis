@@ -235,7 +235,7 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 		for name, column := range table.Columns {
 			var fieldType graphql.Output
 			var inputFieldType graphql.Output
-			fieldName := s.naming.ToGraphQLField(name)
+			fieldName := s.naming.ToGraphQLField(table.Name, name)
 			fieldType, err = s.buildType(column.Type, false)
 			if err != nil {
 				s.schemaGen.logger.Error("unable to build graphql type for column",

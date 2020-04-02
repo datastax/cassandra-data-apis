@@ -189,7 +189,7 @@ func (s *KeyspaceGraphQLSchema) getTable(keyspace *gocql.KeyspaceMetadata, args 
 	}
 	return &tableValue{
 		Name:    s.naming.ToGraphQLType(name),
-		Columns: s.toColumnValues(table.Columns),
+		Columns: s.toColumnValues(table.Name, table.Columns),
 	}, nil
 }
 
@@ -198,13 +198,13 @@ func (s *KeyspaceGraphQLSchema) getTables(keyspace *gocql.KeyspaceMetadata) (int
 	for _, table := range keyspace.Tables {
 		tableValues = append(tableValues, &tableValue{
 			Name:    s.naming.ToGraphQLType(table.Name),
-			Columns: s.toColumnValues(table.Columns),
+			Columns: s.toColumnValues(table.Name, table.Columns),
 		})
 	}
 	return tableValues, nil
 }
 
-func (s *KeyspaceGraphQLSchema) decodeColumns(columns []interface{}) ([]*gocql.ColumnMetadata, error) {
+func (s *KeyspaceGraphQLSchema) decodeColumns(tableName string, columns []interface{}) ([]*gocql.ColumnMetadata, error) {
 	columnValues := make([]*gocql.ColumnMetadata, 0)
 	for _, column := range columns {
 		var value columnValue
@@ -214,7 +214,7 @@ func (s *KeyspaceGraphQLSchema) decodeColumns(columns []interface{}) ([]*gocql.C
 
 		// Adapt from GraphQL column to gocql column
 		cqlColumn := &gocql.ColumnMetadata{
-			Name: s.naming.ToCQLColumn(value.Name),
+			Name: s.naming.ToCQLColumn(tableName, value.Name),
 			Kind: toDbColumnKind(value.Kind),
 			Type: toDbColumnType(value.Type),
 		}
@@ -224,7 +224,7 @@ func (s *KeyspaceGraphQLSchema) decodeColumns(columns []interface{}) ([]*gocql.C
 	return columnValues, nil
 }
 
-func (s *KeyspaceGraphQLSchema) decodeClusteringInfo(columns []interface{}) ([]*gocql.ColumnMetadata, error) {
+func (s *KeyspaceGraphQLSchema) decodeClusteringInfo(tableName string, columns []interface{}) ([]*gocql.ColumnMetadata, error) {
 	columnValues := make([]*gocql.ColumnMetadata, 0)
 	for _, column := range columns {
 		var value clusteringInfo
@@ -234,7 +234,7 @@ func (s *KeyspaceGraphQLSchema) decodeClusteringInfo(columns []interface{}) ([]*
 
 		// Adapt from GraphQL column to gocql column
 		cqlColumn := &gocql.ColumnMetadata{
-			Name: s.naming.ToCQLColumn(value.Name),
+			Name: s.naming.ToCQLColumn(tableName, value.Name),
 			Kind: toDbColumnKind(value.Kind),
 			Type: toDbColumnType(value.Type),
 			//TODO: Use enums
@@ -251,22 +251,22 @@ func (sg *SchemaGenerator) createTable(
 	var values []*gocql.ColumnMetadata = nil
 	var clusteringKeys []*gocql.ColumnMetadata = nil
 	args := params.Args
-	name := ksSchema.naming.ToCQLTable(args["name"].(string))
+	tableName := ksSchema.naming.ToCQLTable(args["tableName"].(string))
 
-	partitionKeys, err := ksSchema.decodeColumns(args["partitionKeys"].([]interface{}))
+	partitionKeys, err := ksSchema.decodeColumns(tableName, args["partitionKeys"].([]interface{}))
 
 	if err != nil {
 		return false, err
 	}
 
 	if args["values"] != nil {
-		if values, err = ksSchema.decodeColumns(args["values"].([]interface{})); err != nil {
+		if values, err = ksSchema.decodeColumns(tableName, args["values"].([]interface{})); err != nil {
 			return nil, err
 		}
 	}
 
 	if args["clusteringKeys"] != nil {
-		if clusteringKeys, err = ksSchema.decodeClusteringInfo(args["clusteringKeys"].([]interface{})); err != nil {
+		if clusteringKeys, err = ksSchema.decodeClusteringInfo(tableName, args["clusteringKeys"].([]interface{})); err != nil {
 			return nil, err
 		}
 	}
@@ -277,7 +277,7 @@ func (sg *SchemaGenerator) createTable(
 	}
 	return sg.dbClient.CreateTable(&db.CreateTableInfo{
 		Keyspace:       ksName,
-		Table:          name,
+		Table:          tableName,
 		PartitionKeys:  partitionKeys,
 		ClusteringKeys: clusteringKeys,
 		Values:         values}, db.NewQueryOptions().WithUserOrRole(userOrRole))
@@ -288,9 +288,9 @@ func (sg *SchemaGenerator) alterTableAdd(ksName string, ksSchema *KeyspaceGraphQ
 	var toAdd []*gocql.ColumnMetadata
 
 	args := params.Args
-	name := ksSchema.naming.ToCQLTable(args["name"].(string))
+	tableName := ksSchema.naming.ToCQLTable(args["tableName"].(string))
 
-	if toAdd, err = ksSchema.decodeColumns(args["toAdd"].([]interface{})); err != nil {
+	if toAdd, err = ksSchema.decodeColumns(tableName, args["toAdd"].([]interface{})); err != nil {
 		return nil, err
 	}
 
@@ -304,7 +304,7 @@ func (sg *SchemaGenerator) alterTableAdd(ksName string, ksSchema *KeyspaceGraphQ
 	}
 	return sg.dbClient.AlterTableAdd(&db.AlterTableAddInfo{
 		Keyspace: ksName,
-		Table:    name,
+		Table:    tableName,
 		ToAdd:    toAdd,
 	}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 }
@@ -312,13 +312,13 @@ func (sg *SchemaGenerator) alterTableAdd(ksName string, ksSchema *KeyspaceGraphQ
 func (sg *SchemaGenerator) alterTableDrop(
 	ksName string, ksSchema *KeyspaceGraphQLSchema, params graphql.ResolveParams) (interface{}, error) {
 	args := params.Args
-	name := ksSchema.naming.ToCQLTable(args["name"].(string))
+	tableName := ksSchema.naming.ToCQLTable(args["tableName"].(string))
 
 	toDropArg := args["toDrop"].([]interface{})
 	toDrop := make([]string, 0, len(toDropArg))
 
 	for _, column := range toDropArg {
-		toDrop = append(toDrop, ksSchema.naming.ToCQLColumn(column.(string)))
+		toDrop = append(toDrop, ksSchema.naming.ToCQLColumn(tableName, column.(string)))
 	}
 
 	if len(toDrop) == 0 {
@@ -331,7 +331,7 @@ func (sg *SchemaGenerator) alterTableDrop(
 	}
 	return sg.dbClient.AlterTableDrop(&db.AlterTableDropInfo{
 		Keyspace: ksName,
-		Table:    name,
+		Table:    tableName,
 		ToDrop:   toDrop,
 	}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 }
@@ -423,11 +423,11 @@ func toDbColumnType(info *dataTypeValue) gocql.TypeInfo {
 	return nil
 }
 
-func (s *KeyspaceGraphQLSchema) toColumnValues(columns map[string]*gocql.ColumnMetadata) []*columnValue {
+func (s *KeyspaceGraphQLSchema) toColumnValues(tableName string, columns map[string]*gocql.ColumnMetadata) []*columnValue {
 	columnValues := make([]*columnValue, 0)
 	for _, column := range columns {
 		columnValues = append(columnValues, &columnValue{
-			Name: s.naming.ToGraphQLField(column.Name),
+			Name: s.naming.ToGraphQLField(tableName, column.Name),
 			Kind: toColumnKind(column.Kind),
 			Type: toColumnType(column.Type),
 		})

@@ -54,3 +54,16 @@ func (o *ConfigMock) Logger() log.Logger {
 	args := o.Called()
 	return args.Get(0).(log.Logger)
 }
+
+type KeyspaceNamingInfoMock struct {
+	mock.Mock
+}
+
+func NewKeyspaceNamingInfoMock() *KeyspaceNamingInfoMock {
+	return &KeyspaceNamingInfoMock{}
+}
+
+func (o *KeyspaceNamingInfoMock) Tables() map[string][]string {
+	args := o.Called()
+	return args.Get(0).(map[string][]string)
+}

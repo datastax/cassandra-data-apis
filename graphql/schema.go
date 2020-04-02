@@ -260,7 +260,7 @@ func (sg *SchemaGenerator) queryFieldResolver(
 				whereClause = make([]types.ConditionItem, 0, len(data))
 				for key, value := range data {
 					whereClause = append(whereClause, types.ConditionItem{
-						Column:   ksSchema.naming.ToCQLColumn(key),
+						Column:   ksSchema.naming.ToCQLColumn(table.Name, key),
 						Operator: "=",
 						Value:    adaptParameterValue(value),
 					})
@@ -271,7 +271,7 @@ func (sg *SchemaGenerator) queryFieldResolver(
 					return nil, fmt.Errorf("unable to find table '%s'", params.Info.FieldName)
 				}
 
-				whereClause = ksSchema.adaptCondition(data)
+				whereClause = ksSchema.adaptCondition(table.Name, data)
 			} else {
 				return nil, fmt.Errorf("Unable to find table for '%s'", params.Info.FieldName)
 			}
@@ -310,13 +310,13 @@ func (sg *SchemaGenerator) queryFieldResolver(
 
 			return &types.QueryResult{
 				PageState: result.PageState(),
-				Values:    ksSchema.adaptResult(result.Values()),
+				Values:    ksSchema.adaptResult(table.Name, result.Values()),
 			}, nil
 		}
 	}
 }
 
-func (s *KeyspaceGraphQLSchema) adaptCondition(data map[string]interface{}) []types.ConditionItem {
+func (s *KeyspaceGraphQLSchema) adaptCondition(tableName string, data map[string]interface{}) []types.ConditionItem {
 	result := make([]types.ConditionItem, 0, len(data))
 	for key, value := range data {
 		if value == nil {
@@ -326,7 +326,7 @@ func (s *KeyspaceGraphQLSchema) adaptCondition(data map[string]interface{}) []ty
 
 		for operatorName, itemValue := range mapValue {
 			result = append(result, types.ConditionItem{
-				Column:   s.naming.ToCQLColumn(key),
+				Column:   s.naming.ToCQLColumn(tableName, key),
 				Operator: cqlOperators[operatorName],
 				Value:    adaptParameterValue(itemValue),
 			})
@@ -335,12 +335,12 @@ func (s *KeyspaceGraphQLSchema) adaptCondition(data map[string]interface{}) []ty
 	return result
 }
 
-func (s *KeyspaceGraphQLSchema) adaptResult(values []map[string]interface{}) []map[string]interface{} {
+func (s *KeyspaceGraphQLSchema) adaptResult(tableName string, values []map[string]interface{}) []map[string]interface{} {
 	result := make([]map[string]interface{}, 0, len(values))
 	for _, item := range values {
 		resultItem := make(map[string]interface{})
 		for k, v := range item {
-			resultItem[s.naming.ToGraphQLField(k)] = adaptResultValue(v)
+			resultItem[s.naming.ToGraphQLField(tableName, k)] = adaptResultValue(v)
 		}
 		result = append(result, resultItem)
 	}
@@ -409,7 +409,7 @@ func (sg *SchemaGenerator) mutationFieldResolver(
 				queryParams := make([]interface{}, 0, len(data))
 
 				for key, value := range data {
-					columnNames = append(columnNames, ksSchema.naming.ToCQLColumn(key))
+					columnNames = append(columnNames, ksSchema.naming.ToCQLColumn(table.Name, key))
 					queryParams = append(queryParams, adaptParameterValue(value))
 				}
 
@@ -444,7 +444,8 @@ func (sg *SchemaGenerator) mutationFieldResolver(
 				case deletePrefix:
 					var ifCondition []types.ConditionItem
 					if params.Args["ifCondition"] != nil {
-						ifCondition = ksSchema.adaptCondition(params.Args["ifCondition"].(map[string]interface{}))
+						ifCondition = ksSchema.adaptCondition(
+							table.Name, params.Args["ifCondition"].(map[string]interface{}))
 					}
 					result, err = sg.dbClient.Delete(&db.DeleteInfo{
 						Keyspace:    keyspace.Name,
@@ -456,7 +457,8 @@ func (sg *SchemaGenerator) mutationFieldResolver(
 				case updatePrefix:
 					var ifCondition []types.ConditionItem
 					if params.Args["ifCondition"] != nil {
-						ifCondition = ksSchema.adaptCondition(params.Args["ifCondition"].(map[string]interface{}))
+						ifCondition = ksSchema.adaptCondition(
+							table.Name, params.Args["ifCondition"].(map[string]interface{}))
 					}
 					result, err = sg.dbClient.Update(&db.UpdateInfo{
 						Keyspace:    keyspace.Name,
