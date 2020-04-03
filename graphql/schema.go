@@ -472,7 +472,7 @@ func (sg *SchemaGenerator) mutationFieldResolver(
 					return false, fmt.Errorf("operation '%s' not supported", operation)
 				}
 
-				return sg.getModificationResult(result, err)
+				return ksSchema.getModificationResult(table.Name, result, err)
 			} else {
 				return nil, fmt.Errorf("unable to find table for type name '%s'", params.Info.FieldName)
 			}
@@ -481,7 +481,11 @@ func (sg *SchemaGenerator) mutationFieldResolver(
 	}
 }
 
-func (sg *SchemaGenerator) getModificationResult(rs db.ResultSet, err error) (*types.ModificationResult, error) {
+func (s *KeyspaceGraphQLSchema) getModificationResult(
+	tableName string,
+	rs db.ResultSet,
+	err error,
+) (*types.ModificationResult, error) {
 	if err != nil {
 		return nil, err
 	}
@@ -502,7 +506,7 @@ func (sg *SchemaGenerator) getModificationResult(rs db.ResultSet, err error) (*t
 		if k == "[applied]" {
 			continue
 		}
-		result.Value[sg.naming.ToGraphQLField(k)] = adaptResultValue(v)
+		result.Value[s.naming.ToGraphQLField(tableName, k)] = adaptResultValue(v)
 	}
 
 	return &result, nil
