@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/iancoleman/strcase"
 	"sort"
+	"strings"
 )
 
 type NamingConvention interface {
@@ -37,6 +38,8 @@ type KeyspaceNamingInfo interface {
 	Tables() map[string][]string
 }
 
+const reservedNameSuffix = "Custom"
+
 func NewDefaultNaming(info KeyspaceNamingInfo) NamingConvention {
 	dbTables := info.Tables()
 	tableNames := make([]string, 0, len(dbTables))
@@ -62,7 +65,12 @@ func NewDefaultNaming(info KeyspaceNamingInfo) NamingConvention {
 			columnNameByField[fieldName] = columnName
 		}
 
-		entityName := generateAvailableName(strcase.ToCamel(tableName), tablesByEntities)
+		entityName := strcase.ToCamel(tableName)
+		if isReserved(entityName) {
+			entityName += reservedNameSuffix
+		}
+		entityName = generateAvailableName(entityName, tablesByEntities)
+
 		entitiesByTables[tableName] = entityName
 		fieldsByColumns[tableName] = fieldByColumnName
 		columnsByFields[tableName] = columnNameByField
@@ -91,6 +99,23 @@ func generateAvailableName(baseName string, nameMap map[string]string) string {
 	}
 
 	panic("Name was repeated more than 1000 times")
+}
+
+func isReserved(name string) bool {
+	switch name {
+	case "BasicType", "Bigint", "Blob", "Column", "ColumnInput", "ColumnKind", "Consistency", "ClusteringKeyInput",
+		"DataType", "DataTypeInput", "Decimal", "QueryOptions", "Table", "TableQuery", "TableMutation", "Time",
+		"Timestamp", "TimeUuid", "UpdateOptions", "Uuid", "Varint":
+		return true
+	}
+
+	if strings.HasSuffix(name, "FilterInput") {
+		// We create one input type per scalar, like IntFilterInput
+		// It's best to mark anything that "FilterInput" as reserved
+		return true
+	}
+
+	return false
 }
 
 type snakeCaseToCamelNaming struct {

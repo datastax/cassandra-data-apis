@@ -60,6 +60,13 @@ func TestNamingConventionToGraphQLTypeUnique(t *testing.T) {
 	assert.Equal(t, "TblNotFoundSuffix", nc.ToGraphQLTypeUnique("tbl_not_found", "suffix"))
 }
 
+func TestNamingConventionWithReservedName(t *testing.T) {
+	nc := NewDefaultNaming(getKeyspaceNaming())
+	assert.NotNil(t, nc)
+	assert.Equal(t, "BigintCustom", nc.ToGraphQLType("bigint"))
+	assert.Equal(t, "ConsistencyCustom", nc.ToGraphQLType("consistency"))
+}
+
 func getKeyspaceNaming() KeyspaceNamingInfo {
 	infoMock := NewKeyspaceNamingInfoMock()
 	infoMock.On("Tables").Return(map[string][]string{
@@ -67,6 +74,9 @@ func getKeyspaceNaming() KeyspaceNamingInfo {
 		"tbl_a":        {"a", "b_b", "b__b"},
 		"tbl_b":        {"email", "address_street"},
 		"tbl_b_filter": {"col1", "col2"},
+		// Reserved names
+		"bigint":      {"col1"},
+		"consistency": {"col1"},
 	})
 	return infoMock
 }
