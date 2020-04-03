@@ -18,7 +18,7 @@ func NewConfigMock() *ConfigMock {
 func (o *ConfigMock) Default() *ConfigMock {
 	o.On("ExcludedKeyspaces").Return(nil)
 	o.On("SchemaUpdateInterval").Return(10 * time.Second)
-	o.On("Naming").Return(NamingConventionFn(func(_ KeyspaceNamingInfo) NamingConvention { return DefaultNaming }))
+	o.On("Naming").Return(NamingConventionFn(NewDefaultNaming))
 	o.On("SupportedOperations").Return(Operations(0))
 	o.On("UseUserOrRoleAuth").Return(false)
 	o.On("Logger").Return(log.NewZapLogger(zap.NewExample()))

@@ -103,9 +103,8 @@ func NewEndpointConfig(hosts ...string) (*DataEndpointConfig, error) {
 	return &DataEndpointConfig{
 		dbHosts:        hosts,
 		updateInterval: 10 * time.Second,
-		//TODO: Replace with actual factory
-		naming: func(_ config.KeyspaceNamingInfo) config.NamingConvention { return config.DefaultNaming },
-		logger: log.NewZapLogger(logger),
+		naming:         config.NewDefaultNaming,
+		logger:         log.NewZapLogger(logger),
 	}, nil
 }
 

@@ -135,7 +135,9 @@ func (s *KeyspaceGraphQLSchema) buildKeyValueType(key graphql.Output, value grap
 	typeName := fmt.Sprintf("Key%sValue%s", keyName, valueName)
 
 	if isInput {
-		typeName = "Input" + typeName
+		typeName = s.naming.ToGraphQLTypeUnique(typeName, "MapInput")
+	} else {
+		typeName = s.naming.ToGraphQLTypeUnique(typeName, "")
 	}
 
 	t := s.keyValueTypes[typeName]
@@ -203,18 +205,19 @@ func (s *KeyspaceGraphQLSchema) buildOrderEnums(keyspace *gocql.KeyspaceMetadata
 	for _, table := range keyspace.Tables {
 		values := make(map[string]*graphql.EnumValueConfig, len(table.Columns))
 		for _, column := range table.Columns {
-			values[s.naming.ToGraphQLEnumValue(column.Name)+"_ASC"] = &graphql.EnumValueConfig{
+			field := s.naming.ToGraphQLField(table.Name, column.Name)
+			values[field+"_ASC"] = &graphql.EnumValueConfig{
 				Value: column.Name + "_ASC",
 				Description: fmt.Sprintf("Order %s by %s in a	scending order", table.Name, column.Name),
 			}
-			values[s.naming.ToGraphQLEnumValue(column.Name)+"_DESC"] = &graphql.EnumValueConfig{
+			values[field+"_DESC"] = &graphql.EnumValueConfig{
 				Value:       column.Name + "_DESC",
 				Description: fmt.Sprintf("Order %s by %s in descending order", table.Name, column.Name),
 			}
 		}
 
 		s.orderEnums[table.Name] = graphql.NewEnum(graphql.EnumConfig{
-			Name:   s.naming.ToGraphQLType(table.Name + "Order"),
+			Name:   s.naming.ToGraphQLTypeUnique(table.Name, "Order"),
 			Values: values,
 		})
 	}
@@ -280,12 +283,12 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 		})
 
 		s.tableScalarInputTypes[table.Name] = graphql.NewInputObject(graphql.InputObjectConfig{
-			Name:   s.naming.ToGraphQLType(table.Name) + "Input",
+			Name:   s.naming.ToGraphQLTypeUnique(table.Name, "Input"),
 			Fields: inputFields,
 		})
 
 		s.tableOperatorInputTypes[table.Name] = graphql.NewInputObject(graphql.InputObjectConfig{
-			Name:   s.naming.ToGraphQLType(table.Name) + "FilterInput",
+			Name:   s.naming.ToGraphQLTypeUnique(table.Name, "FilterInput"),
 			Fields: inputOperatorFields,
 		})
 	}
@@ -307,7 +310,7 @@ func (s *KeyspaceGraphQLSchema) buildResultTypes(keyspace *gocql.KeyspaceMetadat
 		}
 
 		s.resultSelectTypes[table.Name] = graphql.NewObject(graphql.ObjectConfig{
-			Name: s.naming.ToGraphQLType(table.Name + "Result"),
+			Name: s.naming.ToGraphQLTypeUnique(table.Name, "Result"),
 			Fields: graphql.Fields{
 				"pageState": {Type: graphql.String},
 				"values":    {Type: graphql.NewList(graphql.NewNonNull(itemType))},
@@ -315,7 +318,7 @@ func (s *KeyspaceGraphQLSchema) buildResultTypes(keyspace *gocql.KeyspaceMetadat
 		})
 
 		s.resultUpdateTypes[table.Name] = graphql.NewObject(graphql.ObjectConfig{
-			Name: s.naming.ToGraphQLType(table.Name + "MutationResult"),
+			Name: s.naming.ToGraphQLTypeUnique(table.Name, "MutationResult"),
 			Fields: graphql.Fields{
 				"applied": {Type: graphql.NewNonNull(graphql.Boolean)},
 				"value":   {Type: itemType},
