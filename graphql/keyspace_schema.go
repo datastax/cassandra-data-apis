@@ -126,7 +126,11 @@ func (s *KeyspaceGraphQLSchema) buildType(typeInfo gocql.TypeInfo, isInput bool)
 	}
 }
 
-func (s *KeyspaceGraphQLSchema) buildKeyValueType(key graphql.Output, value graphql.Output, isInput bool) graphql.Output {
+func (s *KeyspaceGraphQLSchema) buildKeyValueType(
+	key graphql.Output,
+	value graphql.Output,
+	isInput bool,
+) graphql.Output {
 	keyName := getTypeName(key)
 	valueName := getTypeName(value)
 	if keyName == "" || valueName == "" {

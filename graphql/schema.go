@@ -38,7 +38,11 @@ func NewSchemaGenerator(dbClient *db.Db, cfg config.Config) *SchemaGenerator {
 	}
 }
 
-func (sg *SchemaGenerator) buildQueriesFields(ksSchema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
+func (sg *SchemaGenerator) buildQueriesFields(
+	ksSchema *KeyspaceGraphQLSchema,
+	tables map[string]*gocql.TableMetadata,
+	resolve graphql.FieldResolveFn,
+) graphql.Fields {
 	fields := graphql.Fields{}
 	for name, table := range tables {
 		if ksSchema.ignoredTables[table.Name] {
@@ -81,7 +85,11 @@ func (sg *SchemaGenerator) buildQueriesFields(ksSchema *KeyspaceGraphQLSchema, t
 	return fields
 }
 
-func (sg *SchemaGenerator) buildQuery(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) *graphql.Object {
+func (sg *SchemaGenerator) buildQuery(
+	schema *KeyspaceGraphQLSchema,
+	tables map[string]*gocql.TableMetadata,
+	resolve graphql.FieldResolveFn,
+) *graphql.Object {
 	return graphql.NewObject(
 		graphql.ObjectConfig{
 			Name:   "TableQuery",
@@ -89,7 +97,10 @@ func (sg *SchemaGenerator) buildQuery(schema *KeyspaceGraphQLSchema, tables map[
 		})
 }
 
-func (sg *SchemaGenerator) buildMutationFields(ksSchema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolve graphql.FieldResolveFn) graphql.Fields {
+func (sg *SchemaGenerator) buildMutationFields(ksSchema *KeyspaceGraphQLSchema,
+	tables map[string]*gocql.TableMetadata,
+	resolve graphql.FieldResolveFn,
+) graphql.Fields {
 	fields := graphql.Fields{}
 	for name, table := range tables {
 		if ksSchema.ignoredTables[table.Name] {
@@ -189,7 +200,11 @@ func (sg *SchemaGenerator) buildMutationFields(ksSchema *KeyspaceGraphQLSchema, 
 	return fields
 }
 
-func (sg *SchemaGenerator) buildMutation(schema *KeyspaceGraphQLSchema, tables map[string]*gocql.TableMetadata, resolveFn graphql.FieldResolveFn) *graphql.Object {
+func (sg *SchemaGenerator) buildMutation(
+	schema *KeyspaceGraphQLSchema,
+	tables map[string]*gocql.TableMetadata,
+	resolveFn graphql.FieldResolveFn,
+) *graphql.Object {
 	return graphql.NewObject(
 		graphql.ObjectConfig{
 			Name:   "TableMutation",
