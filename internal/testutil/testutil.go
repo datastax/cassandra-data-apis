@@ -50,7 +50,7 @@ func cassandraVersion() string {
 	return version
 }
 
-func SetupIntegrationTestFixture() *gocql.Session {
+func SetupIntegrationTestFixture(queries ...string) *gocql.Session {
 	if !IntegrationTestsEnabled() {
 		return nil
 	}
@@ -66,6 +66,13 @@ func SetupIntegrationTestFixture() *gocql.Session {
 
 	if session, err = cluster.CreateSession(); err != nil {
 		panic(err)
+	}
+
+	for _, query := range queries {
+		err := session.Query(query).Exec()
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	return session

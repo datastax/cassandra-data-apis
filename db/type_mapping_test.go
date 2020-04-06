@@ -184,13 +184,9 @@ var _ = BeforeSuite(func() {
 		return
 	}
 
-	session := SetupIntegrationTestFixture()
+	session := SetupIntegrationTestFixture("CREATE KEYSPACE ks1 WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 1}")
 
-	err := session.Query("CREATE KEYSPACE ks1 WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 1}").Exec()
-	if err != nil {
-		panic(err)
-	}
-	db = &Db{session: &GoCqlSession{ref: session}}
+	db = NewDbWithConnectedInstance(session)
 })
 
 var _ = AfterSuite(func() {
