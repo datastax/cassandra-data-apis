@@ -83,6 +83,8 @@ func (s *KeyspaceGraphQLSchema) buildType(typeInfo gocql.TypeInfo, isInput bool)
 		return graphql.String, nil
 	case gocql.TypeBigInt:
 		return bigint, nil
+	case gocql.TypeCounter:
+		return counter, nil
 	case gocql.TypeDecimal:
 		return decimal, nil
 	case gocql.TypeVarint:

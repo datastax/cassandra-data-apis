@@ -21,6 +21,9 @@ var ip = newStringNativeScalar("Inet", "The `Inet` scalar type represents a CQL 
 var bigint = newStringNativeScalar(
 	"BigInt", "The `BigInt` scalar type represents a CQL bigint (64-bit signed integer) as a string.")
 
+var counter = newStringNativeScalar(
+	"Counter", "The `Counter` scalar type represents a CQL counter (64-bit signed integer) as a string.")
+
 var decimal = newStringScalar(
 	"Decimal", "The `Decimal` scalar type represents a CQL decimal as a string.",
 	serializeStringer, deserializeDecimal)
