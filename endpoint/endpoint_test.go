@@ -3,7 +3,10 @@ package endpoint
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/gocql/gocql"
+	"github.com/riptano/data-endpoints/auth"
 	"github.com/riptano/data-endpoints/db"
 	"github.com/riptano/data-endpoints/graphql"
 	"github.com/stretchr/testify/assert"
@@ -21,19 +24,22 @@ const (
 
 const host = "127.0.0.1"
 
+type errorEntry struct {
+	Message   string   `json:"message"`
+	Path      []string `json:"path"`
+	Locations []struct {
+		Line   int `json:"line"`
+		Column int `json:"column"`
+	} `json:"locations"`
+}
+
 type responseBody struct {
 	Data   map[string]interface{} `json:"data"`
-	Errors []struct {
-		Message   string `json:"locations"`
-		Locations []struct {
-			Line   int `json:"line"`
-			Column int `json:"column"`
-		}
-	} `json:"errors"`
+	Errors []errorEntry           `json:"errors"`
 }
 
 func TestDataEndpoint_Query(t *testing.T) {
-	session, routes := createRoutes(t, "/graphql", "store")
+	session, routes := createRoutes(t, createConfig(t), "/graphql", "store")
 
 	title := "book1"
 	pages := 42
@@ -72,7 +78,7 @@ func TestDataEndpoint_Query(t *testing.T) {
 		},
 	}
 
-	buffer, err := executePost(routes, "/graphql", body)
+	buffer, err := executePost(routes, "/graphql", body, nil)
 	assert.NoError(t, err, "error executing query")
 
 	var resp responseBody
@@ -81,31 +87,168 @@ func TestDataEndpoint_Query(t *testing.T) {
 	assert.Equal(t, expected, resp)
 }
 
-func executePost(routes []graphql.Route, target string, body graphql.RequestBody) (*bytes.Buffer, error) {
+func TestDataEndpoint_Auth(t *testing.T) {
+	session, routes := createRoutes(t,
+		createConfig(t).WithUseUserOrRoleAuth(true),
+		"/graphql", "store")
+
+	title := "book1"
+	pages := 42
+	resultMock := &db.ResultMock{}
+	resultMock.
+		On("PageState").Return("").
+		On("Values").Return([]map[string]interface{}{
+		map[string]interface{}{"title": &title, "pages": &pages},
+	}, nil)
+
+	authTokens := map[string]string{"token1": "user1"}
+
+	session.
+		On("ExecuteIter", "SELECT * FROM store.books WHERE title = ?",
+			db.
+				NewQueryOptions().
+				WithUserOrRole("user1").
+				WithConsistency(gocql.LocalQuorum).
+				WithSerialConsistency(gocql.Serial),
+			mock.Anything).
+		Return(resultMock, nil)
+
+	body := graphql.RequestBody{
+		Query: `query {
+  books(data:{title:"abc"}) {
+    values {
+      pages
+      title
+    }
+  }
+}`,
+	}
+
+	expected := responseBody{
+		Data: map[string]interface{}{
+			"books": map[string]interface{}{
+				"values": []interface{}{
+					map[string]interface{}{
+						"pages": float64(pages),
+						"title": title,
+					},
+				},
+			},
+		},
+	}
+
+	buffer, err := executePost(withAuth(t, routes, authTokens), "/graphql", body,
+		http.Header{"X-Cassandra-Token": []string{"token1"}})
+	assert.NoError(t, err, "error executing query")
+
+	var resp responseBody
+	err = json.NewDecoder(buffer).Decode(&resp)
+	assert.NoError(t, err, "error decoding response")
+	assert.Equal(t, expected, resp)
+}
+
+func TestDataEndpoint_AuthNotProvided(t *testing.T) {
+	session, routes := createRoutes(t,
+		createConfig(t).WithUseUserOrRoleAuth(true),
+		"/graphql", "store")
+
+	title := "book1"
+	pages := 42
+	resultMock := &db.ResultMock{}
+	resultMock.
+		On("PageState").Return("").
+		On("Values").Return([]map[string]interface{}{
+		map[string]interface{}{"title": &title, "pages": &pages},
+	}, nil)
+
+	session.
+		On("ExecuteIter", "SELECT * FROM store.books WHERE title = ?",
+			db.
+				NewQueryOptions().
+				WithUserOrRole("user1").
+				WithConsistency(gocql.LocalQuorum).
+				WithSerialConsistency(gocql.Serial),
+			mock.Anything).
+		Return(resultMock, errors.New("invalid cre"))
+
+	body := graphql.RequestBody{
+		Query: `query {
+  books(data:{title:"abc"}) {
+    values {
+      pages
+      title
+    }
+  }
+}`,
+	}
+
+	buffer, err := executePost(routes, "/graphql", body, nil) // No auth
+	assert.NoError(t, err, "error executing query")
+
+	var resp responseBody
+	err = json.NewDecoder(buffer).Decode(&resp)
+	assert.NoError(t, err, "error decoding response")
+	assert.Len(t, resp.Errors, 1)
+	assert.Equal(t, "expected user or role for this operation", resp.Errors[0].Message)
+}
+
+func executePost(routes []graphql.Route, target string, body graphql.RequestBody, header http.Header) (*bytes.Buffer, error) {
 	b, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 
 	r := httptest.NewRequest(http.MethodPost, path.Join(fmt.Sprintf("http://%s", host), target), bytes.NewReader(b))
+	if header != nil {
+		r.Header = header
+	}
 	w := httptest.NewRecorder()
-
-	routes[postIndex].HandlerFunc(w, r)
+	routes[postIndex].Handler.ServeHTTP(w, r)
 
 	return w.Body, nil
 }
 
-func createRoutes(t *testing.T, pattern string, ksName string) (*db.SessionMock, []graphql.Route) {
-	sessionMock := db.NewSessionMock().Default()
-
+func createConfig(t *testing.T, ) *DataEndpointConfig {
 	cfg, err := NewEndpointConfig(host)
 	assert.NoError(t, err, "error creating endpoint config")
+	return cfg
+}
+
+func createRoutes(t *testing.T, cfg *DataEndpointConfig, pattern string, ksName string) (*db.SessionMock, []graphql.Route) {
+	sessionMock := db.NewSessionMock().Default()
 
 	endpoint := cfg.newEndpointWithDb(db.NewDbWithSession(sessionMock))
-	routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", "store")
+	routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", ksName)
 
 	assert.Len(t, routes, 2, "expected GET and POST routes")
 	assert.NoError(t, err, "error getting routes for keyspace")
 
 	return sessionMock, routes
+}
+
+func withAuth(t *testing.T, routes []graphql.Route, authTokens map[string]string) []graphql.Route {
+	for i, route := range routes {
+		routes[i].Handler = &authHandler{t, route.Handler, authTokens}
+	}
+	return routes
+}
+
+type authHandler struct {
+	t          *testing.T
+	handler    http.Handler
+	authTokens map[string]string
+}
+
+func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	token := r.Header.Get("X-Cassandra-Token")
+	ctx := r.Context()
+
+	if userOrRole, ok := h.authTokens[token]; ok {
+		h.handler.ServeHTTP(w, r.WithContext(auth.WithContextUserOrRole(ctx, userOrRole)))
+	} else {
+		bytes, err := json.Marshal(responseBody{Errors: []errorEntry{errorEntry{Message: "authorization failed"}}})
+		assert.NoError(h.t, err, "error marshalling error")
+		w.Write(bytes)
+		return
+	}
 }

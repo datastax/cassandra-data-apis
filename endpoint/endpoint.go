@@ -45,36 +45,44 @@ func (cfg DataEndpointConfig) Logger() log.Logger {
 	return cfg.logger
 }
 
-func (cfg *DataEndpointConfig) SetExcludedKeyspaces(ksExcluded []string) {
+func (cfg *DataEndpointConfig) WithExcludedKeyspaces(ksExcluded []string) *DataEndpointConfig {
 	cfg.ksExcluded = ksExcluded
+	return cfg
 }
 
-func (cfg *DataEndpointConfig) SetSchemaUpdateInterval(updateInterval time.Duration) {
+func (cfg *DataEndpointConfig) WithSchemaUpdateInterval(updateInterval time.Duration) *DataEndpointConfig {
 	cfg.updateInterval = updateInterval
+	return cfg
 }
 
-func (cfg *DataEndpointConfig) SetNaming(naming config.NamingConventionFn) {
+func (cfg *DataEndpointConfig) WithNaming(naming config.NamingConventionFn) *DataEndpointConfig {
 	cfg.naming = naming
+	return cfg
 }
 
-func (cfg *DataEndpointConfig) SetSupportedOperations(supportedOps config.Operations) {
+func (cfg *DataEndpointConfig) WithSupportedOperations(supportedOps config.Operations) *DataEndpointConfig {
 	cfg.supportedOps = supportedOps
+	return cfg
 }
 
-func (cfg *DataEndpointConfig) SetUseUserOrRoleAuth(useUserOrRowAuth bool) {
+func (cfg *DataEndpointConfig) WithUseUserOrRoleAuth(useUserOrRowAuth bool) *DataEndpointConfig {
 	cfg.useUserOrRoleAuth = useUserOrRowAuth
+	return cfg
 }
 
-func (cfg *DataEndpointConfig) SetDbUsername(dbUsername string) {
+func (cfg *DataEndpointConfig) WithDbUsername(dbUsername string) *DataEndpointConfig {
 	cfg.dbUsername = dbUsername
+	return cfg
 }
 
-func (cfg *DataEndpointConfig) SetDbPassword(dbPassword string) {
+func (cfg *DataEndpointConfig) WithDbPassword(dbPassword string) *DataEndpointConfig {
 	cfg.dbPassword = dbPassword
+	return cfg
 }
 
-func (cfg *DataEndpointConfig) SetLogger(logger log.Logger) {
+func (cfg *DataEndpointConfig) WithLogger(logger log.Logger) *DataEndpointConfig {
 	cfg.logger = logger
+	return cfg
 }
 
 func (cfg DataEndpointConfig) NewEndpoint() (*DataEndpoint, error) {
