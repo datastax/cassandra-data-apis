@@ -49,10 +49,10 @@ func cassandraVersion() string {
 	return version
 }
 
-func CreateSchema(filename string) {
+func CreateSchema(name string) {
 	_, currentFile, _, _ := runtime.Caller(0)
 	dir := path.Dir(currentFile)
-	filePath := path.Join(dir, "schemas", filename)
+	filePath := path.Join(dir, "schemas", name, "schema.cql")
 	executeCcm(fmt.Sprintf("node1 cqlsh -f %s", filePath))
 }
 
@@ -90,4 +90,10 @@ func TearDownIntegrationTestFixture() {
 		session.Close()
 	}
 	shutdownCassandra()
+}
+
+func PanicIfError(err error) {
+	if err != nil {
+		panic(err)
+	}
 }

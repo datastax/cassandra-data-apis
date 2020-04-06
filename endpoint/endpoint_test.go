@@ -9,6 +9,7 @@ import (
 	"github.com/riptano/data-endpoints/auth"
 	"github.com/riptano/data-endpoints/db"
 	"github.com/riptano/data-endpoints/graphql"
+	"github.com/riptano/data-endpoints/internal/testutil/schemas"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"net/http"
@@ -23,20 +24,6 @@ const (
 )
 
 const host = "127.0.0.1"
-
-type errorEntry struct {
-	Message   string   `json:"message"`
-	Path      []string `json:"path"`
-	Locations []struct {
-		Line   int `json:"line"`
-		Column int `json:"column"`
-	} `json:"locations"`
-}
-
-type responseBody struct {
-	Data   map[string]interface{} `json:"data"`
-	Errors []errorEntry           `json:"errors"`
-}
 
 func TestDataEndpoint_Query(t *testing.T) {
 	session, routes := createRoutes(t, createConfig(t), "/graphql", "store")
@@ -65,7 +52,7 @@ func TestDataEndpoint_Query(t *testing.T) {
 }`,
 	}
 
-	expected := responseBody{
+	expected := schemas.ResponseBody{
 		Data: map[string]interface{}{
 			"books": map[string]interface{}{
 				"values": []interface{}{
@@ -81,7 +68,7 @@ func TestDataEndpoint_Query(t *testing.T) {
 	buffer, err := executePost(routes, "/graphql", body, nil)
 	assert.NoError(t, err, "error executing query")
 
-	var resp responseBody
+	var resp schemas.ResponseBody
 	err = json.NewDecoder(buffer).Decode(&resp)
 	assert.NoError(t, err, "error decoding response")
 	assert.Equal(t, expected, resp)

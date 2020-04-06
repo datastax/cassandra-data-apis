@@ -1,0 +1,41 @@
+package schemas
+
+import (
+	"bytes"
+	"encoding/json"
+	. "github.com/onsi/gomega"
+)
+
+type ResponseBody struct {
+	Data   map[string]interface{} `json:"data"`
+	Errors []ErrorEntry           `json:"errors"`
+}
+
+
+type ErrorEntry struct {
+	Message   string   `json:"message"`
+	Path      []string `json:"path"`
+	Locations []struct {
+		Line   int `json:"line"`
+		Column int `json:"column"`
+	} `json:"locations"`
+}
+
+func DecodeResponse(buffer *bytes.Buffer) ResponseBody {
+	var response ResponseBody
+	err := json.NewDecoder(buffer).Decode(&response)
+	Expect(err).ToNot(HaveOccurred())
+	return response
+}
+
+func DecodeData(buffer *bytes.Buffer, key string) map[string]interface{} {
+	return DecodeResponse(buffer).Data[key].(map[string]interface{})
+}
+
+func NewResponseBody(operationName string, elementMap map[string]interface{}) ResponseBody {
+	return ResponseBody{
+		Data: map[string]interface{}{
+			operationName: elementMap,
+		},
+	}
+}

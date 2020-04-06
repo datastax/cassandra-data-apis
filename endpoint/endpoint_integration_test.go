@@ -1,13 +1,14 @@
 package endpoint
 
 import (
-	"encoding/json"
 	"github.com/gocql/gocql"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/riptano/data-endpoints/db"
 	"github.com/riptano/data-endpoints/graphql"
 	. "github.com/riptano/data-endpoints/internal/testutil"
+	"github.com/riptano/data-endpoints/internal/testutil/schemas"
+	"github.com/riptano/data-endpoints/internal/testutil/schemas/killrvideo"
 	"testing"
 )
 
@@ -21,39 +22,47 @@ var _ = Describe("DataEndpoint", func() {
 	})
 
 	Describe("RoutesKeyspaceGraphQL()", func() {
-		var config, _ = NewEndpointConfig(host)
-		It("Should handle the killrvideo schema", func() {
-			var endpoint = config.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
-			routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", "killrvideo")
-			Expect(err).ToNot(HaveOccurred())
-			Expect(routes).To(HaveLen(2))
+		Context("With killrvideo schema", func() {
+			var config, _ = NewEndpointConfig(host)
+			It("Should insert and select users", func() {
+				var endpoint = config.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
+				routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", "killrvideo")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(routes).To(HaveLen(2))
 
-			body := graphql.RequestBody{
-				Query: `query {
-				  userCredentials(data:{email:"abc@email.com"}) {
-					values {
-					  email
-					  userid
-					}
-				  }
-				}`,
-			}
+				id := killrvideo.NewUuid()
 
-			expected := responseBody{
-				Data: map[string]interface{}{
-					"userCredentials": map[string]interface{}{
-						"values": []interface{}{},
+				buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
+					Query: killrvideo.InsertUserMutation(id, "John", "john@email.com"),
+				})
+				Expect(err).ToNot(HaveOccurred())
+				expected := schemas.NewResponseBody("insertUsers", map[string]interface{}{
+					"applied": true,
+					"value": map[string]interface{}{
+						"createdDate": nil,
+						"email":       nil,
+						"firstname":   nil,
+						"lastname":    nil,
+						"userid":      nil,
 					},
-				},
-			}
+				})
+				Expect(schemas.DecodeResponse(buffer)).To(Equal(expected))
 
-			buffer, err := executePost(routes, "/graphql", body)
-			Expect(err).ToNot(HaveOccurred())
+				buffer, err = executePost(routes, "/graphql", graphql.RequestBody{
+					Query: killrvideo.SelectUserQuery(id),
+				})
+				Expect(err).ToNot(HaveOccurred())
 
-			var resp responseBody
-			err = json.NewDecoder(buffer).Decode(&resp)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(resp).To(Equal(expected))
+				values := []map[string]interface{}{{
+					"createdDate": nil,
+					"email":       "john@email.com",
+					"firstname":   "John",
+					"lastname":    nil,
+					"userid":      id,
+				}}
+
+				Expect(schemas.DecodeData(buffer, "users")["values"]).To(ConsistOf(values))
+			})
 		})
 	})
 })
@@ -64,7 +73,7 @@ var _ = BeforeSuite(func() {
 	}
 
 	session = SetupIntegrationTestFixture()
-	CreateSchema("killrvideo-schema.cql")
+	CreateSchema("killrvideo")
 })
 
 var _ = AfterSuite(func() {
