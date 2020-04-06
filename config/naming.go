@@ -136,8 +136,8 @@ func (n *snakeCaseToCamelNaming) ToCQLColumn(tableName string, fieldName string)
 
 func (n *snakeCaseToCamelNaming) ToCQLTable(name string) string {
 	// lookup table name by entity name
-	tableName := n.tablesByEntities[name]
-	if tableName == "" {
+	tableName, found := n.tablesByEntities[name]
+	if !found {
 		// Default to snake_case for tables that doesn't exist yet (DDL)
 		return strcase.ToSnake(name)
 	}
@@ -162,8 +162,8 @@ func (n *snakeCaseToCamelNaming) ToGraphQLOperation(prefix string, name string) 
 }
 
 func (n *snakeCaseToCamelNaming) ToGraphQLType(name string) string {
-	entityName := n.entitiesByTables[name]
-	if entityName == "" {
+	entityName, found := n.entitiesByTables[name]
+	if !found {
 		// Default to Camel for entities that doesn't exist yet (DDL)
 		return strcase.ToCamel(name)
 	}

@@ -47,7 +47,7 @@ func (db *Db) Keyspace(keyspace string) (*gocql.KeyspaceMetadata, error) {
 // KeyspaceNamingInfo Retrieves the keyspace naming information
 func (db *Db) KeyspaceNamingInfo(ks *gocql.KeyspaceMetadata) config.KeyspaceNamingInfo {
 	result := keyspaceNamingInfo{
-		tables: make(map[string][]string, 0),
+		tables: make(map[string][]string, len(ks.Tables)),
 	}
 
 	for _, table := range ks.Tables {
