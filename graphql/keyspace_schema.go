@@ -5,6 +5,7 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
 	"github.com/riptano/data-endpoints/config"
+	"github.com/riptano/data-endpoints/db"
 	"github.com/riptano/data-endpoints/types"
 )
 
@@ -325,4 +326,67 @@ func (s *KeyspaceGraphQLSchema) buildResultTypes(keyspace *gocql.KeyspaceMetadat
 			},
 		})
 	}
+}
+
+func (s *KeyspaceGraphQLSchema) adaptCondition(tableName string, data map[string]interface{}) []types.ConditionItem {
+	result := make([]types.ConditionItem, 0, len(data))
+	for key, value := range data {
+		if value == nil {
+			continue
+		}
+		mapValue := value.(map[string]interface{})
+
+		for operatorName, itemValue := range mapValue {
+			result = append(result, types.ConditionItem{
+				Column:   s.naming.ToCQLColumn(tableName, key),
+				Operator: cqlOperators[operatorName],
+				Value:    adaptParameterValue(itemValue),
+			})
+		}
+	}
+	return result
+}
+
+func (s *KeyspaceGraphQLSchema) adaptResult(tableName string, values []map[string]interface{}) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0, len(values))
+	for _, item := range values {
+		resultItem := make(map[string]interface{})
+		for k, v := range item {
+			resultItem[s.naming.ToGraphQLField(tableName, k)] = adaptResultValue(v)
+		}
+		result = append(result, resultItem)
+	}
+
+	return result
+}
+
+func (s *KeyspaceGraphQLSchema) getModificationResult(
+	tableName string,
+	rs db.ResultSet,
+	err error,
+) (*types.ModificationResult, error) {
+	if err != nil {
+		return nil, err
+	}
+
+	rows := rs.Values()
+
+	if len(rows) == 0 {
+		return &appliedModificationResult, nil
+	}
+
+	result := types.ModificationResult{}
+	row := rows[0]
+	applied := row["[applied]"].(*bool)
+	result.Applied = applied != nil && *applied
+
+	result.Value = make(map[string]interface{})
+	for k, v := range row {
+		if k == "[applied]" {
+			continue
+		}
+		result.Value[s.naming.ToGraphQLField(tableName, k)] = adaptResultValue(v)
+	}
+
+	return &result, nil
 }
