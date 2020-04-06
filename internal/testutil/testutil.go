@@ -5,9 +5,12 @@ import (
 	"github.com/gocql/gocql"
 	"os"
 	"os/exec"
+	"path"
+	"runtime"
 )
 
 var started = false
+var session *gocql.Session
 
 func startCassandra() {
 	if started {
@@ -15,21 +18,17 @@ func startCassandra() {
 	}
 	started = true
 	fmt.Println("Starting Cassandra")
-	//ccmCmd := "ccm status || true"
-	ccmCmd := fmt.Sprintf("ccm create test -v %s -n 1 -s -b", cassandraVersion())
-	cmd := exec.Command("bash", "-c", ccmCmd)
-
-	output, err := cmd.CombinedOutput()
-	fmt.Println("Output", string(output))
-	if err != nil {
-		fmt.Println("Error", err)
-		panic(err)
-	}
+	executeCcm(fmt.Sprintf("create test -v %s -n 1 -s -b", cassandraVersion()))
 }
 
 func shutdownCassandra() {
 	fmt.Println("Shutting down cassandra")
-	cmd := exec.Command("bash", "-c", "ccm remove")
+	executeCcm("remove")
+}
+
+func executeCcm(command string) {
+	ccmCommand := fmt.Sprintf("ccm %s", command)
+	cmd := exec.Command("bash", "-c", ccmCommand)
 	output, err := cmd.CombinedOutput()
 	fmt.Println("Output", string(output))
 	if err != nil {
@@ -50,6 +49,13 @@ func cassandraVersion() string {
 	return version
 }
 
+func CreateSchema(filename string) {
+	_, currentFile, _, _ := runtime.Caller(0)
+	dir := path.Dir(currentFile)
+	filePath := path.Join(dir, "schemas", filename)
+	executeCcm(fmt.Sprintf("node1 cqlsh -f %s", filePath))
+}
+
 func SetupIntegrationTestFixture(queries ...string) *gocql.Session {
 	if !IntegrationTestsEnabled() {
 		return nil
@@ -59,10 +65,7 @@ func SetupIntegrationTestFixture(queries ...string) *gocql.Session {
 
 	cluster := gocql.NewCluster("127.0.0.1")
 
-	var (
-		session *gocql.Session
-		err     error
-	)
+	var err error
 
 	if session, err = cluster.CreateSession(); err != nil {
 		panic(err)
@@ -83,5 +86,8 @@ func TearDownIntegrationTestFixture() {
 		return
 	}
 
+	if session != nil {
+		session.Close()
+	}
 	shutdownCassandra()
 }
