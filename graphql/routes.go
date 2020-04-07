@@ -30,9 +30,9 @@ type RouteGenerator struct {
 }
 
 type Route struct {
-	Method      string
-	Pattern     string
-	HandlerFunc http.HandlerFunc
+	Method  string
+	Pattern string
+	Handler http.Handler
 }
 
 type Config struct {
@@ -116,15 +116,15 @@ func routesForSchema(pattern string, execute executeQueryFunc) []Route {
 		{
 			Method:  http.MethodGet,
 			Pattern: pattern,
-			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				result := execute(r.URL.Query().Get("query"), r.Context())
 				json.NewEncoder(w).Encode(result)
-			},
+			}),
 		},
 		{
 			Method:  http.MethodPost,
 			Pattern: pattern,
-			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Body == nil {
 					http.Error(w, "No request body", 400)
 					return
@@ -139,7 +139,7 @@ func routesForSchema(pattern string, execute executeQueryFunc) []Route {
 
 				result := execute(body.Query, r.Context())
 				json.NewEncoder(w).Encode(result)
-			},
+			}),
 		},
 	}
 }

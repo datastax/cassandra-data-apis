@@ -34,18 +34,18 @@ func main() {
 
 	logger := cfg.Logger()
 
-	cfg.SetDbUsername(os.Getenv("DB_USERNAME"))
-	cfg.SetDbPassword(os.Getenv("DB_PASSWORD"))
+	cfg.WithDbUsername(os.Getenv("DB_USERNAME"))
+	cfg.WithDbPassword(os.Getenv("DB_PASSWORD"))
 
 	supportedOps := os.Getenv("SUPPORTED_OPERATIONS")
 	if supportedOps == "" {
-		cfg.SetSupportedOperations(config.TableCreate | config.KeyspaceCreate)
+		cfg.WithSupportedOperations(config.TableCreate | config.KeyspaceCreate)
 	} else {
 		ops, err := config.Ops(strings.Split(supportedOps, ",")...)
 		if err != nil {
 			logger.Fatal("invalid supported operation", "operations", supportedOps, "error", err)
 		}
-		cfg.SetSupportedOperations(ops)
+		cfg.WithSupportedOperations(ops)
 	}
 
 	endpoint, err := cfg.NewEndpoint()
@@ -68,7 +68,7 @@ func main() {
 
 	router := httprouter.New()
 	for _, route := range routes {
-		router.HandlerFunc(route.Method, route.Pattern, route.HandlerFunc)
+		router.Handler(route.Method, route.Pattern, route.Handler)
 	}
 
 	handler := http.Handler(router)

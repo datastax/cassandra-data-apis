@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
+	"github.com/riptano/data-endpoints/auth"
 	"github.com/riptano/data-endpoints/config"
 	"github.com/riptano/data-endpoints/db"
 	"github.com/riptano/data-endpoints/log"
@@ -243,13 +244,12 @@ func (sg *SchemaGenerator) BuildSchema(keyspaceName string) (graphql.Schema, err
 	)
 }
 func (sg *SchemaGenerator) checkUserOrRoleAuth(params graphql.ResolveParams) (string, error) {
-	value := params.Context.Value(AuthUserOrRole)
-	if value == nil {
-		if sg.useUserOrRoleAuth {
+	if sg.useUserOrRoleAuth {
+		value := auth.ContextUserOrRole(params.Context)
+		if value == "" {
 			return "", fmt.Errorf("expected user or role for this operation")
-		} else {
-			return "", nil
 		}
+		return value, nil
 	}
-	return value.(string), nil
+	return "", nil
 }
