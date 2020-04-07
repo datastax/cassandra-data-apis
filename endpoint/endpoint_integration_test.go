@@ -34,7 +34,7 @@ var _ = Describe("DataEndpoint", func() {
 
 				buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
 					Query: killrvideo.InsertUserMutation(id, "John", "john@email.com"),
-				})
+				}, nil)
 				Expect(err).ToNot(HaveOccurred())
 				expected := schemas.NewResponseBody("insertUsers", map[string]interface{}{
 					"applied": true,
@@ -50,7 +50,7 @@ var _ = Describe("DataEndpoint", func() {
 
 				buffer, err = executePost(routes, "/graphql", graphql.RequestBody{
 					Query: killrvideo.SelectUserQuery(id),
-				})
+				}, nil)
 				Expect(err).ToNot(HaveOccurred())
 
 				values := []map[string]interface{}{{
@@ -65,15 +65,15 @@ var _ = Describe("DataEndpoint", func() {
 			})
 
 			XIt("Should support normal and conditional updates", func() {
-
+				//TODO: Implement
 			})
 
 			XIt("Should support conditional inserts", func() {
-
+				//TODO: Implement
 			})
 
 			XIt("Should support normal and conditional deletes", func() {
-
+				//TODO: Implement
 			})
 
 			It("Should types per table", func() {
@@ -89,7 +89,7 @@ var _ = Describe("DataEndpoint", func() {
 						}
 					  }
 					}`,
-				})
+				}, nil)
 
 				Expect(err).ToNot(HaveOccurred())
 				result := schemas.DecodeData(buffer, "__schema")["types"].([]interface{})
