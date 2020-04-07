@@ -40,6 +40,22 @@ func SelectUserQuery(id string) string {
 	return fmt.Sprintf(query, asGraphQLString(id))
 }
 
+func SelectCommentsByVideoGreaterThan(videoId string, startCommentId string) string {
+	query := `query {
+	  commentsByVideoFilter(filter:{videoid:{eq: %s}, commentid: {gt: %s}}) {
+		pageState
+		values {
+		  videoid
+		  commentid
+		  comment
+          userid
+		}
+	  }
+	}`
+
+	return fmt.Sprintf(query, asGraphQLString(videoId), asGraphQLString(startCommentId))
+}
+
 func NewUuid() string {
 	uuid, err := gocql.RandomUUID()
 	testutil.PanicIfError(err)
