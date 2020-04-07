@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+const DefaultSchemaUpdateDuration = 10 * time.Second
+
 type DataEndpointConfig struct {
 	dbHosts           []string
 	dbUsername        string
@@ -80,11 +82,6 @@ func (cfg *DataEndpointConfig) WithDbPassword(dbPassword string) *DataEndpointCo
 	return cfg
 }
 
-func (cfg *DataEndpointConfig) WithLogger(logger log.Logger) *DataEndpointConfig {
-	cfg.logger = logger
-	return cfg
-}
-
 func (cfg DataEndpointConfig) NewEndpoint() (*DataEndpoint, error) {
 	dbClient, err := db.NewDb(cfg.dbUsername, cfg.dbPassword, cfg.dbHosts...)
 	if err != nil {
@@ -110,10 +107,19 @@ func NewEndpointConfig(hosts ...string) (*DataEndpointConfig, error) {
 	}
 	return &DataEndpointConfig{
 		dbHosts:        hosts,
-		updateInterval: 10 * time.Second,
+		updateInterval: DefaultSchemaUpdateDuration,
 		naming:         config.NewDefaultNaming,
 		logger:         log.NewZapLogger(logger),
 	}, nil
+}
+
+func NewEndpointConfigWithLogger(logger log.Logger, hosts ...string) *DataEndpointConfig {
+	return &DataEndpointConfig{
+		dbHosts:        hosts,
+		updateInterval: DefaultSchemaUpdateDuration,
+		naming:         config.NewDefaultNaming,
+		logger:         logger,
+	}
 }
 
 func (e *DataEndpoint) RoutesGraphQL(pattern string) ([]graphql.Route, error) {
