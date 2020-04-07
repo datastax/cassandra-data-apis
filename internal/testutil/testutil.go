@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path"
 	"runtime"
+	"time"
 )
 
 var started = false
@@ -64,6 +65,8 @@ func SetupIntegrationTestFixture(queries ...string) *gocql.Session {
 	startCassandra()
 
 	cluster := gocql.NewCluster("127.0.0.1")
+	cluster.Timeout = 5 * time.Second
+	cluster.ConnectTimeout = cluster.Timeout
 
 	var err error
 

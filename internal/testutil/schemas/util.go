@@ -3,6 +3,7 @@ package schemas
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/iancoleman/strcase"
 	. "github.com/onsi/gomega"
 )
 
@@ -10,7 +11,6 @@ type ResponseBody struct {
 	Data   map[string]interface{} `json:"data"`
 	Errors []ErrorEntry           `json:"errors"`
 }
-
 
 type ErrorEntry struct {
 	Message   string   `json:"message"`
@@ -37,5 +37,17 @@ func NewResponseBody(operationName string, elementMap map[string]interface{}) Re
 		Data: map[string]interface{}{
 			operationName: elementMap,
 		},
+	}
+}
+
+func GetTypeNamesByTable(tableName string) []string {
+	baseName := strcase.ToCamel(tableName)
+	return []string{
+		baseName + "Input",
+		baseName + "FilterInput",
+		baseName,
+		baseName + "Result",
+		baseName + "Order",
+		baseName + "MutationResult",
 	}
 }

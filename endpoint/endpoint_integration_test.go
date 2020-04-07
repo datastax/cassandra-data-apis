@@ -63,6 +63,49 @@ var _ = Describe("DataEndpoint", func() {
 
 				Expect(schemas.DecodeData(buffer, "users")["values"]).To(ConsistOf(values))
 			})
+
+			XIt("Should support normal and conditional updates", func() {
+
+			})
+
+			XIt("Should support conditional inserts", func() {
+
+			})
+
+			XIt("Should support normal and conditional deletes", func() {
+
+			})
+
+			It("Should types per table", func() {
+				var endpoint = config.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
+				routes, _ := endpoint.RoutesKeyspaceGraphQL("/graphql", "killrvideo")
+
+				buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
+					Query: `{
+					  __schema {
+						types {
+						  name
+						  description
+						}
+					  }
+					}`,
+				})
+
+				Expect(err).ToNot(HaveOccurred())
+				result := schemas.DecodeData(buffer, "__schema")["types"].([]interface{})
+
+				typeNames := make([]string, 0, len(result))
+				for _, item := range result {
+					mapItem := item.(map[string]interface{})
+					typeNames = append(typeNames, mapItem["name"].(string))
+				}
+
+				Expect(typeNames).To(ContainElements(schemas.GetTypeNamesByTable("videos_by_tag")))
+				Expect(typeNames).To(ContainElements(schemas.GetTypeNamesByTable("user_videos")))
+				Expect(typeNames).To(ContainElements(schemas.GetTypeNamesByTable("comments_by_video")))
+				Expect(typeNames).To(ContainElements(schemas.GetTypeNamesByTable("video_event")))
+				Expect(typeNames).To(ContainElements("BigInt", "Counter", "Uuid", "TimeUuid"))
+			})
 		})
 	})
 })
