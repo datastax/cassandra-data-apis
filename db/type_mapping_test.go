@@ -1,3 +1,5 @@
+// +build integration
+
 package db
 
 import (
@@ -17,12 +19,6 @@ import (
 var db *Db
 
 var _ = Describe("Session", func() {
-	BeforeEach(func() {
-		if !IntegrationTestsEnabled() {
-			Skip("Integration tests are not enabled")
-		}
-	})
-
 	Describe("ExecuteIter()", func() {
 		Context("With numerical values", func() {
 			It("Should provide the expected representation", func() {
@@ -180,10 +176,6 @@ var _ = Describe("Session", func() {
 })
 
 var _ = BeforeSuite(func() {
-	if !IntegrationTestsEnabled() {
-		return
-	}
-
 	session := SetupIntegrationTestFixture("CREATE KEYSPACE ks1 WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 1}")
 
 	db = NewDbWithConnectedInstance(session)

@@ -1,3 +1,5 @@
+// +build integration
+
 package endpoint
 
 import (
@@ -18,12 +20,6 @@ import (
 var session *gocql.Session
 
 var _ = Describe("DataEndpoint", func() {
-	BeforeEach(func() {
-		if !IntegrationTestsEnabled() {
-			Skip("Integration tests are not enabled")
-		}
-	})
-
 	Describe("RoutesKeyspaceGraphQL()", func() {
 		Context("With killrvideo schema", func() {
 			var config, _ = NewEndpointConfig(host)
@@ -255,10 +251,6 @@ var _ = Describe("DataEndpoint", func() {
 })
 
 var _ = BeforeSuite(func() {
-	if !IntegrationTestsEnabled() {
-		return
-	}
-
 	session = SetupIntegrationTestFixture()
 	CreateSchema("killrvideo")
 })
