@@ -38,10 +38,6 @@ func executeCcm(command string) {
 	}
 }
 
-func IntegrationTestsEnabled() bool {
-	return os.Getenv("RUN_INTEGRATION_TESTS") == "1"
-}
-
 func cassandraVersion() string {
 	version := os.Getenv("CCM_VERSION")
 	if version == "" {
@@ -58,10 +54,6 @@ func CreateSchema(name string) {
 }
 
 func SetupIntegrationTestFixture(queries ...string) *gocql.Session {
-	if !IntegrationTestsEnabled() {
-		return nil
-	}
-
 	startCassandra()
 
 	cluster := gocql.NewCluster("127.0.0.1")
@@ -85,10 +77,6 @@ func SetupIntegrationTestFixture(queries ...string) *gocql.Session {
 }
 
 func TearDownIntegrationTestFixture() {
-	if !IntegrationTestsEnabled() {
-		return
-	}
-
 	if session != nil {
 		session.Close()
 	}
