@@ -28,9 +28,7 @@ var _ = Describe("DataEndpoint", func() {
 		Context("With killrvideo schema", func() {
 			var config, _ = NewEndpointConfig(host)
 			It("Should insert and select users", func() {
-				var endpoint = config.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
-				routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", "killrvideo")
-				Expect(err).ToNot(HaveOccurred())
+				routes := getRoutes(config)
 				Expect(routes).To(HaveLen(2))
 
 				id := killrvideo.NewUuid()
@@ -64,11 +62,39 @@ var _ = Describe("DataEndpoint", func() {
 					"userid":      id,
 				}}
 
-				Expect(schemas.DecodeData(buffer, "users")["values"]).To(ConsistOf(values))
+				Expect(schemas.DecodeDataAsSliceOfMaps(buffer, "users", "values")).To(ConsistOf(values))
 			})
 
-			XIt("Should support normal and conditional updates", func() {
-				//TODO: Implement
+			It("Should support normal and conditional updates", func() {
+				routes := getRoutes(config)
+				id := killrvideo.NewUuid()
+				firstEmail := "email1@email.com"
+				buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
+					Query: killrvideo.UpdateUserMutation(id, "John", firstEmail, ""),
+				}, nil)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(schemas.DecodeData(buffer, "updateUsers")["applied"]).To(BeTrue())
+
+				// This should not be applied
+				buffer, _ = executePost(routes, "/graphql", graphql.RequestBody{
+					Query: killrvideo.UpdateUserMutation(id, "John", "new_email@email.com", "email_old@email.com"),
+				}, nil)
+				data := schemas.DecodeData(buffer, "updateUsers")
+				// Verify that the mutation was not applied on C* side
+				Expect(data["applied"]).To(BeFalse())
+				Expect(data["value"]).To(Equal(map[string]interface{}{
+					"userid":    nil,
+					"firstname": nil,
+					"email":     firstEmail,
+				}))
+
+				// This should be applied
+				buffer, _ = executePost(routes, "/graphql", graphql.RequestBody{
+					Query: killrvideo.UpdateUserMutation(id, "John", "new_email@email.com", firstEmail),
+				}, nil)
+				data = schemas.DecodeData(buffer, "updateUsers")
+				// Verify that the mutation was applied on C* side
+				Expect(data["applied"]).To(BeTrue())
 			})
 
 			XIt("Should support conditional inserts", func() {
@@ -93,8 +119,7 @@ var _ = Describe("DataEndpoint", func() {
 					Expect(err).ToNot(HaveOccurred())
 				}
 
-				var endpoint = config.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
-				routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", "killrvideo")
+				routes := getRoutes(config)
 				buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
 					Query: killrvideo.SelectCommentsByVideoGreaterThan(videoId.String(), t0.String()),
 				}, nil)
@@ -111,9 +136,7 @@ var _ = Describe("DataEndpoint", func() {
 			})
 
 			It("Should types per table", func() {
-				var endpoint = config.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
-				routes, _ := endpoint.RoutesKeyspaceGraphQL("/graphql", "killrvideo")
-
+				routes := getRoutes(config)
 				buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
 					Query: `{
 					  __schema {
@@ -126,12 +149,10 @@ var _ = Describe("DataEndpoint", func() {
 				}, nil)
 
 				Expect(err).ToNot(HaveOccurred())
-				result := schemas.DecodeData(buffer, "__schema")["types"].([]interface{})
-
+				result := schemas.DecodeDataAsSliceOfMaps(buffer, "__schema", "types")
 				typeNames := make([]string, 0, len(result))
 				for _, item := range result {
-					mapItem := item.(map[string]interface{})
-					typeNames = append(typeNames, mapItem["name"].(string))
+					typeNames = append(typeNames, item["name"].(string))
 				}
 
 				Expect(typeNames).To(ContainElements(schemas.GetTypeNamesByTable("videos_by_tag")))
@@ -160,4 +181,11 @@ var _ = AfterSuite(func() {
 func TestEndpoint(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Endpoint integration test suite")
+}
+
+func getRoutes(config *DataEndpointConfig) []graphql.Route {
+	var endpoint = config.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
+	routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", "killrvideo")
+	Expect(err).ToNot(HaveOccurred())
+	return routes
 }

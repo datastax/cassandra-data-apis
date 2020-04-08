@@ -23,6 +23,27 @@ func InsertUserMutation(id string, firstname string, email string) string {
 	return fmt.Sprintf(query, asGraphQLString(id), asGraphQLString(firstname), asGraphQLString(email))
 }
 
+func UpdateUserMutation(id string, firstname string, email string, ifEmail string) string {
+	query := `mutation {
+	  updateUsers(data:{userid:%s, firstname:%s, email:%s}%s) {
+		applied
+		value {
+		  userid
+		  firstname
+          email
+		}
+	  }
+	}`
+
+	conditionalParameter := ""
+	if ifEmail != "" {
+		conditionalParameter = fmt.Sprintf(`, ifCondition: { email: {eq: "%s"}}`, ifEmail)
+	}
+
+	return fmt.Sprintf(
+		query, asGraphQLString(id), asGraphQLString(firstname), asGraphQLString(email), conditionalParameter)
+}
+
 func SelectUserQuery(id string) string {
 	query := `query {
 	  users(data:{userid:%s}) {
