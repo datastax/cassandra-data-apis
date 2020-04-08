@@ -38,23 +38,11 @@ func TestSchemaUpdater_Update(t *testing.T) {
 			"newTable1": db.BooksColumnsMock,
 		})).Once()
 
-	updater.update() // Schema version is not set
-	assert.Contains(t, updater.Schema().QueryType().Fields(), "newTable1")
-	assert.NotContains(t, updater.Schema().QueryType().Fields(), "newTable2")
-
-	// Add new another table
-	sessionMock.AddKeyspace(db.NewKeyspaceMock(
-		"store", map[string][]*gocql.ColumnMetadata{
-			"books":     db.BooksColumnsMock,
-			"newTable1": db.BooksColumnsMock,
-			"newTable2": db.BooksColumnsMock,
-		})).Once()
-
-	updater.update() // Schema version is the same
-	assert.NotContains(t, updater.Schema().QueryType().Fields(), "newTable2")
+	updater.update() // Schema version is set
+	// No change in the schema version, the updater will not read the new table
+	assert.NotContains(t, updater.Schema().QueryType().Fields(), "newTable1")
 
 	sessionMock.SetSchemaVersion("2ca627b7-f869-4f0c-b995-142f903a0367")
-
-	updater.update() // Schema version is different
-	assert.Contains(t, updater.Schema().QueryType().Fields(), "newTable2")
+	updater.update() // Schema version changed
+	assert.Contains(t, updater.Schema().QueryType().Fields(), "newTable1")
 }
