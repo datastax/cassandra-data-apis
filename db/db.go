@@ -3,6 +3,7 @@ package db
 import (
 	"github.com/gocql/gocql"
 	"github.com/riptano/data-endpoints/config"
+	"time"
 )
 
 // Db represents a connection to a db
@@ -13,6 +14,10 @@ type Db struct {
 // NewDb Gets a pointer to a db
 func NewDb(username string, password string, hosts ...string) (*Db, error) {
 	cluster := gocql.NewCluster(hosts...)
+
+	// Match DataStax drivers settings
+	cluster.ConnectTimeout = 5 * time.Second
+	cluster.Timeout = 12 * time.Second
 
 	if username != "" && password != "" {
 		cluster.Authenticator = gocql.PasswordAuthenticator{

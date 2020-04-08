@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"context"
+	"errors"
 	"github.com/graphql-go/graphql"
 	"github.com/riptano/data-endpoints/log"
 	"sync"
@@ -32,6 +33,7 @@ func NewUpdater(schemaGen *SchemaGenerator, ksName string, updateInterval time.D
 	if err != nil {
 		return nil, err
 	}
+
 	updater := &SchemaUpdater{
 		ctx:            nil,
 		cancel:         nil,
@@ -42,6 +44,14 @@ func NewUpdater(schemaGen *SchemaGenerator, ksName string, updateInterval time.D
 		ksName:         ksName,
 		logger:         logger,
 	}
+
+	version, err := updater.getSchemaVersion()
+	if err != nil {
+		logger.Error("unable to query schema version",
+			"error", err)
+	}
+	updater.schemaVersion = version
+
 	return updater, nil
 }
 
@@ -60,7 +70,7 @@ func (su *SchemaUpdater) Stop() {
 }
 
 func (su *SchemaUpdater) update() {
-	result, err := su.schemaGen.dbClient.Execute("SELECT schema_version FROM system.local", nil)
+	version, err := su.getSchemaVersion()
 
 	if err != nil {
 		su.logger.Error("unable to query schema version",
@@ -69,16 +79,9 @@ func (su *SchemaUpdater) update() {
 	}
 
 	shouldUpdate := false
-	for _, row := range result.Values() {
-		if schemaVersion, ok := row["schema_version"].(*string); ok && schemaVersion != nil {
-			if *schemaVersion != su.schemaVersion {
-				shouldUpdate = true
-				su.schemaVersion = *schemaVersion
-			}
-		} else {
-			su.logger.Error("schema version value is invalid",
-				"value", row)
-		}
+	if version != su.schemaVersion {
+		shouldUpdate = true
+		su.schemaVersion = version
 	}
 
 	if shouldUpdate {
@@ -92,6 +95,19 @@ func (su *SchemaUpdater) update() {
 			su.mutex.Unlock()
 		}
 	}
+}
+
+func (su *SchemaUpdater) getSchemaVersion() (string, error) {
+	result, err := su.schemaGen.dbClient.Execute("SELECT schema_version FROM system.local", nil)
+	if err != nil {
+		return "", err
+	}
+	row := result.Values()[0]
+	version := row["schema_version"].(*string)
+	if version == nil {
+		return "", errors.New("schema version value is empty")
+	}
+	return *version, nil
 }
 
 func (su *SchemaUpdater) sleep() bool {
