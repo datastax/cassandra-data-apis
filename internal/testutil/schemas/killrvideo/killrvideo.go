@@ -61,6 +61,16 @@ func SelectUserQuery(id string) string {
 	return fmt.Sprintf(query, asGraphQLString(id))
 }
 
+func SelectTagsByLetter(firstLetter string, pageSize int, pageState string) string {
+	query := `{
+		tagsByLetter(data: {firstLetter: %s}, options: {pageSize: %d, pageState: %s}){
+  		  pageState
+		  values{ tag }}
+	}`
+
+	return fmt.Sprintf(query, asGraphQLString(firstLetter), pageSize, asGraphQLString(pageState))
+}
+
 func SelectCommentsByVideoGreaterThan(videoId string, startCommentId string) string {
 	query := `query {
 	  commentsByVideoFilter(filter:{videoid:{eq: %s}, commentid: {gt: %s}}) {

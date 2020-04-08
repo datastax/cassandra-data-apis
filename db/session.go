@@ -1,7 +1,6 @@
 package db
 
 import (
-	"encoding/hex"
 	"errors"
 	"github.com/gocql/gocql"
 )
@@ -10,6 +9,8 @@ type QueryOptions struct {
 	UserOrRole        string
 	Consistency       gocql.Consistency
 	SerialConsistency gocql.SerialConsistency
+	PageState         []byte
+	PageSize          int
 }
 
 func NewQueryOptions() *QueryOptions {
@@ -36,6 +37,16 @@ func (q *QueryOptions) WithSerialConsistency(serialConsistency gocql.SerialConsi
 	return q
 }
 
+func (q *QueryOptions) WithPageSize(pageSize int) *QueryOptions {
+	q.PageSize = pageSize
+	return q
+}
+
+func (q *QueryOptions) WithPageState(pageState []byte) *QueryOptions {
+	q.PageState = pageState
+	return q
+}
+
 type Session interface {
 	// Execute executes a statement without returning row results
 	Execute(query string, options *QueryOptions, values ...interface{}) error
@@ -48,12 +59,12 @@ type Session interface {
 }
 
 type ResultSet interface {
-	PageState() string
+	PageState() []byte
 	Values() []map[string]interface{}
 }
 
-func (r *goCqlResultIterator) PageState() string {
-	return hex.EncodeToString(r.pageState)
+func (r *goCqlResultIterator) PageState() []byte {
+	return r.pageState
 }
 
 func (r *goCqlResultIterator) Values() []map[string]interface{} {
@@ -122,6 +133,13 @@ func (session *GoCqlSession) ExecuteIter(query string, options *QueryOptions, va
 		}
 
 		q.SerialConsistency(options.SerialConsistency)
+
+		if options.PageSize > 0 {
+			// We don't allow disabling paging
+			q.PageSize(options.PageSize)
+		}
+
+		q.PageState(options.PageState)
 
 		if options.UserOrRole != "" {
 			q.CustomPayload(map[string][]byte{

@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"encoding/base64"
 	"fmt"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
@@ -72,6 +73,8 @@ func (sg *SchemaGenerator) queryFieldResolver(
 				return nil, err
 			}
 
+			pageState, err := base64.StdEncoding.DecodeString(options.PageState)
+
 			result, err := sg.dbClient.Select(
 				&db.SelectInfo{
 					Keyspace: keyspace.Name,
@@ -82,6 +85,8 @@ func (sg *SchemaGenerator) queryFieldResolver(
 				},
 				db.NewQueryOptions().
 					WithUserOrRole(userOrRole).
+					WithPageSize(options.PageSize).
+					WithPageState(pageState).
 					WithConsistency(gocql.Consistency(options.Consistency)).
 					WithSerialConsistency(gocql.SerialConsistency(options.SerialConsistency)))
 
@@ -90,7 +95,7 @@ func (sg *SchemaGenerator) queryFieldResolver(
 			}
 
 			return &types.QueryResult{
-				PageState: result.PageState(),
+				PageState: base64.StdEncoding.EncodeToString(result.PageState()),
 				Values:    ksSchema.adaptResult(table.Name, result.Values()),
 			}, nil
 		}
