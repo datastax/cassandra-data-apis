@@ -32,7 +32,7 @@ func TestDataEndpoint_Query(t *testing.T) {
 	pages := 42
 	resultMock := &db.ResultMock{}
 	resultMock.
-		On("PageState").Return("").
+		On("PageState").Return([]byte{}).
 		On("Values").Return([]map[string]interface{}{
 		map[string]interface{}{"title": &title, "pages": &pages},
 	}, nil)
@@ -83,7 +83,7 @@ func TestDataEndpoint_Auth(t *testing.T) {
 	pages := 42
 	resultMock := &db.ResultMock{}
 	resultMock.
-		On("PageState").Return("").
+		On("PageState").Return([]byte{}).
 		On("Values").Return([]map[string]interface{}{
 		map[string]interface{}{"title": &title, "pages": &pages},
 	}, nil)
@@ -95,6 +95,7 @@ func TestDataEndpoint_Auth(t *testing.T) {
 			db.
 				NewQueryOptions().
 				WithUserOrRole("user1").
+				WithPageState([]byte{}).
 				WithConsistency(gocql.LocalQuorum).
 				WithSerialConsistency(gocql.Serial),
 			mock.Anything).
@@ -143,7 +144,7 @@ func TestDataEndpoint_AuthNotProvided(t *testing.T) {
 	pages := 42
 	resultMock := &db.ResultMock{}
 	resultMock.
-		On("PageState").Return("").
+		On("PageState").Return([]byte{}).
 		On("Values").Return([]map[string]interface{}{
 		map[string]interface{}{"title": &title, "pages": &pages},
 	}, nil)

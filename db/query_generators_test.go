@@ -151,7 +151,7 @@ func TestInsertGeneration(t *testing.T) {
 func TestSelectGeneration(t *testing.T) {
 	resultMock := &ResultMock{}
 	resultMock.
-		On("PageState").Return("").
+		On("PageState").Return([]byte{}).
 		On("Values").Return([]map[string]interface{}{}, nil)
 
 	items := []struct {

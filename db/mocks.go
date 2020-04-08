@@ -29,8 +29,8 @@ type ResultMock struct {
 	mock.Mock
 }
 
-func (o ResultMock) PageState() string {
-	return o.Called().String(0)
+func (o ResultMock) PageState() []byte {
+	return o.Called().Get(0).([]byte)
 }
 
 func (o ResultMock) Values() []map[string]interface{} {
@@ -116,7 +116,7 @@ func (o *SessionMock) SetSchemaVersion(version string) *mock.Call {
 		Return(schemaVersionResultMock, nil)
 }
 
-func (o* SessionMock) AddKeyspace(keyspace *gocql.KeyspaceMetadata) *mock.Call {
+func (o *SessionMock) AddKeyspace(keyspace *gocql.KeyspaceMetadata) *mock.Call {
 	return o.On("KeyspaceMetadata", keyspace.Name).Return(keyspace, nil)
 }
 
