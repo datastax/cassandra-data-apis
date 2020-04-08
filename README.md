@@ -33,7 +33,7 @@ To start the server using a configuration file, use:
 ./run.exe --config <your_config_file>.yaml
 ```
 
-Configuration can also be overridden using environment variables prefixed with
+Settings can also be overridden using environment variables prefixed with
 `ENDPOINT_`:
 
 ```bash

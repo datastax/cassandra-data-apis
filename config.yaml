@@ -1,7 +1,2 @@
 hosts:
-  - 127.0.0.1
-keyspace: store
-operations:
-  - TableCreate
-port: 8080
-schema-update-interval: 30s
+  - "127.0.0.1"

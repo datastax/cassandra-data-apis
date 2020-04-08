@@ -25,7 +25,7 @@ var logger log.Logger
 var cfg *endpoint.DataEndpointConfig
 
 var serverCmd = &cobra.Command{
-	Use:   "data-endpoints",
+	Use:   "data-endpoints --hosts [HOSTS] [--start-graph|--start-rest] [OPTIONS]",
 	Short: "GraphQL and REST endpoints for Apache Cassandra",
 	Args: func(cmd *cobra.Command, args []string) error {
 		// TODO: Validate GraphQL/REST paths, should they be disjointed?
