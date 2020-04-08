@@ -62,7 +62,45 @@ var _ = Describe("DataEndpoint", func() {
 					"userid":      id,
 				}}
 
-				Expect(schemas.DecodeDataAsSliceOfMaps(buffer, "users", "values")).To(ConsistOf(values))
+				data := schemas.DecodeData(buffer, "users")
+				Expect(data["values"]).To(ConsistOf(values))
+				Expect(data["pageState"]).To(BeEmpty())
+			})
+
+			It("Should support page size and state", func() {
+				// Insert some data
+				insertQuery := "INSERT INTO killrvideo.tags_by_letter (first_letter, tag) VALUES (?, ?)"
+				length := 5
+				for i := 1; i <= length; i++ {
+					err := session.Query(insertQuery, "a", fmt.Sprintf("a%d", i)).Exec()
+					Expect(err).ToNot(HaveOccurred())
+				}
+
+				var endpoint = config.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
+				routes, _ := endpoint.RoutesKeyspaceGraphQL("/graphql", "killrvideo")
+
+				queryTags := func(pageState string, expectedValues []map[string]interface{}) string {
+					buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
+						Query: killrvideo.SelectTagsByLetter("a", 2, pageState),
+					}, nil)
+					Expect(err).ToNot(HaveOccurred())
+					data := schemas.DecodeData(buffer, "tagsByLetter")
+					Expect(data["values"]).To(ConsistOf(expectedValues))
+					return data["pageState"].(string)
+				}
+
+				// Use an empty page state
+				pageState := queryTags("", []map[string]interface{}{{"tag": "a1"}, {"tag": "a2"}})
+				Expect(pageState).NotTo(HaveLen(0))
+
+				// Use the previous page state
+				pageState = queryTags(pageState, []map[string]interface{}{{"tag": "a3"}, {"tag": "a4"}})
+				Expect(pageState).NotTo(HaveLen(0))
+
+				// Last page
+				pageState = queryTags(pageState, []map[string]interface{}{{"tag": "a5"}})
+				// No more pages
+				Expect(pageState).To(HaveLen(0))
 			})
 
 			It("Should support normal and conditional updates", func() {
