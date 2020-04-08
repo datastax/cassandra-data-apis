@@ -9,6 +9,7 @@ import (
 	"github.com/riptano/data-endpoints/auth"
 	"github.com/riptano/data-endpoints/db"
 	"github.com/riptano/data-endpoints/graphql"
+	"github.com/riptano/data-endpoints/internal/testutil/schemas"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"net/http"
@@ -23,20 +24,6 @@ const (
 )
 
 const host = "127.0.0.1"
-
-type errorEntry struct {
-	Message   string   `json:"message"`
-	Path      []string `json:"path"`
-	Locations []struct {
-		Line   int `json:"line"`
-		Column int `json:"column"`
-	} `json:"locations"`
-}
-
-type responseBody struct {
-	Data   map[string]interface{} `json:"data"`
-	Errors []errorEntry           `json:"errors"`
-}
 
 func TestDataEndpoint_Query(t *testing.T) {
 	session, routes := createRoutes(t, createConfig(t), "/graphql", "store")
@@ -65,7 +52,7 @@ func TestDataEndpoint_Query(t *testing.T) {
 }`,
 	}
 
-	expected := responseBody{
+	expected := schemas.ResponseBody{
 		Data: map[string]interface{}{
 			"books": map[string]interface{}{
 				"values": []interface{}{
@@ -81,7 +68,7 @@ func TestDataEndpoint_Query(t *testing.T) {
 	buffer, err := executePost(routes, "/graphql", body, nil)
 	assert.NoError(t, err, "error executing query")
 
-	var resp responseBody
+	var resp schemas.ResponseBody
 	err = json.NewDecoder(buffer).Decode(&resp)
 	assert.NoError(t, err, "error decoding response")
 	assert.Equal(t, expected, resp)
@@ -124,7 +111,7 @@ func TestDataEndpoint_Auth(t *testing.T) {
 }`,
 	}
 
-	expected := responseBody{
+	expected := schemas.ResponseBody{
 		Data: map[string]interface{}{
 			"books": map[string]interface{}{
 				"values": []interface{}{
@@ -141,7 +128,7 @@ func TestDataEndpoint_Auth(t *testing.T) {
 		http.Header{"X-Cassandra-Token": []string{"token1"}})
 	assert.NoError(t, err, "error executing query")
 
-	var resp responseBody
+	var resp schemas.ResponseBody
 	err = json.NewDecoder(buffer).Decode(&resp)
 	assert.NoError(t, err, "error decoding response")
 	assert.Equal(t, expected, resp)
@@ -185,7 +172,7 @@ func TestDataEndpoint_AuthNotProvided(t *testing.T) {
 	buffer, err := executePost(routes, "/graphql", body, nil) // No auth
 	assert.NoError(t, err, "error executing query")
 
-	var resp responseBody
+	var resp schemas.ResponseBody
 	err = json.NewDecoder(buffer).Decode(&resp)
 	assert.NoError(t, err, "error decoding response")
 	assert.Len(t, resp.Errors, 1)
@@ -208,7 +195,7 @@ func executePost(routes []graphql.Route, target string, body graphql.RequestBody
 	return w.Body, nil
 }
 
-func createConfig(t *testing.T, ) *DataEndpointConfig {
+func createConfig(t *testing.T) *DataEndpointConfig {
 	cfg, err := NewEndpointConfig(host)
 	assert.NoError(t, err, "error creating endpoint config")
 	return cfg
@@ -246,7 +233,7 @@ func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if userOrRole, ok := h.authTokens[token]; ok {
 		h.handler.ServeHTTP(w, r.WithContext(auth.WithContextUserOrRole(ctx, userOrRole)))
 	} else {
-		bytes, err := json.Marshal(responseBody{Errors: []errorEntry{errorEntry{Message: "authorization failed"}}})
+		bytes, err := json.Marshal(schemas.ResponseBody{Errors: []schemas.ErrorEntry{{Message: "authorization failed"}}})
 		assert.NoError(h.t, err, "error marshalling error")
 		w.Write(bytes)
 		return

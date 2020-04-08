@@ -38,6 +38,10 @@ func NewDbWithSession(session Session) *Db {
 	}
 }
 
+func NewDbWithConnectedInstance(session *gocql.Session) *Db {
+	return &Db{session: &GoCqlSession{ref: session}}
+}
+
 // Keyspace Retrieves a keyspace
 func (db *Db) Keyspace(keyspace string) (*gocql.KeyspaceMetadata, error) {
 	// We expose gocql types for now, we should wrap them in the future instead

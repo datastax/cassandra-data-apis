@@ -17,7 +17,7 @@ type SchemaUpdater struct {
 	schemaGen      *SchemaGenerator
 	ksName         string
 	schemaVersion  string
-	logger 		   log.Logger
+	logger         log.Logger
 }
 
 func (su *SchemaUpdater) Schema() *graphql.Schema {
@@ -40,7 +40,7 @@ func NewUpdater(schemaGen *SchemaGenerator, ksName string, updateInterval time.D
 		schema:         &schema,
 		schemaGen:      schemaGen,
 		ksName:         ksName,
-		logger:			logger,
+		logger:         logger,
 	}
 	return updater, nil
 }
@@ -65,6 +65,7 @@ func (su *SchemaUpdater) update() {
 	if err != nil {
 		su.logger.Error("unable to query schema version",
 			"error", err)
+		return
 	}
 
 	shouldUpdate := false
