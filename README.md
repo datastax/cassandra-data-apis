@@ -2,7 +2,50 @@
 
 ## Getting started
 
-The GraphQL endpoints can be used as a standalone webserver or you could plugin the routes within your HTTP request router.
+The GraphQL endpoints can be used as a standalone webserver or you could plugin
+the routes within your HTTP request router.
+
+### Run as a container (GraphQL only)
+
+```bash
+docker build -t data-endpoints .
+docker run -p 8080:8080 -e "ENDPOINT_HOSTS=<cassandra_hosts_here>" data-endpoints
+```
+
+Or to use with a configuration file, create a file with the following contents:
+
+```yaml
+hosts:
+  # Change to your cluster's hosts
+  - 127.0.0.1
+
+# Add your configuration here
+
+```
+
+Then start the endpoints with:
+
+```bash
+docker run -p 8080:8080 -v "${PWD}/<your_config_file>.yaml:/root/config.yaml" data-endpoints
+```
+
+#### Use with single node, local Cassandra cluster
+
+```bash
+docker build -t data-endpoints .
+
+# On Linux (with a cluster started on the docker bridge: 172.17.0.1)
+docker run -p 8080:8080 -e "ENDPOINT_HOSTS=172.17.0.1" data-endpoints
+
+# Or (with a cluster bound to 0.0.0.0)
+run --network host -e "ENDPOINT_HOSTS=127.0.0.1" data-endpoints
+
+# On macOS (with a cluster bound to 0.0.0.0)
+docker run -p 8080:8080 -e "ENDPOINT_HOSTS=host.docker.internal" data-endpoints
+```
+
+These host values can also be used in the configuration file approach used in
+the previous section.
 
 ### Run as a standalone webserver (GraphQL only)
 
@@ -40,8 +83,7 @@ Settings can also be overridden using environment variables prefixed with
 ENDPOINT_HOSTS=127.0.0.1 ENDPOINT_KEYSPACE=store ./run.exe --config <your_config_file>.yaml
 ```
 
-Note that in the future the deployment model will be containerized. Also,
-`--start-rest` is not currently implemented.
+Note `--start-rest` is not currently implemented.
 
 ### Plugin the routes within your HTTP request router
 
