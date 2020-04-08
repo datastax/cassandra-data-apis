@@ -34,7 +34,7 @@ var _ = Describe("DataEndpoint", func() {
 				id := killrvideo.NewUuid()
 
 				buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
-					Query: killrvideo.InsertUserMutation(id, "John", "john@email.com"),
+					Query: killrvideo.InsertUserMutation(id, "John", "john@email.com", false),
 				}, nil)
 				Expect(err).ToNot(HaveOccurred())
 				expected := schemas.NewResponseBody("insertUsers", map[string]interface{}{
@@ -135,12 +135,63 @@ var _ = Describe("DataEndpoint", func() {
 				Expect(data["applied"]).To(BeTrue())
 			})
 
-			XIt("Should support conditional inserts", func() {
-				//TODO: Implement
+			It("Should support conditional inserts", func() {
+				routes := getRoutes(config)
+				value := map[string]interface{}{
+					"userid":      killrvideo.NewUuid(),
+					"firstname":   "John",
+					"email":       "john@bonham.com",
+					"createdDate": nil,
+					"lastname":    nil,
+				}
+
+				buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
+					Query: killrvideo.InsertUserMutation(value["userid"], value["firstname"], value["email"], true),
+				}, nil)
+				Expect(err).ToNot(HaveOccurred())
+				data := schemas.DecodeData(buffer, "insertUsers")
+				Expect(data["applied"]).To(BeTrue())
+
+				buffer, err = executePost(routes, "/graphql", graphql.RequestBody{
+					Query: killrvideo.InsertUserMutation(value["userid"], value["firstname"], value["email"], true),
+				}, nil)
+				Expect(err).ToNot(HaveOccurred())
+				data = schemas.DecodeData(buffer, "insertUsers")
+				Expect(data["applied"]).To(BeFalse())
+				Expect(data["value"]).To(Equal(value))
 			})
 
-			XIt("Should support normal and conditional deletes", func() {
-				//TODO: Implement
+			It("Should support normal and conditional deletes", func() {
+				routes := getRoutes(config)
+				id1 := killrvideo.NewUuid()
+				id2 := killrvideo.NewUuid()
+				name := "John"
+
+				insertQuery := "INSERT INTO killrvideo.users (userid, firstname) VALUES (?, ?)"
+				selectQuery := "SELECT firstname FROM killrvideo.users WHERE userid = ?"
+				Expect(session.Query(insertQuery, id1, name).Exec()).NotTo(HaveOccurred())
+				Expect(session.Query(insertQuery, id2, name).Exec()).NotTo(HaveOccurred())
+
+				// Normal delete
+				buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
+					Query: killrvideo.DeleteUserMutation(id1, ""),
+				}, nil)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(schemas.DecodeData(buffer, "deleteUsers")["applied"]).To(BeTrue())
+				iter := session.Query(selectQuery, id1).Iter()
+				Expect(iter.NumRows()).To(BeZero())
+				Expect(iter.Close()).ToNot(HaveOccurred())
+
+				// Conditional delete
+				buffer, err = executePost(routes, "/graphql", graphql.RequestBody{
+					Query: killrvideo.DeleteUserMutation(id2, name),
+				}, nil)
+				Expect(err).ToNot(HaveOccurred())
+				data := schemas.DecodeData(buffer, "deleteUsers")
+				Expect(data["applied"]).To(BeFalse())
+				iter = session.Query(selectQuery, id2).Iter()
+				Expect(iter.NumRows()).To(Equal(1))
+				Expect(iter.Close()).ToNot(HaveOccurred())
 			})
 
 			It("Should support query filters", func() {

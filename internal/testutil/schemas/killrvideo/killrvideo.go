@@ -6,9 +6,9 @@ import (
 	"github.com/riptano/data-endpoints/internal/testutil"
 )
 
-func InsertUserMutation(id string, firstname string, email string) string {
+func InsertUserMutation(id interface{}, firstname interface{}, email interface{}, ifNotExists bool) string {
 	query := `mutation {
-	  insertUsers(data:{userid:%s, firstname:%s, email:%s}) {
+	  insertUsers(data:{userid:%s, firstname:%s, email:%s}%s) {
 		applied
 		value {
 		  userid
@@ -20,7 +20,13 @@ func InsertUserMutation(id string, firstname string, email string) string {
 	  }
 	}`
 
-	return fmt.Sprintf(query, asGraphQLString(id), asGraphQLString(firstname), asGraphQLString(email))
+	conditionalParameter := ""
+	if ifNotExists {
+		conditionalParameter = ", ifNotExists: true"
+	}
+
+	return fmt.Sprintf(
+		query, asGraphQLString(id), asGraphQLString(firstname), asGraphQLString(email), conditionalParameter)
 }
 
 func UpdateUserMutation(id string, firstname string, email string, ifEmail string) string {
@@ -42,6 +48,26 @@ func UpdateUserMutation(id string, firstname string, email string, ifEmail strin
 
 	return fmt.Sprintf(
 		query, asGraphQLString(id), asGraphQLString(firstname), asGraphQLString(email), conditionalParameter)
+}
+
+func DeleteUserMutation(id string, ifNotName string) string {
+	query := `mutation {
+	  deleteUsers(data:{userid:%s}%s) {
+		applied
+		value {
+		  userid
+		  firstname
+          email
+		}
+	  }
+	}`
+
+	conditionalParameter := ""
+	if ifNotName != "" {
+		conditionalParameter = fmt.Sprintf(`, ifCondition: { firstname: {notEq: "%s"}}`, ifNotName)
+	}
+
+	return fmt.Sprintf(query, asGraphQLString(id), conditionalParameter)
 }
 
 func SelectUserQuery(id string) string {
@@ -93,8 +119,8 @@ func NewUuid() string {
 	return uuid.String()
 }
 
-func asGraphQLString(value string) string {
-	if value == "" {
+func asGraphQLString(value interface{}) string {
+	if value == "" || value == nil {
 		return "null"
 	}
 	return fmt.Sprintf(`"%s"`, value)
