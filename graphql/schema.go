@@ -24,6 +24,7 @@ type SchemaGenerator struct {
 	namingFn          config.NamingConventionFn
 	supportedOps      config.Operations
 	useUserOrRoleAuth bool
+	ksExcluded        []string
 	logger            log.Logger
 }
 
@@ -35,6 +36,7 @@ func NewSchemaGenerator(dbClient *db.Db, cfg config.Config) *SchemaGenerator {
 		namingFn:          cfg.Naming(),
 		supportedOps:      cfg.SupportedOperations(),
 		useUserOrRoleAuth: cfg.UseUserOrRoleAuth(),
+		ksExcluded:        cfg.ExcludedKeyspaces(),
 		logger:            cfg.Logger(),
 	}
 }
@@ -243,6 +245,11 @@ func (sg *SchemaGenerator) BuildSchema(keyspaceName string) (graphql.Schema, err
 		},
 	)
 }
+
+func (sg* SchemaGenerator) isKeyspaceExcluded(ksName string) bool {
+	return isKeyspaceExcluded(ksName, systemKeyspaces) || isKeyspaceExcluded(ksName, sg.ksExcluded)
+}
+
 func (sg *SchemaGenerator) checkUserOrRoleAuth(params graphql.ResolveParams) (string, error) {
 	if sg.useUserOrRoleAuth {
 		value := auth.ContextUserOrRole(params.Context)

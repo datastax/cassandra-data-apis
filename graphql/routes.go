@@ -23,7 +23,6 @@ type executeQueryFunc func(query string, ctx context.Context) *graphql.Result
 
 type RouteGenerator struct {
 	dbClient       *db.Db
-	ksExcluded     []string
 	updateInterval time.Duration
 	logger         log.Logger
 	schemaGen      *SchemaGenerator
@@ -46,7 +45,6 @@ type RequestBody struct {
 func NewRouteGenerator(dbClient *db.Db, cfg config.Config) *RouteGenerator {
 	return &RouteGenerator{
 		dbClient:       dbClient,
-		ksExcluded:     cfg.ExcludedKeyspaces(),
 		updateInterval: cfg.SchemaUpdateInterval(),
 		logger:         cfg.Logger(),
 		schemaGen:      NewSchemaGenerator(dbClient, cfg),
@@ -68,7 +66,7 @@ func (rg *RouteGenerator) Routes(prefixPattern string) ([]Route, error) {
 	routes = append(routes, ksManageRoutes...)
 
 	for _, ksName := range ksNames {
-		if isKeyspaceExcluded(ksName, systemKeyspaces) || isKeyspaceExcluded(ksName, rg.ksExcluded) {
+		if rg.schemaGen.isKeyspaceExcluded(ksName) {
 			continue
 		}
 		ksRoutes, err := rg.RoutesKeyspace(path.Join(prefixPattern, ksName), ksName)

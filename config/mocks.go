@@ -16,7 +16,7 @@ func NewConfigMock() *ConfigMock {
 }
 
 func (o *ConfigMock) Default() *ConfigMock {
-	o.On("ExcludedKeyspaces").Return(nil)
+	o.On("ExcludedKeyspaces").Return([]string{"system"})
 	o.On("SchemaUpdateInterval").Return(10 * time.Second)
 	o.On("Naming").Return(NamingConventionFn(NewDefaultNaming))
 	o.On("SupportedOperations").Return(Operations(0))
