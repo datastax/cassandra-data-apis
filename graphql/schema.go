@@ -19,24 +19,37 @@ const (
 
 const AuthUserOrRole = "userOrRole"
 
+var systemKeyspaces = []string{
+	"system", "system_auth", "system_distributed", "system_schema", "system_traces", "system_views", "system_virtual_schema",
+	"dse_insights", "dse_insights_local", "dse_leases", "dse_perf", "dse_security", "dse_system", "dse_system_local",
+	"solr_admin",
+}
+
 type SchemaGenerator struct {
 	dbClient          *db.Db
 	namingFn          config.NamingConventionFn
 	supportedOps      config.Operations
 	useUserOrRoleAuth bool
-	ksExcluded        []string
+	ksExcluded        map[string]bool
 	logger            log.Logger
 }
 
 var appliedModificationResult = types.ModificationResult{Applied: true}
 
 func NewSchemaGenerator(dbClient *db.Db, cfg config.Config) *SchemaGenerator {
+	ksExcluded := map[string]bool{}
+	for _, ksName := range systemKeyspaces {
+		ksExcluded[ksName] = true
+	}
+	for _, ksName := range cfg.ExcludedKeyspaces() {
+		ksExcluded[ksName] = true
+	}
 	return &SchemaGenerator{
 		dbClient:          dbClient,
 		namingFn:          cfg.Naming(),
 		supportedOps:      cfg.SupportedOperations(),
 		useUserOrRoleAuth: cfg.UseUserOrRoleAuth(),
-		ksExcluded:        cfg.ExcludedKeyspaces(),
+		ksExcluded:        ksExcluded,
 		logger:            cfg.Logger(),
 	}
 }
@@ -247,7 +260,7 @@ func (sg *SchemaGenerator) BuildSchema(keyspaceName string) (graphql.Schema, err
 }
 
 func (sg* SchemaGenerator) isKeyspaceExcluded(ksName string) bool {
-	return isKeyspaceExcluded(ksName, systemKeyspaces) || isKeyspaceExcluded(ksName, sg.ksExcluded)
+	return sg.ksExcluded[ksName]
 }
 
 func (sg *SchemaGenerator) checkUserOrRoleAuth(params graphql.ResolveParams) (string, error) {

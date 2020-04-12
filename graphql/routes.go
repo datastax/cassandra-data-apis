@@ -13,12 +13,6 @@ import (
 	"time"
 )
 
-var systemKeyspaces = []string{
-	"system", "system_auth", "system_distributed", "system_schema", "system_traces", "system_views", "system_virtual_schema",
-	"dse_insights", "dse_insights_local", "dse_leases", "dse_perf", "dse_security", "dse_system", "dse_system_local",
-	"solr_admin",
-}
-
 type executeQueryFunc func(query string, ctx context.Context) *graphql.Result
 
 type RouteGenerator struct {
@@ -98,15 +92,6 @@ func (rg *RouteGenerator) RoutesKeyspace(pattern string, ksName string) ([]Route
 	return routesForSchema(pattern, func(query string, ctx context.Context) *graphql.Result {
 		return rg.executeQuery(query, ctx, *updater.Schema())
 	}), nil
-}
-
-func isKeyspaceExcluded(ksName string, ksExcluded []string) bool {
-	for _, excluded := range ksExcluded {
-		if ksName == excluded {
-			return true
-		}
-	}
-	return false
 }
 
 func routesForSchema(pattern string, execute executeQueryFunc) []Route {
