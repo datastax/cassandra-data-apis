@@ -105,12 +105,7 @@ func NewEndpointConfig(hosts ...string) (*DataEndpointConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DataEndpointConfig{
-		dbHosts:        hosts,
-		updateInterval: DefaultSchemaUpdateDuration,
-		naming:         config.NewDefaultNaming,
-		logger:         log.NewZapLogger(logger),
-	}, nil
+	return NewEndpointConfigWithLogger(log.NewZapLogger(logger), hosts...), nil
 }
 
 func NewEndpointConfigWithLogger(logger log.Logger, hosts ...string) *DataEndpointConfig {

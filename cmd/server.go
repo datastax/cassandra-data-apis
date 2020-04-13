@@ -20,12 +20,15 @@ import (
 const defaultGraphQLPath = "/graphql"
 const defaultRESTPath = "/todo"
 
+// Environment variables prefixed with "ENDPOINT_" can override settings e.g. "ENDPOINT_HOSTS"
+const envVarPrefix = "endpoint"
+
 var cfgFile string
 var logger log.Logger
 var cfg *endpoint.DataEndpointConfig
 
 var serverCmd = &cobra.Command{
-	Use:   "data-endpoints --hosts [HOSTS] [--start-graph|--start-rest] [OPTIONS]",
+	Use:   os.Args[0] + " --hosts [HOSTS] [--start-graph|--start-rest] [OPTIONS]",
 	Short: "GraphQL and REST endpoints for Apache Cassandra",
 	Args: func(cmd *cobra.Command, args []string) error {
 		// TODO: Validate GraphQL/REST paths, should they be disjointed?
@@ -128,8 +131,7 @@ func Execute() {
 
 	cobra.OnInitialize(initialize)
 
-	// Environment variables prefixed with "ENDPOINT_" can override settings e.g. "ENDPOINT_HOSTS"
-	viper.SetEnvPrefix("endpoint")
+	viper.SetEnvPrefix(envVarPrefix)
 	viper.AutomaticEnv()
 
 	if err := serverCmd.Execute(); err != nil {
