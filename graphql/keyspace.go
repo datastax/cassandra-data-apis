@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"errors"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
 	"github.com/riptano/data-endpoints/config"
@@ -96,6 +97,9 @@ func (sg *SchemaGenerator) buildKeyspaceQuery() *graphql.Object {
 				},
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) {
 					ksName := params.Args["name"].(string)
+					if sg.isKeyspaceExcluded(ksName) {
+						return nil, errors.New("keyspace does not exist")
+					}
 					keyspace, err := sg.dbClient.Keyspace(ksName)
 					if err != nil {
 						return nil, err
@@ -114,6 +118,9 @@ func (sg *SchemaGenerator) buildKeyspaceQuery() *graphql.Object {
 
 					ksValues := make([]ksValue, 0)
 					for _, ksName := range ksNames {
+						if sg.isKeyspaceExcluded(ksName) {
+							continue
+						}
 						keyspace, err := sg.dbClient.Keyspace(ksName)
 						if err != nil {
 							return nil, err
