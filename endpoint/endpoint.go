@@ -10,17 +10,14 @@ import (
 )
 
 const DefaultSchemaUpdateDuration = 10 * time.Second
-const DefaultSchemaManagementPath = "_schema"
 
 type DataEndpointConfig struct {
 	dbHosts           []string
 	dbUsername        string
 	dbPassword        string
 	ksExcluded        []string
-	managementPath    string
 	updateInterval    time.Duration
 	naming            config.NamingConventionFn
-	supportedOps      config.SchemaOperations
 	useUserOrRoleAuth bool
 	logger            log.Logger
 }
