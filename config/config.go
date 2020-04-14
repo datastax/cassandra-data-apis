@@ -9,7 +9,6 @@ type Config interface {
 	ExcludedKeyspaces() []string
 	SchemaUpdateInterval() time.Duration
 	Naming() NamingConventionFn
-	SupportedOperations() Operations
 	UseUserOrRoleAuth() bool
 	Logger() log.Logger
 }

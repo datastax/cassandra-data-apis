@@ -15,9 +15,11 @@ import (
 	log2 "log"
 	"net/http"
 	"os"
+	"path"
 )
 
 const defaultGraphQLPath = "/graphql"
+const defaultGraphQLSchemaPath = "/graphql/__schema"
 const defaultRESTPath = "/todo"
 
 // Environment variables prefixed with "ENDPOINT_" can override settings e.g. "ENDPOINT_HOSTS"
@@ -116,6 +118,7 @@ func Execute() {
 	// GraphQL specific flags
 	flags.Bool("start-graphql", true, "start the GraphQL endpoint")
 	flags.String("graphql-path", defaultGraphQLPath, "path for the GraphQL endpoint")
+	flags.String("graphql-schema-path", defaultGraphQLSchemaPath, "path for the GraphQL schema management")
 	flags.Int("graphql-port", 8080, "port for the GraphQL endpoint")
 
 	// REST specific flags
@@ -154,13 +157,6 @@ func createEndpoint() *endpoint.DataEndpoint {
 		WithExcludedKeyspaces(viper.GetStringSlice("excluded-keyspaces")).
 		WithSchemaUpdateInterval(updateInterval)
 
-	supportedOps := viper.GetStringSlice("operations")
-	ops, err := config.Ops(supportedOps...)
-	if err != nil {
-		logger.Fatal("invalid supported operation", "operations", supportedOps, "error", err)
-	}
-	cfg.WithSupportedOperations(ops)
-
 	endpoint, err := cfg.NewEndpoint()
 	if err != nil {
 		logger.Fatal("unable create new endpoint",
@@ -175,12 +171,12 @@ func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint
 	var err error
 
 	singleKeyspace := viper.GetString("keyspace")
-	path := viper.GetString("graphql-path")
+	rootPath := viper.GetString("graphql-path")
 
 	if singleKeyspace != "" {
-		routes, err = endpoint.RoutesKeyspaceGraphQL(path, singleKeyspace)
+		routes, err = endpoint.RoutesKeyspaceGraphQL(rootPath, singleKeyspace)
 	} else {
-		routes, err = endpoint.RoutesGraphQL(path)
+		routes, err = endpoint.RoutesGraphQL(rootPath)
 	}
 
 	if err != nil {
@@ -191,6 +187,32 @@ func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint
 	for _, route := range routes {
 		router.Handler(route.Method, route.Pattern, route.Handler)
 	}
+
+	supportedOps := viper.GetStringSlice("operations")
+	ops, err := config.Ops(supportedOps...)
+	if err != nil {
+		logger.Fatal("invalid supported operation", "operations", supportedOps, "error", err)
+	}
+
+	routes, err = endpoint.RoutesSchemaManagementGraphQL(getSchemaPath(), ops)
+
+	if err != nil {
+		logger.Fatal("unable to generate graphql schema routes",
+			"error", err)
+	}
+
+	for _, route := range routes {
+		router.Handler(route.Method, route.Pattern, route.Handler)
+	}
+}
+
+func getSchemaPath() string {
+	schemaPath := viper.GetString("graphql-schema-path")
+	// Schema path moves with root path unless it's explicitly changed
+	if path.Dir(schemaPath) == defaultGraphQLPath {
+		return path.Join(viper.GetString("graphql-path"), path.Base(schemaPath))
+	}
+	return schemaPath
 }
 
 func addRESTRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint) {

@@ -51,13 +51,7 @@ func (rg *RouteGenerator) Routes(prefixPattern string) ([]Route, error) {
 		return nil, fmt.Errorf("unable to retrieve keyspace names: %s", err)
 	}
 
-	routes := make([]Route, 0, len(ksNames)+1)
-
-	ksManageRoutes, err := rg.RoutesKeyspaceManagement(prefixPattern)
-	if err != nil {
-		return nil, err
-	}
-	routes = append(routes, ksManageRoutes...)
+	routes := make([]Route, 0, len(ksNames))
 
 	for _, ksName := range ksNames {
 		if rg.schemaGen.isKeyspaceExcluded(ksName) {
@@ -73,10 +67,10 @@ func (rg *RouteGenerator) Routes(prefixPattern string) ([]Route, error) {
 	return routes, nil
 }
 
-func (rg *RouteGenerator) RoutesKeyspaceManagement(pattern string) ([]Route, error) {
-	schema, err := rg.schemaGen.BuildKeyspaceSchema()
+func (rg *RouteGenerator) RoutesSchemaManagement(pattern string, ops config.SchemaOperations) ([]Route, error) {
+	schema, err := rg.schemaGen.BuildKeyspaceSchema(ops)
 	if err != nil {
-		return nil, fmt.Errorf("unable to build graphql schema for keyspace management: %s", err)
+		return nil, fmt.Errorf("unable to build graphql schema for schema management: %s", err)
 	}
 	return routesForSchema(pattern, func(query string, ctx context.Context) *graphql.Result {
 		return rg.executeQuery(query, ctx, schema)

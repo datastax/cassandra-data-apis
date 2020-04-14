@@ -28,7 +28,6 @@ var systemKeyspaces = []string{
 type SchemaGenerator struct {
 	dbClient          *db.Db
 	namingFn          config.NamingConventionFn
-	supportedOps      config.Operations
 	useUserOrRoleAuth bool
 	ksExcluded        map[string]bool
 	logger            log.Logger
@@ -47,7 +46,6 @@ func NewSchemaGenerator(dbClient *db.Db, cfg config.Config) *SchemaGenerator {
 	return &SchemaGenerator{
 		dbClient:          dbClient,
 		namingFn:          cfg.Naming(),
-		supportedOps:      cfg.SupportedOperations(),
 		useUserOrRoleAuth: cfg.UseUserOrRoleAuth(),
 		ksExcluded:        ksExcluded,
 		logger:            cfg.Logger(),
@@ -84,19 +82,6 @@ func (sg *SchemaGenerator) buildQueriesFields(
 			},
 			Resolve: resolve,
 		}
-	}
-	fields["table"] = &graphql.Field{
-		Type: tableType,
-		Args: graphql.FieldConfigArgument{
-			"name": &graphql.ArgumentConfig{
-				Type: graphql.NewNonNull(graphql.String),
-			},
-		},
-		Resolve: resolve,
-	}
-	fields["tables"] = &graphql.Field{
-		Type:    graphql.NewList(tableType),
-		Resolve: resolve,
 	}
 	return fields
 }
@@ -150,65 +135,6 @@ func (sg *SchemaGenerator) buildMutationFields(ksSchema *KeyspaceGraphQLSchema,
 				"ifExists":    {Type: graphql.Boolean},
 				"ifCondition": {Type: ksSchema.tableOperatorInputTypes[table.Name]},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
-			},
-			Resolve: resolve,
-		}
-	}
-	if sg.supportedOps.IsSupported(config.TableCreate) {
-		fields["createTable"] = &graphql.Field{
-			Type: graphql.Boolean,
-			Args: graphql.FieldConfigArgument{
-				"name": &graphql.ArgumentConfig{
-					Type: graphql.NewNonNull(graphql.String),
-				},
-				"partitionKeys": &graphql.ArgumentConfig{
-					Type: graphql.NewNonNull(graphql.NewList(columnInput)),
-				},
-				"clusteringKeys": &graphql.ArgumentConfig{
-					Type: graphql.NewList(clusteringKeyInput),
-				},
-				"values": &graphql.ArgumentConfig{
-					Type: graphql.NewList(columnInput),
-				},
-			},
-			Resolve: resolve,
-		}
-	}
-	if sg.supportedOps.IsSupported(config.TableAlterAdd) {
-		fields["alterTableAdd"] = &graphql.Field{
-			Type: graphql.Boolean,
-			Args: graphql.FieldConfigArgument{
-				"name": &graphql.ArgumentConfig{
-					Type: graphql.NewNonNull(graphql.String),
-				},
-				"toAdd": &graphql.ArgumentConfig{
-					Type: graphql.NewNonNull(graphql.NewList(columnInput)),
-				},
-			},
-			Resolve: resolve,
-		}
-	}
-	if sg.supportedOps.IsSupported(config.TableAlterDrop) {
-		fields["alterTableDrop"] = &graphql.Field{
-			Type: graphql.Boolean,
-			Args: graphql.FieldConfigArgument{
-				"name": &graphql.ArgumentConfig{
-					Type: graphql.NewNonNull(graphql.String),
-				},
-				"toDrop": &graphql.ArgumentConfig{
-					Type: graphql.NewNonNull(graphql.NewList(graphql.String)),
-				},
-			},
-			Resolve: resolve,
-		}
-	}
-	if sg.supportedOps.IsSupported(config.TableDrop) {
-		fields["dropTable"] = &graphql.Field{
-			Type: graphql.Boolean,
-			Args: graphql.FieldConfigArgument{
-				"name": &graphql.ArgumentConfig{
-					Type: graphql.NewNonNull(graphql.String),
-				},
 			},
 			Resolve: resolve,
 		}

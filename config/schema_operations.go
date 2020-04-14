@@ -4,10 +4,10 @@ import (
 	"fmt"
 )
 
-type Operations int
+type SchemaOperations int
 
 const (
-	TableCreate Operations = 1 << iota
+	TableCreate SchemaOperations = 1 << iota
 	TableDrop
 	TableAlterAdd
 	TableAlterDrop
@@ -15,17 +15,17 @@ const (
 	KeyspaceDrop
 )
 
-func Ops(ops ...string) (Operations, error) {
-	var o Operations
+func Ops(ops ...string) (SchemaOperations, error) {
+	var o SchemaOperations
 	err := o.Add(ops...)
 	return o, err
 }
 
-func (o *Operations) Set(ops Operations) { *o |= ops; }
-func (o *Operations) Clear(ops Operations) { *o &= ^ops; }
-func (o Operations) IsSupported(ops Operations) bool { return o & ops != 0; }
+func (o *SchemaOperations) Set(ops SchemaOperations)             { *o |= ops; }
+func (o *SchemaOperations) Clear(ops SchemaOperations)           { *o &= ^ops; }
+func (o SchemaOperations) IsSupported(ops SchemaOperations) bool { return o & ops != 0; }
 
-func (o *Operations) Add(ops ...string) error {
+func (o *SchemaOperations) Add(ops ...string) error {
 	for _, op := range ops {
 		switch op {
 		case "TableCreate":
