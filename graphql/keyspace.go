@@ -10,6 +10,17 @@ import (
 	"strings"
 )
 
+type dataCenterValue struct {
+	Name     string `json:"name"`
+	Replicas int    `json:"replicas"`
+}
+
+type ksValue struct {
+	Name     string            `json:"name"`
+	DCs      []dataCenterValue `json:"dcs"`
+	keyspace *gocql.KeyspaceMetadata
+}
+
 var dataCenterType = graphql.NewObject(graphql.ObjectConfig{
 	Name: "DataCenter",
 	Fields: graphql.Fields{
@@ -43,25 +54,34 @@ var keyspaceType = graphql.NewObject(graphql.ObjectConfig{
 		"dcs": &graphql.Field{
 			Type: graphql.NewList(dataCenterType),
 		},
+		"table": &graphql.Field{
+			Type: tableType,
+			Args: graphql.FieldConfigArgument{
+				"name": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+			},
+			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
+				parent := p.Source.(ksValue)
+				return getTable(parent.keyspace, p.Args)
+			},
+		},
+		"tables": &graphql.Field{
+			Type: graphql.NewList(tableType),
+			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
+				parent := p.Source.(ksValue)
+				return getTables(parent.keyspace)
+			},
+		},
 	},
 })
 
-func (sg *SchemaGenerator) BuildKeyspaceSchema() (graphql.Schema, error) {
+func (sg *SchemaGenerator) BuildKeyspaceSchema(ops config.SchemaOperations) (graphql.Schema, error) {
 	return graphql.NewSchema(
 		graphql.SchemaConfig{
 			Query:    sg.buildKeyspaceQuery(),
-			Mutation: sg.buildKeyspaceMutation(),
+			Mutation: sg.buildKeyspaceMutation(ops),
 		})
-}
-
-type dataCenterValue struct {
-	Name     string `json:"name"`
-	Replicas int    `json:"replicas"`
-}
-
-type ksValue struct {
-	Name string            `json:"name"`
-	DCs  []dataCenterValue `json:"dcs"`
 }
 
 func (sg *SchemaGenerator) buildKeyspaceValue(keyspace *gocql.KeyspaceMetadata) ksValue {
@@ -81,12 +101,16 @@ func (sg *SchemaGenerator) buildKeyspaceValue(keyspace *gocql.KeyspaceMetadata) 
 			})
 		}
 	}
-	return ksValue{keyspace.Name, dcs}
+	return ksValue{
+		keyspace.Name,
+		dcs,
+		keyspace,
+	}
 }
 
 func (sg *SchemaGenerator) buildKeyspaceQuery() *graphql.Object {
 	return graphql.NewObject(graphql.ObjectConfig{
-		Name: "KeyspaceQuery",
+		Name: "SchemaQuery",
 		Fields: graphql.Fields{
 			"keyspace": &graphql.Field{
 				Type: keyspaceType,
@@ -135,10 +159,10 @@ func (sg *SchemaGenerator) buildKeyspaceQuery() *graphql.Object {
 	})
 }
 
-func (sg *SchemaGenerator) buildKeyspaceMutation() *graphql.Object {
+func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *graphql.Object {
 	fields := graphql.Fields{}
 
-	if sg.supportedOps.IsSupported(config.KeyspaceCreate) {
+	if ops.IsSupported(config.KeyspaceCreate) {
 		fields["createKeyspace"] = &graphql.Field{
 			Type: graphql.Boolean,
 			Args: graphql.FieldConfigArgument{
@@ -168,7 +192,7 @@ func (sg *SchemaGenerator) buildKeyspaceMutation() *graphql.Object {
 		}
 	}
 
-	if sg.supportedOps.IsSupported(config.KeyspaceDrop) {
+	if ops.IsSupported(config.KeyspaceDrop) {
 		fields["dropKeyspace"] = &graphql.Field{
 			Type: graphql.Boolean,
 			Args: graphql.FieldConfigArgument{
@@ -189,8 +213,91 @@ func (sg *SchemaGenerator) buildKeyspaceMutation() *graphql.Object {
 
 	}
 
+	if ops.IsSupported(config.TableCreate) {
+		fields["createTable"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Args: graphql.FieldConfigArgument{
+				"keyspaceName": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"tableName": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"partitionKeys": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.NewList(columnInput)),
+				},
+				"clusteringKeys": &graphql.ArgumentConfig{
+					Type: graphql.NewList(clusteringKeyInput),
+				},
+				"values": &graphql.ArgumentConfig{
+					Type: graphql.NewList(columnInput),
+				},
+			},
+			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
+				return sg.createTable(p)
+			},
+		}
+	}
+
+	if ops.IsSupported(config.TableAlterAdd) {
+		fields["alterTableAdd"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Args: graphql.FieldConfigArgument{
+				"keyspaceName": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"tableName": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"toAdd": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.NewList(columnInput)),
+				},
+			},
+			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
+				return sg.alterTableAdd(p)
+			},
+		}
+	}
+
+	if ops.IsSupported(config.TableAlterDrop) {
+		fields["alterTableDrop"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Args: graphql.FieldConfigArgument{
+				"keyspaceName": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"tableName": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"toDrop": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.NewList(graphql.String)),
+				},
+			},
+			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
+				return sg.alterTableDrop(p)
+			},
+		}
+	}
+
+	if ops.IsSupported(config.TableDrop) {
+		fields["dropTable"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Args: graphql.FieldConfigArgument{
+				"keyspaceName": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"tableName": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+			},
+			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
+				return sg.dropTable(p)
+			},
+		}
+	}
+
 	return graphql.NewObject(graphql.ObjectConfig{
-		Name:   "KeyspaceMutation",
+		Name:   "SchemaMutation",
 		Fields: fields,
 	})
 }

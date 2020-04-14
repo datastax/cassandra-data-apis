@@ -6,9 +6,9 @@ import (
 )
 
 func TestOperationsSetAndClear(t *testing.T) {
-	var op Operations
+	var op SchemaOperations
 
-	assert.Equal(t, op, Operations(0))
+	assert.Equal(t, op, SchemaOperations(0))
 	assert.False(t, op.IsSupported(TableCreate))
 
 	op.Set(TableCreate | TableDrop)
@@ -21,9 +21,9 @@ func TestOperationsSetAndClear(t *testing.T) {
 }
 
 func TestOperationsAdd(t *testing.T) {
-	var op Operations
+	var op SchemaOperations
 
-	assert.Equal(t, op, Operations(0))
+	assert.Equal(t, op, SchemaOperations(0))
 
 	op.Add("TableCreate", "TableDrop", "TableAlterAdd", "TableAlterDrop", "KeyspaceCreate", "KeyspaceDrop")
 	assert.True(t, op.IsSupported(TableCreate))

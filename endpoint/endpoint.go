@@ -18,7 +18,6 @@ type DataEndpointConfig struct {
 	ksExcluded        []string
 	updateInterval    time.Duration
 	naming            config.NamingConventionFn
-	supportedOps      config.Operations
 	useUserOrRoleAuth bool
 	logger            log.Logger
 }
@@ -33,10 +32,6 @@ func (cfg DataEndpointConfig) SchemaUpdateInterval() time.Duration {
 
 func (cfg DataEndpointConfig) Naming() config.NamingConventionFn {
 	return cfg.naming
-}
-
-func (cfg DataEndpointConfig) SupportedOperations() config.Operations {
-	return cfg.supportedOps
 }
 
 func (cfg DataEndpointConfig) UseUserOrRoleAuth() bool {
@@ -59,11 +54,6 @@ func (cfg *DataEndpointConfig) WithSchemaUpdateInterval(updateInterval time.Dura
 
 func (cfg *DataEndpointConfig) WithNaming(naming config.NamingConventionFn) *DataEndpointConfig {
 	cfg.naming = naming
-	return cfg
-}
-
-func (cfg *DataEndpointConfig) WithSupportedOperations(supportedOps config.Operations) *DataEndpointConfig {
-	cfg.supportedOps = supportedOps
 	return cfg
 }
 
@@ -123,4 +113,8 @@ func (e *DataEndpoint) RoutesGraphQL(pattern string) ([]graphql.Route, error) {
 
 func (e *DataEndpoint) RoutesKeyspaceGraphQL(pattern string, ksName string) ([]graphql.Route, error) {
 	return e.graphQLRouteGen.RoutesKeyspace(pattern, ksName)
+}
+
+func (e *DataEndpoint) RoutesSchemaManagementGraphQL(pattern string, ops config.SchemaOperations) ([]graphql.Route, error) {
+	return e.graphQLRouteGen.RoutesSchemaManagement(pattern, ops)
 }

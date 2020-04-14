@@ -181,30 +181,30 @@ var tableType = graphql.NewObject(graphql.ObjectConfig{
 	},
 })
 
-func (s *KeyspaceGraphQLSchema) getTable(keyspace *gocql.KeyspaceMetadata, args map[string]interface{}) (interface{}, error) {
+func getTable(keyspace *gocql.KeyspaceMetadata, args map[string]interface{}) (interface{}, error) {
 	name := args["name"].(string)
-	table := keyspace.Tables[s.naming.ToCQLTable(name)]
+	table := keyspace.Tables[name]
 	if table == nil {
 		return nil, fmt.Errorf("unable to find table '%s'", name)
 	}
 	return &tableValue{
-		Name:    s.naming.ToGraphQLType(name),
-		Columns: s.toColumnValues(table.Name, table.Columns),
+		Name:    name,
+		Columns: toColumnValues(table.Columns),
 	}, nil
 }
 
-func (s *KeyspaceGraphQLSchema) getTables(keyspace *gocql.KeyspaceMetadata) (interface{}, error) {
+func getTables(keyspace *gocql.KeyspaceMetadata) (interface{}, error) {
 	tableValues := make([]*tableValue, 0)
 	for _, table := range keyspace.Tables {
 		tableValues = append(tableValues, &tableValue{
-			Name:    s.naming.ToGraphQLType(table.Name),
-			Columns: s.toColumnValues(table.Name, table.Columns),
+			Name:    table.Name,
+			Columns: toColumnValues(table.Columns),
 		})
 	}
 	return tableValues, nil
 }
 
-func (s *KeyspaceGraphQLSchema) decodeColumns(tableName string, columns []interface{}) ([]*gocql.ColumnMetadata, error) {
+func decodeColumns(columns []interface{}) ([]*gocql.ColumnMetadata, error) {
 	columnValues := make([]*gocql.ColumnMetadata, 0)
 	for _, column := range columns {
 		var value columnValue
@@ -214,7 +214,7 @@ func (s *KeyspaceGraphQLSchema) decodeColumns(tableName string, columns []interf
 
 		// Adapt from GraphQL column to gocql column
 		cqlColumn := &gocql.ColumnMetadata{
-			Name: s.naming.ToCQLColumn(tableName, value.Name),
+			Name: value.Name,
 			Kind: toDbColumnKind(value.Kind),
 			Type: toDbColumnType(value.Type),
 		}
@@ -224,7 +224,7 @@ func (s *KeyspaceGraphQLSchema) decodeColumns(tableName string, columns []interf
 	return columnValues, nil
 }
 
-func (s *KeyspaceGraphQLSchema) decodeClusteringInfo(tableName string, columns []interface{}) ([]*gocql.ColumnMetadata, error) {
+func decodeClusteringInfo(columns []interface{}) ([]*gocql.ColumnMetadata, error) {
 	columnValues := make([]*gocql.ColumnMetadata, 0)
 	for _, column := range columns {
 		var value clusteringInfo
@@ -234,7 +234,7 @@ func (s *KeyspaceGraphQLSchema) decodeClusteringInfo(tableName string, columns [
 
 		// Adapt from GraphQL column to gocql column
 		cqlColumn := &gocql.ColumnMetadata{
-			Name: s.naming.ToCQLColumn(tableName, value.Name),
+			Name: value.Name,
 			Kind: toDbColumnKind(value.Kind),
 			Type: toDbColumnType(value.Type),
 			//TODO: Use enums
@@ -246,27 +246,27 @@ func (s *KeyspaceGraphQLSchema) decodeClusteringInfo(tableName string, columns [
 	return columnValues, nil
 }
 
-func (sg *SchemaGenerator) createTable(
-	ksName string, ksSchema *KeyspaceGraphQLSchema, params graphql.ResolveParams) (interface{}, error) {
+func (sg *SchemaGenerator) createTable(params graphql.ResolveParams) (interface{}, error) {
 	var values []*gocql.ColumnMetadata = nil
 	var clusteringKeys []*gocql.ColumnMetadata = nil
 	args := params.Args
-	tableName := ksSchema.naming.ToCQLTable(args["tableName"].(string))
+	ksName := args["keyspaceName"].(string)
+	tableName := args["tableName"].(string)
 
-	partitionKeys, err := ksSchema.decodeColumns(tableName, args["partitionKeys"].([]interface{}))
+	partitionKeys, err := decodeColumns(args["partitionKeys"].([]interface{}))
 
 	if err != nil {
 		return false, err
 	}
 
 	if args["values"] != nil {
-		if values, err = ksSchema.decodeColumns(tableName, args["values"].([]interface{})); err != nil {
+		if values, err = decodeColumns(args["values"].([]interface{})); err != nil {
 			return nil, err
 		}
 	}
 
 	if args["clusteringKeys"] != nil {
-		if clusteringKeys, err = ksSchema.decodeClusteringInfo(tableName, args["clusteringKeys"].([]interface{})); err != nil {
+		if clusteringKeys, err = decodeClusteringInfo(args["clusteringKeys"].([]interface{})); err != nil {
 			return nil, err
 		}
 	}
@@ -283,14 +283,15 @@ func (sg *SchemaGenerator) createTable(
 		Values:         values}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 }
 
-func (sg *SchemaGenerator) alterTableAdd(ksName string, ksSchema *KeyspaceGraphQLSchema, params graphql.ResolveParams) (interface{}, error) {
+func (sg *SchemaGenerator) alterTableAdd(params graphql.ResolveParams) (interface{}, error) {
 	var err error
 	var toAdd []*gocql.ColumnMetadata
 
 	args := params.Args
-	tableName := ksSchema.naming.ToCQLTable(args["tableName"].(string))
+	ksName := args["keyspaceName"].(string)
+	tableName := args["tableName"].(string)
 
-	if toAdd, err = ksSchema.decodeColumns(tableName, args["toAdd"].([]interface{})); err != nil {
+	if toAdd, err = decodeColumns(args["toAdd"].([]interface{})); err != nil {
 		return nil, err
 	}
 
@@ -309,16 +310,16 @@ func (sg *SchemaGenerator) alterTableAdd(ksName string, ksSchema *KeyspaceGraphQ
 	}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 }
 
-func (sg *SchemaGenerator) alterTableDrop(
-	ksName string, ksSchema *KeyspaceGraphQLSchema, params graphql.ResolveParams) (interface{}, error) {
+func (sg *SchemaGenerator) alterTableDrop(params graphql.ResolveParams) (interface{}, error) {
 	args := params.Args
-	tableName := ksSchema.naming.ToCQLTable(args["tableName"].(string))
+	ksName := args["keyspaceName"].(string)
+	tableName := args["tableName"].(string)
 
 	toDropArg := args["toDrop"].([]interface{})
 	toDrop := make([]string, 0, len(toDropArg))
 
 	for _, column := range toDropArg {
-		toDrop = append(toDrop, ksSchema.naming.ToCQLColumn(tableName, column.(string)))
+		toDrop = append(toDrop, column.(string))
 	}
 
 	if len(toDrop) == 0 {
@@ -336,15 +337,17 @@ func (sg *SchemaGenerator) alterTableDrop(
 	}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 }
 
-func (sg *SchemaGenerator) dropTable(ksName string, ksSchema *KeyspaceGraphQLSchema, params graphql.ResolveParams) (interface{}, error) {
-	name := ksSchema.naming.ToCQLTable(params.Args["name"].(string))
+func (sg *SchemaGenerator) dropTable(params graphql.ResolveParams) (interface{}, error) {
+	args := params.Args
+	ksName := args["keyspaceName"].(string)
+	tableName := args["tableName"].(string)
 	userOrRole, err := sg.checkUserOrRoleAuth(params)
 	if err != nil {
 		return nil, err
 	}
 	return sg.dbClient.DropTable(&db.DropTableInfo{
 		Keyspace: ksName,
-		Table:    name}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+		Table:    tableName}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 }
 
 func toColumnKind(kind gocql.ColumnKind) int {
@@ -423,11 +426,11 @@ func toDbColumnType(info *dataTypeValue) gocql.TypeInfo {
 	return nil
 }
 
-func (s *KeyspaceGraphQLSchema) toColumnValues(tableName string, columns map[string]*gocql.ColumnMetadata) []*columnValue {
+func toColumnValues(columns map[string]*gocql.ColumnMetadata) []*columnValue {
 	columnValues := make([]*columnValue, 0)
 	for _, column := range columns {
 		columnValues = append(columnValues, &columnValue{
-			Name: s.naming.ToGraphQLField(tableName, column.Name),
+			Name: column.Name,
 			Kind: toColumnKind(column.Kind),
 			Type: toColumnType(column.Type),
 		})
