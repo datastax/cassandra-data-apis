@@ -153,11 +153,12 @@ func (n *snakeCaseToCamelNaming) ToGraphQLField(tableName string, columnName str
 	return fieldName
 }
 
-func (n *snakeCaseToCamelNaming) ToGraphQLOperation(prefix string, name string) string {
+func (n *snakeCaseToCamelNaming) ToGraphQLOperation(prefix string, tableName string) string {
+	entityName := n.ToGraphQLType(tableName)
 	if prefix == "" {
-		return strcase.ToLowerCamel(name)
+		return strcase.ToLowerCamel(entityName)
 	} else {
-		return strcase.ToLowerCamel(prefix) + strcase.ToCamel(name)
+		return strcase.ToLowerCamel(prefix) + entityName
 	}
 }
 

@@ -18,8 +18,9 @@ func startCassandra() {
 		return
 	}
 	started = true
-	fmt.Println("Starting Cassandra")
-	executeCcm(fmt.Sprintf("create test -v %s -n 1 -s -b", cassandraVersion()))
+	version := cassandraVersion()
+	fmt.Printf("Starting Cassandra %s\n", version)
+	executeCcm(fmt.Sprintf("create test -v %s -n 1 -s -b", version))
 }
 
 func shutdownCassandra() {

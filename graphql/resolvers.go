@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
+	"github.com/iancoleman/strcase"
 	"github.com/mitchellh/mapstructure"
 	"github.com/riptano/data-endpoints/db"
 	"github.com/riptano/data-endpoints/types"
@@ -21,8 +22,12 @@ func (sg *SchemaGenerator) queryFieldResolver(
 ) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
 		fieldName := params.Info.FieldName
+		// TODO: Get the table metadata from the closure
 		var table *gocql.TableMetadata
-		table, tableFound := keyspace.Tables[ksSchema.naming.ToCQLTable(fieldName)]
+		// TODO: Remove
+		// GraphQL operation is lower camel
+		typeName := strcase.ToCamel(fieldName)
+		table, tableFound := keyspace.Tables[ksSchema.naming.ToCQLTable(typeName)]
 		var data map[string]interface{}
 		if params.Args["data"] != nil {
 			data = params.Args["data"].(map[string]interface{})
@@ -41,8 +46,8 @@ func (sg *SchemaGenerator) queryFieldResolver(
 					Value:    adaptParameterValue(value),
 				})
 			}
-		} else if strings.HasSuffix(fieldName, "Filter") {
-			table, tableFound = keyspace.Tables[ksSchema.naming.ToCQLTable(strings.TrimSuffix(fieldName, "Filter"))]
+		} else if strings.HasSuffix(typeName, "Filter") {
+			table, tableFound = keyspace.Tables[ksSchema.naming.ToCQLTable(strings.TrimSuffix(typeName, "Filter"))]
 			if !tableFound {
 				return nil, fmt.Errorf("unable to find table '%s'", params.Info.FieldName)
 			}
@@ -101,6 +106,7 @@ func (sg *SchemaGenerator) mutationFieldResolver(
 ) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
 		fieldName := params.Info.FieldName
+		// TODO: Get the table name from the closure
 		operation, typeName := mutationPrefix(fieldName)
 		if table, ok := keyspace.Tables[ksSchema.naming.ToCQLTable(typeName)]; ok {
 			data := params.Args["data"].(map[string]interface{})

@@ -3,8 +3,15 @@ package schemas
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"github.com/gocql/gocql"
 	"github.com/iancoleman/strcase"
 	. "github.com/onsi/gomega"
+	"github.com/riptano/data-endpoints/graphql"
+	"github.com/riptano/data-endpoints/internal/testutil"
+	"net/http"
+	"net/http/httptest"
+	"path"
 )
 
 type ResponseBody struct {
@@ -20,6 +27,20 @@ type ErrorEntry struct {
 		Column int `json:"column"`
 	} `json:"locations"`
 }
+
+const GraphQLTypesQuery = `{
+  __schema {
+	types {
+	  name
+	  description
+	}
+  }
+}`
+
+const (
+	postIndex = 1
+	host      = "127.0.0.1"
+)
 
 func DecodeResponse(buffer *bytes.Buffer) ResponseBody {
 	var response ResponseBody
@@ -59,4 +80,25 @@ func GetTypeNamesByTable(tableName string) []string {
 		baseName + "Order",
 		baseName + "MutationResult",
 	}
+}
+
+func NewUuid() string {
+	uuid, err := gocql.RandomUUID()
+	testutil.PanicIfError(err)
+	return uuid.String()
+}
+
+func ExecutePost(routes []graphql.Route, target string, body string) (*bytes.Buffer, error) {
+	b, err := json.Marshal(graphql.RequestBody{
+		Query: body,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	r := httptest.NewRequest(http.MethodPost, path.Join(fmt.Sprintf("http://%s", host), target), bytes.NewReader(b))
+	w := httptest.NewRecorder()
+	routes[postIndex].Handler.ServeHTTP(w, r)
+
+	return w.Body, nil
 }

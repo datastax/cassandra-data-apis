@@ -38,7 +38,7 @@ func TestDataEndpoint_Query(t *testing.T) {
 	}, nil)
 
 	session.
-		On("ExecuteIter", "SELECT * FROM store.books WHERE title = ?", mock.Anything, mock.Anything).
+		On("ExecuteIter", `SELECT * FROM "store"."books" WHERE title = ?`, mock.Anything, mock.Anything).
 		Return(resultMock, nil)
 
 	body := graphql.RequestBody{
@@ -91,7 +91,7 @@ func TestDataEndpoint_Auth(t *testing.T) {
 	authTokens := map[string]string{"token1": "user1"}
 
 	session.
-		On("ExecuteIter", "SELECT * FROM store.books WHERE title = ?",
+		On("ExecuteIter", `SELECT * FROM "store"."books" WHERE title = ?`,
 			db.
 				NewQueryOptions().
 				WithUserOrRole("user1").
@@ -150,7 +150,7 @@ func TestDataEndpoint_AuthNotProvided(t *testing.T) {
 	}, nil)
 
 	session.
-		On("ExecuteIter", "SELECT * FROM store.books WHERE title = ?",
+		On("ExecuteIter", `SELECT * FROM "store"."books" WHERE title = ?`,
 			db.
 				NewQueryOptions().
 				WithUserOrRole("user1").

@@ -16,10 +16,10 @@ func TestDeleteGeneration(t *testing.T) {
 		ifExists    bool
 		ifCondition []types.ConditionItem
 	}{
-		{[]string{"a"}, []interface{}{"b"}, "DELETE FROM ks1.tbl1 WHERE a = ?", false, nil},
-		{[]string{"a", "b"}, []interface{}{"A Value", 2}, "DELETE FROM ks1.tbl1 WHERE a = ? AND b = ?", false, nil},
-		{[]string{"a"}, []interface{}{"b"}, "DELETE FROM ks1.tbl1 WHERE a = ? IF EXISTS", true, nil},
-		{[]string{"a"}, []interface{}{"b"}, "DELETE FROM ks1.tbl1 WHERE a = ? IF c = ?", false, []types.ConditionItem{{"c", "=", "z"}}},
+		{[]string{"a"}, []interface{}{"b"}, "DELETE FROM \"ks1\".\"tbl1\" WHERE a = ?", false, nil},
+		{[]string{"a", "b"}, []interface{}{"A Value", 2}, "DELETE FROM \"ks1\".\"tbl1\" WHERE a = ? AND b = ?", false, nil},
+		{[]string{"a"}, []interface{}{"b"}, "DELETE FROM \"ks1\".\"tbl1\" WHERE a = ? IF EXISTS", true, nil},
+		{[]string{"a"}, []interface{}{"b"}, "DELETE FROM \"ks1\".\"tbl1\" WHERE a = ? IF c = ?", false, []types.ConditionItem{{"c", "=", "z"}}},
 	}
 
 	for _, item := range items {
@@ -70,13 +70,13 @@ func TestUpdateGeneration(t *testing.T) {
 		expectedParams []interface{}
 	}{
 		{[]string{"ck1", "a", "b", "pk2", "pk1"}, []interface{}{1, 2, 3, 4, 5}, false, nil, -1,
-			"UPDATE ks1.tbl1 SET a = ?, b = ? WHERE ck1 = ? AND pk2 = ? AND pk1 = ?", []interface{}{2, 3, 1, 4, 5}},
+			"UPDATE \"ks1\".\"tbl1\" SET a = ?, b = ? WHERE ck1 = ? AND pk2 = ? AND pk1 = ?", []interface{}{2, 3, 1, 4, 5}},
 		{[]string{"a", "ck1", "pk1", "pk2"}, []interface{}{1, 2, 3, 4}, true, nil, 60,
-			"UPDATE ks1.tbl1 USING TTL ? SET a = ? WHERE ck1 = ? AND pk1 = ? AND pk2 = ? IF EXISTS",
+			"UPDATE \"ks1\".\"tbl1\" USING TTL ? SET a = ? WHERE ck1 = ? AND pk1 = ? AND pk2 = ? IF EXISTS",
 			[]interface{}{60, 1, 2, 3, 4}},
 		{[]string{"a", "ck1", "pk1", "pk2"}, []interface{}{1, 2, 3, 4}, false,
 			[]types.ConditionItem{{"c", ">", 100}}, -1,
-			"UPDATE ks1.tbl1 SET a = ? WHERE ck1 = ? AND pk1 = ? AND pk2 = ? IF c > ?",
+			"UPDATE \"ks1\".\"tbl1\" SET a = ? WHERE ck1 = ? AND pk1 = ? AND pk2 = ? IF c > ?",
 			[]interface{}{1, 2, 3, 4, 100}},
 	}
 
@@ -112,11 +112,11 @@ func TestInsertGeneration(t *testing.T) {
 		ifNotExists bool
 		query       string
 	}{
-		{[]string{"a"}, []interface{}{100}, -1, false, "INSERT INTO ks1.tbl1 (a) VALUES (?)"},
-		{[]string{"a", "b"}, []interface{}{100, 2}, -1, false, "INSERT INTO ks1.tbl1 (a, b) VALUES (?, ?)"},
-		{[]string{"a"}, []interface{}{100}, -1, true, "INSERT INTO ks1.tbl1 (a) VALUES (?) IF NOT EXISTS"},
+		{[]string{"a"}, []interface{}{100}, -1, false, "INSERT INTO \"ks1\".\"tbl1\" (a) VALUES (?)"},
+		{[]string{"a", "b"}, []interface{}{100, 2}, -1, false, "INSERT INTO \"ks1\".\"tbl1\" (a, b) VALUES (?, ?)"},
+		{[]string{"a"}, []interface{}{100}, -1, true, "INSERT INTO \"ks1\".\"tbl1\" (a) VALUES (?) IF NOT EXISTS"},
 		{[]string{"a"}, []interface{}{"z"}, 3600, true,
-			"INSERT INTO ks1.tbl1 (a) VALUES (?) IF NOT EXISTS USING TTL ?"},
+			"INSERT INTO \"ks1\".\"tbl1\" (a) VALUES (?) IF NOT EXISTS USING TTL ?"},
 	}
 
 	for _, item := range items {
@@ -161,15 +161,15 @@ func TestSelectGeneration(t *testing.T) {
 		query   string
 	}{
 		{[]types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, nil,
-			"SELECT * FROM ks1.tbl1 WHERE a = ?"},
+			"SELECT * FROM \"ks1\".\"tbl1\" WHERE a = ?"},
 		{[]types.ConditionItem{{"a", "=", 1}, {"b", ">", 2}}, &types.QueryOptions{}, nil,
-			"SELECT * FROM ks1.tbl1 WHERE a = ? AND b > ?"},
+			"SELECT * FROM \"ks1\".\"tbl1\" WHERE a = ? AND b > ?"},
 		{[]types.ConditionItem{{"a", "=", 1}, {"b", ">", 2}, {"b", "<=", 5}}, &types.QueryOptions{}, nil,
-			"SELECT * FROM ks1.tbl1 WHERE a = ? AND b > ? AND b <= ?"},
+			"SELECT * FROM \"ks1\".\"tbl1\" WHERE a = ? AND b > ? AND b <= ?"},
 		{[]types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, []ColumnOrder{{"c", "DESC"}},
-			"SELECT * FROM ks1.tbl1 WHERE a = ? ORDER BY c DESC"},
+			"SELECT * FROM \"ks1\".\"tbl1\" WHERE a = ? ORDER BY c DESC"},
 		{[]types.ConditionItem{{"a", "=", "z"}}, &types.QueryOptions{Limit: 1}, []ColumnOrder{{"c", "ASC"}},
-			"SELECT * FROM ks1.tbl1 WHERE a = ? ORDER BY c ASC LIMIT ?"},
+			"SELECT * FROM \"ks1\".\"tbl1\" WHERE a = ? ORDER BY c ASC LIMIT ?"},
 	}
 
 	for _, item := range items {

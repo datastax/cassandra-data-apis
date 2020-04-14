@@ -52,7 +52,7 @@ type ColumnOrder struct {
 func (db *Db) Select(info *SelectInfo, options *QueryOptions) (ResultSet, error) {
 	values := make([]interface{}, 0, len(info.Where))
 	whereClause := buildCondition(info.Where, &values)
-	query := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", info.Keyspace, info.Table, whereClause)
+	query := fmt.Sprintf(`SELECT * FROM "%s"."%s" WHERE %s`, info.Keyspace, info.Table, whereClause)
 
 	if len(info.OrderBy) > 0 {
 		query += " ORDER BY "
@@ -80,7 +80,7 @@ func (db *Db) Insert(info *InsertInfo, options *QueryOptions) (ResultSet, error)
 	}
 
 	query := fmt.Sprintf(
-		"INSERT INTO %s.%s (%s) VALUES (%s)",
+		`INSERT INTO "%s"."%s" (%s) VALUES (%s)`,
 		info.Keyspace, info.Table, strings.Join(info.Columns, ", "), placeholders)
 
 	if info.IfNotExists {
@@ -97,7 +97,7 @@ func (db *Db) Insert(info *InsertInfo, options *QueryOptions) (ResultSet, error)
 
 func (db *Db) Delete(info *DeleteInfo, options *QueryOptions) (ResultSet, error) {
 	whereClause := buildWhereClause(info.Columns)
-	query := fmt.Sprintf("DELETE FROM %s.%s WHERE %s", info.Keyspace, info.Table, whereClause)
+	query := fmt.Sprintf(`DELETE FROM "%s"."%s" WHERE %s`, info.Keyspace, info.Table, whereClause)
 	queryParameters := make([]interface{}, len(info.QueryParams))
 	copy(queryParameters, info.QueryParams)
 
@@ -162,7 +162,8 @@ func (db *Db) Update(info *UpdateInfo, options *QueryOptions) (ResultSet, error)
 	// Remove the initial , operator
 	setClause = setClause[2:]
 
-	query := fmt.Sprintf("UPDATE %s.%s%s SET %s WHERE %s", info.Keyspace, info.Table.Name, ttl, setClause, whereClause)
+	query := fmt.Sprintf(
+		`UPDATE "%s"."%s"%s SET %s WHERE %s`, info.Keyspace, info.Table.Name, ttl, setClause, whereClause)
 
 	if info.IfExists {
 		query += " IF EXISTS"

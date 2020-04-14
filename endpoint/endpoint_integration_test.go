@@ -12,6 +12,7 @@ import (
 	. "github.com/riptano/data-endpoints/internal/testutil"
 	"github.com/riptano/data-endpoints/internal/testutil/schemas"
 	"github.com/riptano/data-endpoints/internal/testutil/schemas/killrvideo"
+	"github.com/riptano/data-endpoints/internal/testutil/schemas/quirky"
 	"sort"
 	"testing"
 	"time"
@@ -22,12 +23,13 @@ var session *gocql.Session
 var _ = Describe("DataEndpoint", func() {
 	Describe("RoutesKeyspaceGraphQL()", func() {
 		Context("With killrvideo schema", func() {
-			var config, _ = NewEndpointConfig(host)
+			config, _ := NewEndpointConfig(host)
+			keyspace := "killrvideo"
 			It("Should insert and select users", func() {
-				routes := getRoutes(config)
+				routes := getRoutes(config, keyspace)
 				Expect(routes).To(HaveLen(2))
 
-				id := killrvideo.NewUuid()
+				id := schemas.NewUuid()
 
 				buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
 					Query: killrvideo.InsertUserMutation(id, "John", "john@email.com", false),
@@ -72,8 +74,7 @@ var _ = Describe("DataEndpoint", func() {
 					Expect(err).ToNot(HaveOccurred())
 				}
 
-				var endpoint = config.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
-				routes, _ := endpoint.RoutesKeyspaceGraphQL("/graphql", "killrvideo")
+				routes := getRoutes(config, keyspace)
 
 				queryTags := func(pageState string, expectedValues []map[string]interface{}) string {
 					buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
@@ -100,8 +101,8 @@ var _ = Describe("DataEndpoint", func() {
 			})
 
 			It("Should support normal and conditional updates", func() {
-				routes := getRoutes(config)
-				id := killrvideo.NewUuid()
+				routes := getRoutes(config, keyspace)
+				id := schemas.NewUuid()
 				firstEmail := "email1@email.com"
 				buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
 					Query: killrvideo.UpdateUserMutation(id, "John", firstEmail, ""),
@@ -132,9 +133,9 @@ var _ = Describe("DataEndpoint", func() {
 			})
 
 			It("Should support conditional inserts", func() {
-				routes := getRoutes(config)
+				routes := getRoutes(config, keyspace)
 				value := map[string]interface{}{
-					"userid":      killrvideo.NewUuid(),
+					"userid":      schemas.NewUuid(),
 					"firstname":   "John",
 					"email":       "john@bonham.com",
 					"createdDate": nil,
@@ -158,9 +159,9 @@ var _ = Describe("DataEndpoint", func() {
 			})
 
 			It("Should support normal and conditional deletes", func() {
-				routes := getRoutes(config)
-				id1 := killrvideo.NewUuid()
-				id2 := killrvideo.NewUuid()
+				routes := getRoutes(config, keyspace)
+				id1 := schemas.NewUuid()
+				id2 := schemas.NewUuid()
 				name := "John"
 
 				insertQuery := "INSERT INTO killrvideo.users (userid, firstname) VALUES (?, ?)"
@@ -204,7 +205,7 @@ var _ = Describe("DataEndpoint", func() {
 					Expect(err).ToNot(HaveOccurred())
 				}
 
-				routes := getRoutes(config)
+				routes := getRoutes(config, keyspace)
 				buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
 					Query: killrvideo.SelectCommentsByVideoGreaterThan(videoId.String(), t0.String()),
 				}, nil)
@@ -220,17 +221,10 @@ var _ = Describe("DataEndpoint", func() {
 				}
 			})
 
-			It("Should types per table", func() {
-				routes := getRoutes(config)
+			It("Should create types per table", func() {
+				routes := getRoutes(config, keyspace)
 				buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
-					Query: `{
-					  __schema {
-						types {
-						  name
-						  description
-						}
-					  }
-					}`,
+					Query: schemas.GraphQLTypesQuery,
 				}, nil)
 
 				Expect(err).ToNot(HaveOccurred())
@@ -246,6 +240,47 @@ var _ = Describe("DataEndpoint", func() {
 				Expect(typeNames).To(ContainElements(schemas.GetTypeNamesByTable("video_event")))
 				Expect(typeNames).To(ContainElements("BigInt", "Counter", "Uuid", "TimeUuid"))
 			})
+
+			XIt("Should return an error when query is not found")
+		})
+
+		Context("With quirky schema", func() {
+			config, _ := NewEndpointConfig(host)
+			keyspace := "quirky"
+
+			It("Should build tables with supported types", func() {
+				routes := getRoutes(config, keyspace)
+				buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
+					Query: schemas.GraphQLTypesQuery,
+				}, nil)
+
+				Expect(err).ToNot(HaveOccurred())
+				result := schemas.DecodeDataAsSliceOfMaps(buffer, "__schema", "types")
+				typeNames := make([]string, 0, len(result))
+				for _, item := range result {
+					typeNames = append(typeNames, item["name"].(string))
+				}
+
+				Expect(typeNames).To(ContainElements(schemas.GetTypeNamesByTable("valid_sample")))
+			})
+
+			It("Should support reserved names", func() {
+				routes := getRoutes(config, keyspace)
+				names := []string{
+					"ColumnCustom", "ColumnCustom2", "ConsistencyCustom", "DataTypeCustom", "BasicTypeCustom",
+				}
+				for _, name := range names {
+					quirky.InsertAndSelect(routes, name)
+				}
+			})
+
+			It("Should support conflicting names", func() {
+				routes := getRoutes(config, keyspace)
+				names := []string{"TesterAbc", "TesterAbc2"}
+				for _, name := range names {
+					quirky.InsertAndSelect(routes, name)
+				}
+			})
 		})
 	})
 })
@@ -253,6 +288,7 @@ var _ = Describe("DataEndpoint", func() {
 var _ = BeforeSuite(func() {
 	session = SetupIntegrationTestFixture()
 	CreateSchema("killrvideo")
+	CreateSchema("quirky")
 })
 
 var _ = AfterSuite(func() {
@@ -264,9 +300,9 @@ func TestEndpoint(t *testing.T) {
 	RunSpecs(t, "Endpoint integration test suite")
 }
 
-func getRoutes(config *DataEndpointConfig) []graphql.Route {
+func getRoutes(config *DataEndpointConfig, keyspace string) []graphql.Route {
 	var endpoint = config.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
-	routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", "killrvideo")
+	routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", keyspace)
 	Expect(err).ToNot(HaveOccurred())
 	return routes
 }

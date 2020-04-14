@@ -2,8 +2,6 @@ package killrvideo
 
 import (
 	"fmt"
-	"github.com/gocql/gocql"
-	"github.com/riptano/data-endpoints/internal/testutil"
 )
 
 func InsertUserMutation(id interface{}, firstname interface{}, email interface{}, ifNotExists bool) string {
@@ -111,12 +109,6 @@ func SelectCommentsByVideoGreaterThan(videoId string, startCommentId string) str
 	}`
 
 	return fmt.Sprintf(query, asGraphQLString(videoId), asGraphQLString(startCommentId))
-}
-
-func NewUuid() string {
-	uuid, err := gocql.RandomUUID()
-	testutil.PanicIfError(err)
-	return uuid.String()
 }
 
 func asGraphQLString(value interface{}) string {
