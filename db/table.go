@@ -3,7 +3,6 @@ package db
 import (
 	"fmt"
 	"github.com/gocql/gocql"
-	"strings"
 )
 
 type CreateTableInfo struct {
@@ -37,40 +36,34 @@ func (db *Db) CreateTable(info *CreateTableInfo, options *QueryOptions) (bool, e
 	clusteringOrder := ""
 
 	for _, c := range info.PartitionKeys {
-		columns += fmt.Sprintf("%s %s, ", c.Name, c.Type)
-		if len(primaryKeys) > 0 {
-			primaryKeys += ", "
-		}
-		primaryKeys += c.Name
+		columns += fmt.Sprintf(`"%s" %s, `, c.Name, c.Type)
+		primaryKeys += fmt.Sprintf(`, "%s"`, c.Name)
 	}
 
 	if info.ClusteringKeys != nil {
 		primaryKeys = fmt.Sprintf("(%s)", primaryKeys)
 
 		for _, c := range info.ClusteringKeys {
-			columns += fmt.Sprintf("%s %s, ", c.Name, c.Type)
-			primaryKeys += fmt.Sprintf(", %s", c.Name)
-			if len(clusteringOrder) > 0 {
-				clusteringOrder += ", "
-			}
+			columns += fmt.Sprintf(`"%s" %s, `, c.Name, c.Type)
+			primaryKeys += fmt.Sprintf(`, "%s"`, c.Name)
 			order := c.ClusteringOrder
 			if order == "" {
 				order = "ASC"
 			}
-			clusteringOrder += fmt.Sprintf("%s %s", c.Name, order)
+			clusteringOrder += fmt.Sprintf(`, "%s" %s`, c.Name, order)
 		}
 	}
 
 	if info.Values != nil {
 		for _, c := range info.Values {
-			columns += fmt.Sprintf("%s %s, ", c.Name, c.Type)
+			columns += fmt.Sprintf(`"%s" %s, `, c.Name, c.Type)
 		}
 	}
 
-	query := fmt.Sprintf("CREATE TABLE %s.%s (%sPRIMARY KEY (%s))", info.Keyspace, info.Table, columns, primaryKeys)
+	query := fmt.Sprintf(`CREATE TABLE "%s"."%s" (%sPRIMARY KEY (%s))`, info.Keyspace, info.Table, columns, primaryKeys[2:])
 
 	if clusteringOrder != "" {
-		query += fmt.Sprintf(" WITH CLUSTERING ORDER BY (%s)", clusteringOrder)
+		query += fmt.Sprintf(" WITH CLUSTERING ORDER BY (%s)", clusteringOrder[2:])
 	}
 
 	err := db.session.Execute(query, options)
@@ -78,27 +71,27 @@ func (db *Db) CreateTable(info *CreateTableInfo, options *QueryOptions) (bool, e
 }
 
 func (db *Db) AlterTableAdd(info *AlterTableAddInfo, options *QueryOptions) (bool, error) {
-	query := fmt.Sprintf("ALTER TABLE %s.%s ADD(", info.Keyspace, info.Table)
-	for i, c := range info.ToAdd {
-		if i > 0 {
-			query += ", "
-		}
-		query += fmt.Sprintf("%s %s", c.Name, c.Type)
+	columns := ""
+	for _, c := range info.ToAdd {
+		columns += fmt.Sprintf(`, "%s" %s`, c.Name, c.Type)
 	}
-	query += ")"
+	query := fmt.Sprintf(`ALTER TABLE "%s"."%s" ADD(%s)`, info.Keyspace, info.Table, columns[2:])
 	err := db.session.Execute(query, options)
 	return err == nil, err
 }
 
 func (db *Db) AlterTableDrop(info *AlterTableDropInfo, options *QueryOptions) (bool, error) {
-	query := fmt.Sprintf("ALTER TABLE %s.%s DROP ", info.Keyspace, info.Table)
-	query += strings.Join(info.ToDrop, ", ")
+	columns := ""
+	for _, column := range info.ToDrop {
+		columns += fmt.Sprintf(`, "%s"`, column)
+	}
+	query := fmt.Sprintf(`ALTER TABLE "%s"."%s" DROP %s`, info.Keyspace, info.Table, columns[2:])
 	err := db.session.Execute(query, options)
 	return err == nil, err
 }
 
 func (db *Db) DropTable(info *DropTableInfo, options *QueryOptions) (bool, error) {
-	query := fmt.Sprintf("DROP TABLE %s.%s", info.Table, info.Keyspace)
+	query := fmt.Sprintf(`DROP TABLE "%s"."%s"`, info.Keyspace, info.Table)
 	err := db.session.Execute(query, options)
 	return err == nil, err
 }
