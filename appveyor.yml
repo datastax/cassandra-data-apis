@@ -2,8 +2,11 @@ image: Ubuntu
 stack: jdk 8, go 1.14, python 2
 build: off
 
+cache:
+  - $HOME/.ccm/repository -> appveyor.yml, ci/ubuntu_tools.sh
+  - $GOPATH/pkg/mod -> appveyor.yml, go.mod, go.sum
+
 environment:
-  RUN_INTEGRATION_TESTS: "1"
   matrix:
     - CCM_VERSION: "3.11.6"
 
@@ -15,4 +18,5 @@ before_test:
   - ccm remove
 
 test_script:
-  - go test -v -p=1 ./...
+  - go test -v ./...
+  - go test -v -p=1 -tags integration ./...
