@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/gocql/gocql"
 	"github.com/riptano/data-endpoints/types"
-	"strings"
 )
 
 type SelectInfo struct {
@@ -60,7 +59,7 @@ func (db *Db) Select(info *SelectInfo, options *QueryOptions) (ResultSet, error)
 			if i > 0 {
 				query += ", "
 			}
-			query += order.Column + " " + order.Order
+			query += fmt.Sprintf(`"%s" %s`, order.Column, order.Order)
 		}
 	}
 
@@ -73,15 +72,17 @@ func (db *Db) Select(info *SelectInfo, options *QueryOptions) (ResultSet, error)
 }
 
 func (db *Db) Insert(info *InsertInfo, options *QueryOptions) (ResultSet, error) {
-
-	placeholders := "?"
-	for i := 1; i < len(info.Columns); i++ {
+	placeholders := ""
+	columns := ""
+	for _, columnName := range info.Columns {
 		placeholders += ", ?"
+		columns += fmt.Sprintf(`, "%s"`, columnName)
 	}
 
 	query := fmt.Sprintf(
-		`INSERT INTO "%s"."%s" (%s) VALUES (%s)`,
-		info.Keyspace, info.Table, strings.Join(info.Columns, ", "), placeholders)
+		`INSERT INTO "%s"."%s" (%s) VALUES (%s)`, info.Keyspace, info.Table,
+		// Remove the initial ", " token
+		columns[2:], placeholders[2:])
 
 	if info.IfNotExists {
 		query += " IF NOT EXISTS"
@@ -127,10 +128,10 @@ func (db *Db) Update(info *UpdateInfo, options *QueryOptions) (ResultSet, error)
 
 	for i, columnName := range info.Columns {
 		if keys[columnName] {
-			whereClause += fmt.Sprintf(" AND %s = ?", columnName)
+			whereClause += fmt.Sprintf(` AND "%s" = ?`, columnName)
 			whereParameters = append(whereParameters, info.QueryParams[i])
 		} else {
-			setClause += fmt.Sprintf(", %s = ?", columnName)
+			setClause += fmt.Sprintf(`, "%s" = ?`, columnName)
 			setParameters = append(setParameters, info.QueryParams[i])
 		}
 	}
@@ -159,7 +160,7 @@ func (db *Db) Update(info *UpdateInfo, options *QueryOptions) (ResultSet, error)
 
 	// Remove the initial AND operator
 	whereClause = whereClause[5:]
-	// Remove the initial , operator
+	// Remove the initial ", " token
 	setClause = setClause[2:]
 
 	query := fmt.Sprintf(
@@ -175,22 +176,20 @@ func (db *Db) Update(info *UpdateInfo, options *QueryOptions) (ResultSet, error)
 }
 
 func buildWhereClause(columnNames []string) string {
-	whereClause := columnNames[0] + " = ?"
-	for i := 1; i < len(columnNames); i++ {
-		whereClause += " AND " + columnNames[i] + " = ?"
+	whereClause := ""
+	for _, name := range columnNames {
+		whereClause += fmt.Sprintf(` AND "%s" = ?`, name)
 	}
-	return whereClause
+	// Remove initial " AND " characters
+	return whereClause[5:]
 }
 
 func buildCondition(condition []types.ConditionItem, queryParameters *[]interface{}) string {
 	conditionClause := ""
 	for _, item := range condition {
-		if conditionClause != "" {
-			conditionClause += " AND "
-		}
-
-		conditionClause += fmt.Sprintf("%s %s ?", item.Column, item.Operator)
+		conditionClause += fmt.Sprintf(` AND "%s" %s ?`, item.Column, item.Operator)
 		*queryParameters = append(*queryParameters, item.Value)
 	}
-	return conditionClause
+	// Remove initial " AND " characters
+	return conditionClause[5:]
 }

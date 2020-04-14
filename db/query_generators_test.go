@@ -20,21 +20,24 @@ var _ = Describe("db", func() {
 		}{
 			{
 				"a single column",
-				[]string{"a"}, []interface{}{"b"}, "DELETE FROM \"ks1\".\"tbl1\" WHERE a = ?", false, nil},
+				[]string{"a"}, []interface{}{"b"}, `DELETE FROM "ks1"."tbl1" WHERE "a" = ?`, false, nil},
 			{
 				"multiple columns",
-				[]string{"a", "b"},
-				[]interface{}{"A Value", 2}, "DELETE FROM \"ks1\".\"tbl1\" WHERE a = ? AND b = ?", false, nil},
+				[]string{"A", "b"},
+				[]interface{}{"A Value", 2}, `DELETE FROM "ks1"."tbl1" WHERE "A" = ? AND "b" = ?`, false, nil},
 			{
 				"IF EXISTS",
-				[]string{"a"}, []interface{}{"b"}, "DELETE FROM \"ks1\".\"tbl1\" WHERE a = ? IF EXISTS", true, nil},
+				[]string{"a"}, []interface{}{"b"}, `DELETE FROM "ks1"."tbl1" WHERE "a" = ? IF EXISTS`, true, nil},
 			{
 				"IF condition",
 				[]string{"a"}, []interface{}{"b"},
-				"DELETE FROM \"ks1\".\"tbl1\" WHERE a = ? IF c = ?", false, []types.ConditionItem{{"c", "=", "z"}}},
+				`DELETE FROM "ks1"."tbl1" WHERE "a" = ? IF "C" = ?`, false, []types.ConditionItem{{"C", "=", "z"}}},
 		}
 
-		for _, item := range items {
+		for i := 0; i < len(items); i++ {
+			// Capture the item in the closure
+			item := items[i]
+
 			It("Should generate DELETE statement with "+item.description, func() {
 				sessionMock := SessionMock{}
 				sessionMock.On("ExecuteIter", mock.Anything, mock.Anything, mock.Anything).Return(ResultMock{}, nil)
@@ -79,28 +82,31 @@ var _ = Describe("db", func() {
 		}{
 			{
 				"multiple set columns",
-				[]string{"ck1", "a", "b", "pk2", "pk1"}, []interface{}{1, 2, 3, 4, 5}, false, nil, -1,
-				"UPDATE \"ks1\".\"tbl1\" SET a = ?, b = ? WHERE ck1 = ? AND pk2 = ? AND pk1 = ?",
+				[]string{"CK1", "a", "b", "pk2", "pk1"}, []interface{}{1, 2, 3, 4, 5}, false, nil, -1,
+				`UPDATE "ks1"."tbl1" SET "a" = ?, "b" = ? WHERE "CK1" = ? AND "pk2" = ? AND "pk1" = ?`,
 				[]interface{}{2, 3, 1, 4, 5}},
 			{
 				"ttl and IF EXISTS",
-				[]string{"a", "ck1", "pk1", "pk2"}, []interface{}{1, 2, 3, 4}, true, nil, 60,
-				"UPDATE \"ks1\".\"tbl1\" USING TTL ? SET a = ? WHERE ck1 = ? AND pk1 = ? AND pk2 = ? IF EXISTS",
+				[]string{"a", "CK1", "pk1", "pk2"}, []interface{}{1, 2, 3, 4}, true, nil, 60,
+				`UPDATE "ks1"."tbl1" USING TTL ? SET "a" = ? WHERE "CK1" = ? AND "pk1" = ? AND "pk2" = ? IF EXISTS`,
 				[]interface{}{60, 1, 2, 3, 4}},
 			{
 				"IF condition",
-				[]string{"a", "ck1", "pk1", "pk2"}, []interface{}{1, 2, 3, 4}, false,
+				[]string{"a", "CK1", "pk1", "pk2"}, []interface{}{1, 2, 3, 4}, false,
 				[]types.ConditionItem{{"c", ">", 100}}, -1,
-				"UPDATE \"ks1\".\"tbl1\" SET a = ? WHERE ck1 = ? AND pk1 = ? AND pk2 = ? IF c > ?",
+				`UPDATE "ks1"."tbl1" SET "a" = ? WHERE "CK1" = ? AND "pk1" = ? AND "pk2" = ? IF "c" > ?`,
 				[]interface{}{1, 2, 3, 4, 100}},
 		}
 
-		for _, item := range items {
+		for i := 0; i < len(items); i++ {
+			// Capture the item in the closure
+			item := items[i]
+
 			It("Should generate UPDATE statement with "+item.description, func() {
 				table := &gocql.TableMetadata{
 					Name:              "tbl1",
 					PartitionKey:      []*gocql.ColumnMetadata{{Name: "pk1"}, {Name: "pk2"}},
-					ClusteringColumns: []*gocql.ColumnMetadata{{Name: "ck1"}},
+					ClusteringColumns: []*gocql.ColumnMetadata{{Name: "CK1"}},
 				}
 				sessionMock := SessionMock{}
 				sessionMock.On("ExecuteIter", mock.Anything, mock.Anything, mock.Anything).Return(ResultMock{}, nil)
@@ -135,24 +141,27 @@ var _ = Describe("db", func() {
 		}{
 			{
 				"a single column",
-				[]string{"a"}, []interface{}{100}, -1, false, "INSERT INTO \"ks1\".\"tbl1\" (a) VALUES (?)"},
+				[]string{"a"}, []interface{}{100}, -1, false,
+				`INSERT INTO "ks1"."tbl1" ("a") VALUES (?)`},
 			{
 				"multiple columns",
-				[]string{"a", "b"}, []interface{}{100, 2}, -1, false,
-				"INSERT INTO \"ks1\".\"tbl1\" (a, b) VALUES (?, ?)"},
+
+				[]string{"a", "B"}, []interface{}{100, 2}, -1, false,
+				`INSERT INTO "ks1"."tbl1" ("a", "B") VALUES (?, ?)`},
 			{
 				"IF NOT EXISTS",
 				[]string{"a"}, []interface{}{100}, -1, true,
-				"INSERT INTO \"ks1\".\"tbl1\" (a) VALUES (?) IF NOT EXISTS"},
+				`INSERT INTO "ks1"."tbl1" ("a") VALUES (?) IF NOT EXISTS`},
 			{
 				"TTL",
 				[]string{"a"}, []interface{}{"z"}, 3600, true,
-				"INSERT INTO \"ks1\".\"tbl1\" (a) VALUES (?) IF NOT EXISTS USING TTL ?"},
+				`INSERT INTO "ks1"."tbl1" ("a") VALUES (?) IF NOT EXISTS USING TTL ?`},
 		}
 
-		for _, item := range items {
+		for i := 0; i < len(items); i++ {
+			// Capture the item in the closure
+			item := items[i]
 			It("Should generate INSERT statement with "+item.description, func() {
-
 				sessionMock := SessionMock{}
 				sessionMock.On("ExecuteIter", mock.Anything, mock.Anything, mock.Anything).Return(ResultMock{}, nil)
 				db := &Db{
@@ -190,19 +199,22 @@ var _ = Describe("db", func() {
 			orderBy     []ColumnOrder
 			query       string
 		}{
-			{"", []types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, nil,
-				"SELECT * FROM \"ks1\".\"tbl1\" WHERE a = ?"},
-			{"", []types.ConditionItem{{"a", "=", 1}, {"b", ">", 2}}, &types.QueryOptions{}, nil,
-				"SELECT * FROM \"ks1\".\"tbl1\" WHERE a = ? AND b > ?"},
-			{"", []types.ConditionItem{{"a", "=", 1}, {"b", ">", 2}, {"b", "<=", 5}}, &types.QueryOptions{}, nil,
-				"SELECT * FROM \"ks1\".\"tbl1\" WHERE a = ? AND b > ? AND b <= ?"},
-			{"", []types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, []ColumnOrder{{"c", "DESC"}},
-				"SELECT * FROM \"ks1\".\"tbl1\" WHERE a = ? ORDER BY c DESC"},
-			{"", []types.ConditionItem{{"a", "=", "z"}}, &types.QueryOptions{Limit: 1}, []ColumnOrder{{"c", "ASC"}},
-				"SELECT * FROM \"ks1\".\"tbl1\" WHERE a = ? ORDER BY c ASC LIMIT ?"},
+			{"a single condition", []types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, nil,
+				`SELECT * FROM "ks1"."tbl1" WHERE "a" = ?`},
+			{"multiple conditions", []types.ConditionItem{{"a", "=", 1}, {"B", ">", 2}}, &types.QueryOptions{}, nil,
+				`SELECT * FROM "ks1"."tbl1" WHERE "a" = ? AND "B" > ?`},
+			{"relational operators", []types.ConditionItem{{"a", "=", 1}, {"b", ">", 2}, {"b", "<=", 5}},
+				&types.QueryOptions{}, nil, `SELECT * FROM "ks1"."tbl1" WHERE "a" = ? AND "b" > ? AND "b" <= ?`},
+			{"order clause", []types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, []ColumnOrder{{"c", "DESC"}},
+				`SELECT * FROM "ks1"."tbl1" WHERE "a" = ? ORDER BY "c" DESC`},
+			{"order and limit", []types.ConditionItem{{"ABC", "=", "z"}}, &types.QueryOptions{Limit: 1},
+				[]ColumnOrder{{"DEF", "ASC"}}, `SELECT * FROM "ks1"."tbl1" WHERE "ABC" = ? ORDER BY "DEF" ASC LIMIT ?`},
 		}
 
-		for _, item := range items {
+		for i := 0; i < len(items); i++ {
+			// Capture the item in the closure
+			item := items[i]
+
 			It("Should generate SELECT statement with "+item.description, func() {
 				resultMock := &ResultMock{}
 				resultMock.
