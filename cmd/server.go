@@ -15,11 +15,10 @@ import (
 	log2 "log"
 	"net/http"
 	"os"
-	"path"
 )
 
 const defaultGraphQLPath = "/graphql"
-const defaultGraphQLSchemaPath = "/graphql/__schema"
+const defaultGraphQLSchemaPath = "/graphql-schema"
 const defaultRESTPath = "/todo"
 
 // Environment variables prefixed with "ENDPOINT_" can override settings e.g. "ENDPOINT_HOSTS"
@@ -194,7 +193,7 @@ func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint
 		logger.Fatal("invalid supported operation", "operations", supportedOps, "error", err)
 	}
 
-	routes, err = endpoint.RoutesSchemaManagementGraphQL(getSchemaPath(), ops)
+	routes, err = endpoint.RoutesSchemaManagementGraphQL(viper.GetString("graphql-schema-path"), ops)
 
 	if err != nil {
 		logger.Fatal("unable to generate graphql schema routes",
@@ -204,15 +203,6 @@ func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint
 	for _, route := range routes {
 		router.Handler(route.Method, route.Pattern, route.Handler)
 	}
-}
-
-func getSchemaPath() string {
-	schemaPath := viper.GetString("graphql-schema-path")
-	// Schema path moves with root path unless it's explicitly changed
-	if path.Dir(schemaPath) == defaultGraphQLPath {
-		return path.Join(viper.GetString("graphql-path"), path.Base(schemaPath))
-	}
-	return schemaPath
 }
 
 func addRESTRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint) {
