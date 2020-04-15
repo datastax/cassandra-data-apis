@@ -2,13 +2,13 @@ package graphql
 
 import (
 	"fmt"
+	"github.com/datastax/cassandra-data-apis/auth"
+	"github.com/datastax/cassandra-data-apis/config"
+	"github.com/datastax/cassandra-data-apis/db"
+	"github.com/datastax/cassandra-data-apis/log"
+	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
-	"github.com/riptano/data-endpoints/auth"
-	"github.com/riptano/data-endpoints/config"
-	"github.com/riptano/data-endpoints/db"
-	"github.com/riptano/data-endpoints/log"
-	"github.com/riptano/data-endpoints/types"
 )
 
 const (
@@ -16,8 +16,6 @@ const (
 	deletePrefix = "delete"
 	updatePrefix = "update"
 )
-
-const AuthUserOrRole = "userOrRole"
 
 var systemKeyspaces = []string{
 	"system", "system_auth", "system_distributed", "system_schema", "system_traces", "system_views", "system_virtual_schema",
@@ -185,7 +183,7 @@ func (sg *SchemaGenerator) BuildSchema(keyspaceName string) (graphql.Schema, err
 	)
 }
 
-func (sg* SchemaGenerator) isKeyspaceExcluded(ksName string) bool {
+func (sg *SchemaGenerator) isKeyspaceExcluded(ksName string) bool {
 	return sg.ksExcluded[ksName]
 }
 

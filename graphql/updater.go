@@ -3,8 +3,8 @@ package graphql
 import (
 	"context"
 	"errors"
+	"github.com/datastax/cassandra-data-apis/log"
 	"github.com/graphql-go/graphql"
-	"github.com/riptano/data-endpoints/log"
 	"sync"
 	"time"
 )

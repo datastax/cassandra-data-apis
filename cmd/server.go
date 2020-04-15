@@ -3,11 +3,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"github.com/datastax/cassandra-data-apis/config"
+	"github.com/datastax/cassandra-data-apis/endpoint"
+	"github.com/datastax/cassandra-data-apis/graphql"
+	"github.com/datastax/cassandra-data-apis/log"
 	"github.com/julienschmidt/httprouter"
-	"github.com/riptano/data-endpoints/config"
-	"github.com/riptano/data-endpoints/endpoint"
-	"github.com/riptano/data-endpoints/graphql"
-	"github.com/riptano/data-endpoints/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -35,7 +35,7 @@ var serverCmd = &cobra.Command{
 		// TODO: Validate GraphQL/REST paths, should they be disjointed?
 
 		hosts := viper.GetStringSlice("hosts")
-		if  len(hosts) == 0 {
+		if len(hosts) == 0 {
 			return errors.New("hosts are required")
 		}
 
@@ -234,6 +234,6 @@ func listenAndServe(handler http.Handler, port int, endpointNames string) {
 	if err != nil {
 		logger.Fatal("unable to start server",
 			"port", port,
-			"error", err, )
+			"error", err)
 	}
 }

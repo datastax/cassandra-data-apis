@@ -1,10 +1,10 @@
 package graphql
 
 import (
+	"github.com/datastax/cassandra-data-apis/config"
+	"github.com/datastax/cassandra-data-apis/db"
+	"github.com/datastax/cassandra-data-apis/log"
 	"github.com/gocql/gocql"
-	"github.com/riptano/data-endpoints/config"
-	"github.com/riptano/data-endpoints/db"
-	"github.com/riptano/data-endpoints/log"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"testing"

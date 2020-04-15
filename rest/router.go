@@ -3,8 +3,8 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/julienschmidt/httprouter"
-	"github.com/riptano/data-endpoints/db"
 	"net/http"
 )
 

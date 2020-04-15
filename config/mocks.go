@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/riptano/data-endpoints/log"
+	"github.com/datastax/cassandra-data-apis/log"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 	"time"

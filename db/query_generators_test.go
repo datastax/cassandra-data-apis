@@ -1,10 +1,10 @@
 package db
 
 import (
+	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/gocql/gocql"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/riptano/data-endpoints/types"
 	"github.com/stretchr/testify/mock"
 	"testing"
 )

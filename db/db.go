@@ -1,8 +1,8 @@
 package db
 
 import (
+	"github.com/datastax/cassandra-data-apis/config"
 	"github.com/gocql/gocql"
-	"github.com/riptano/data-endpoints/config"
 	"time"
 )
 

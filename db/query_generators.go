@@ -3,8 +3,8 @@ package db
 import (
 	"errors"
 	"fmt"
+	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/gocql/gocql"
-	"github.com/riptano/data-endpoints/types"
 )
 
 type SelectInfo struct {

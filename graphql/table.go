@@ -2,10 +2,10 @@ package graphql
 
 import (
 	"fmt"
+	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
 	"github.com/mitchellh/mapstructure"
-	"github.com/riptano/data-endpoints/db"
 )
 
 const (
