@@ -21,8 +21,8 @@ const defaultGraphQLPath = "/graphql"
 const defaultGraphQLSchemaPath = "/graphql-schema"
 const defaultRESTPath = "/todo"
 
-// Environment variables prefixed with "ENDPOINT_" can override settings e.g. "ENDPOINT_HOSTS"
-const envVarPrefix = "endpoint"
+// Environment variables prefixed with "DATA_API_" can override settings e.g. "DATA_API_HOSTS"
+const envVarPrefix = "data_api"
 
 var cfgFile string
 var logger log.Logger
