@@ -7,7 +7,7 @@
 *.dll
 *.so
 *.dylib
-data-endpoints
+cassandra-data-apis
 
 # Test binary, built with `go test -c`
 *.test
