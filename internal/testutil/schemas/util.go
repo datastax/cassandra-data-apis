@@ -39,7 +39,7 @@ const GraphQLTypesQuery = `{
 
 const (
 	postIndex = 1
-	host      = "127.0.0.1"
+	Host      = "127.0.0.1"
 )
 
 func DecodeResponse(buffer *bytes.Buffer) ResponseBody {
@@ -88,17 +88,11 @@ func NewUuid() string {
 	return uuid.String()
 }
 
-func ExecutePost(routes []graphql.Route, target string, body string) (*bytes.Buffer, error) {
-	b, err := json.Marshal(graphql.RequestBody{
-		Query: body,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	r := httptest.NewRequest(http.MethodPost, path.Join(fmt.Sprintf("http://%s", host), target), bytes.NewReader(b))
+func ExecutePost(routes []graphql.Route, target string, body string) *bytes.Buffer {
+	b, err := json.Marshal(graphql.RequestBody{Query: body})
+	Expect(err).ToNot(HaveOccurred())
+	r := httptest.NewRequest(http.MethodPost, path.Join(fmt.Sprintf("http://%s", Host), target), bytes.NewReader(b))
 	w := httptest.NewRecorder()
 	routes[postIndex].Handler.ServeHTTP(w, r)
-
-	return w.Body, nil
+	return w.Body
 }

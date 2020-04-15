@@ -3,6 +3,8 @@
 package endpoint
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/graphql"
@@ -241,7 +243,29 @@ var _ = Describe("DataEndpoint", func() {
 				Expect(typeNames).To(ContainElements("BigInt", "Counter", "Uuid", "TimeUuid"))
 			})
 
-			XIt("Should return an error when query is not found")
+			It("Should return an error when query is not found", func() {
+				routes := getRoutes(config, keyspace)
+				query := `query {
+				 insertNotFound {
+					values {
+					  name
+					  description
+					}
+				 }
+				}`
+				b, err := json.Marshal(graphql.RequestBody{Query: query})
+				Expect(err).ToNot(HaveOccurred())
+				r := httptest.NewRequest(http.MethodPost, path.Join(fmt.Sprintf("http://%s", schemas.Host), "/graphql"), bytes.NewReader(b))
+				w := httptest.NewRecorder()
+				routes[postIndex].Handler.ServeHTTP(w, r)
+				// GraphQL spec defines the error as a field and HTTP status code should still be 200
+				// http://spec.graphql.org/June2018/#sec-Errors
+				Expect(w.Code).To(Equal(http.StatusOK))
+				response := schemas.DecodeResponse(w.Body)
+				Expect(response.Data).To(HaveLen(0))
+				Expect(response.Errors).To(HaveLen(1))
+				Expect(response.Errors[0].Message).To(ContainSubstring("Cannot query field"))
+			})
 		})
 
 		Context("With quirky schema", func() {
