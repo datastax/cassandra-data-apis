@@ -12,7 +12,6 @@ import (
 	"math/big"
 	"reflect"
 	"strings"
-	"testing"
 	"time"
 )
 
@@ -197,9 +196,4 @@ func assertPointerValue(expected interface{}, actual interface{}) {
 func assertNilPointer(expectedType interface{}, actual interface{}) {
 	assert.IsType(GinkgoT(), expectedType, actual)
 	assert.Nil(GinkgoT(), actual)
-}
-
-func TestTypeMapping(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Type mapping suite")
 }

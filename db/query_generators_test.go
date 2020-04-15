@@ -6,6 +6,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/riptano/data-endpoints/types"
 	"github.com/stretchr/testify/mock"
+	"testing"
 )
 
 var _ = Describe("db", func() {
@@ -249,3 +250,8 @@ var _ = Describe("db", func() {
 		}
 	})
 })
+
+func TestTypeMapping(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Db test suite")
+}
