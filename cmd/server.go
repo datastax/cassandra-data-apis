@@ -15,6 +15,7 @@ import (
 	log2 "log"
 	"net/http"
 	"os"
+	"strings"
 )
 
 const defaultGraphQLPath = "/graphql"
@@ -41,6 +42,10 @@ var serverCmd = &cobra.Command{
 
 		startGraphQL := viper.GetBool("start-graphql")
 		startREST := viper.GetBool("start-rest")
+
+		if startREST {
+			return errors.New("REST endpoint is not currently supported")
+		}
 		if !startGraphQL && !startREST {
 			return errors.New("at least one endpoint type should be started")
 		}
@@ -57,7 +62,7 @@ var serverCmd = &cobra.Command{
 		startREST := viper.GetBool("start-rest")
 
 		if graphqlPort == restPort {
-			router := httprouter.New()
+			router := createRouter()
 			endpointNames := ""
 			if startGraphQL {
 				addGraphQLRoutes(router, endpoint)
@@ -70,11 +75,11 @@ var serverCmd = &cobra.Command{
 				}
 				endpointNames += "REST"
 			}
-			listenAndServe(maybeAddRequestLogging(router), graphqlPort, endpointNames)
+			listenAndServe(maybeAddCORS(maybeAddRequestLogging(router)), graphqlPort, endpointNames)
 		} else {
 			finish := make(chan bool)
 			if startGraphQL {
-				router := httprouter.New()
+				router := createRouter()
 				addGraphQLRoutes(router, endpoint)
 				go listenAndServe(maybeAddRequestLogging(router), graphqlPort, "GraphQL")
 			}
@@ -113,6 +118,7 @@ func Execute() {
 		"TableCreate",
 		"KeyspaceCreate",
 	}, "list of supported table and keyspace management operations. options: TableCreate,TableDrop,TableAlterAdd,TableAlterDrop,KeyspaceCreate,KeyspaceDrop")
+	flags.String("access-control-allow-origin", "", "value to use for the Access-Control-Allow-Origin header")
 
 	// GraphQL specific flags
 	flags.Bool("start-graphql", true, "start the GraphQL endpoint")
@@ -134,6 +140,7 @@ func Execute() {
 	cobra.OnInitialize(initialize)
 
 	viper.SetEnvPrefix(envVarPrefix)
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
 
 	if err := serverCmd.Execute(); err != nil {
@@ -216,6 +223,16 @@ func maybeAddRequestLogging(handler http.Handler) http.Handler {
 	return handler
 }
 
+func maybeAddCORS(handler http.Handler) http.Handler {
+	if value := viper.GetString("access-control-allow-origin"); value != "" {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", value)
+			handler.ServeHTTP(w, r)
+		})
+	}
+	return handler
+}
+
 func initialize() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
@@ -224,6 +241,23 @@ func initialize() {
 				"file", viper.ConfigFileUsed())
 		}
 	}
+}
+
+func createRouter() *httprouter.Router {
+	router := httprouter.New()
+	if value := viper.GetString("access-control-allow-origin"); value != "" {
+		router.GlobalOPTIONS = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Access-Control-Request-Method") != "" {
+				header := w.Header()
+				header.Set("Access-Control-Allow-Method", r.Header.Get("Access-Control-Request-Method"))
+				header.Set("Access-Control-Allow-Headers", r.Header.Get("Access-Control-Request-Headers"))
+				header.Set("Access-Control-Allow-Origin", value)
+			}
+
+			w.WriteHeader(http.StatusNoContent)
+		})
+	}
+	return router
 }
 
 func listenAndServe(handler http.Handler, port int, endpointNames string) {
