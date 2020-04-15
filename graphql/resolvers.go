@@ -3,11 +3,11 @@ package graphql
 import (
 	"encoding/base64"
 	"fmt"
+	"github.com/datastax/cassandra-data-apis/db"
+	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
 	"github.com/mitchellh/mapstructure"
-	"github.com/riptano/data-endpoints/db"
-	"github.com/riptano/data-endpoints/types"
 	"gopkg.in/inf.v0"
 	"math/big"
 	"reflect"

@@ -1,10 +1,9 @@
 package main
 
 import (
-	"github.com/riptano/data-endpoints/cmd"
+	"github.com/datastax/cassandra-data-apis/cmd"
 )
 
 func main() {
 	cmd.Execute()
 }
-

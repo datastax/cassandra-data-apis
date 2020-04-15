@@ -24,4 +24,3 @@ func ContextUserOrRole(ctx context.Context) string {
 	}
 	return ""
 }
-

@@ -21,9 +21,9 @@ func Ops(ops ...string) (SchemaOperations, error) {
 	return o, err
 }
 
-func (o *SchemaOperations) Set(ops SchemaOperations)             { *o |= ops; }
-func (o *SchemaOperations) Clear(ops SchemaOperations)           { *o &= ^ops; }
-func (o SchemaOperations) IsSupported(ops SchemaOperations) bool { return o & ops != 0; }
+func (o *SchemaOperations) Set(ops SchemaOperations)             { *o |= ops }
+func (o *SchemaOperations) Clear(ops SchemaOperations)           { *o &= ^ops }
+func (o SchemaOperations) IsSupported(ops SchemaOperations) bool { return o&ops != 0 }
 
 func (o *SchemaOperations) Add(ops ...string) error {
 	for _, op := range ops {

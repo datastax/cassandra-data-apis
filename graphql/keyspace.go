@@ -2,10 +2,10 @@ package graphql
 
 import (
 	"errors"
+	"github.com/datastax/cassandra-data-apis/config"
+	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
-	"github.com/riptano/data-endpoints/config"
-	"github.com/riptano/data-endpoints/db"
 	"strconv"
 	"strings"
 )

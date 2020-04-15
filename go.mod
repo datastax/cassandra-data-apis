@@ -1,4 +1,4 @@
-module github.com/riptano/data-endpoints
+module github.com/datastax/cassandra-data-apis
 
 go 1.13
 

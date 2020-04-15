@@ -1,10 +1,10 @@
 package endpoint
 
 import (
-	"github.com/riptano/data-endpoints/config"
-	"github.com/riptano/data-endpoints/db"
-	"github.com/riptano/data-endpoints/graphql"
-	"github.com/riptano/data-endpoints/log"
+	"github.com/datastax/cassandra-data-apis/config"
+	"github.com/datastax/cassandra-data-apis/db"
+	"github.com/datastax/cassandra-data-apis/graphql"
+	"github.com/datastax/cassandra-data-apis/log"
 	"go.uber.org/zap"
 	"time"
 )

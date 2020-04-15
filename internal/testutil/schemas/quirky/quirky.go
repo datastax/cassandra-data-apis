@@ -2,10 +2,10 @@ package quirky
 
 import (
 	"fmt"
+	"github.com/datastax/cassandra-data-apis/graphql"
+	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas"
 	"github.com/iancoleman/strcase"
 	. "github.com/onsi/gomega"
-	"github.com/riptano/data-endpoints/graphql"
-	"github.com/riptano/data-endpoints/internal/testutil/schemas"
 )
 
 func InsertAndSelect(routes []graphql.Route, name string) {

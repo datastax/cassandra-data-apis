@@ -4,9 +4,9 @@ package db
 
 import (
 	"fmt"
+	. "github.com/datastax/cassandra-data-apis/internal/testutil"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	. "github.com/riptano/data-endpoints/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/inf.v0"
 	"math/big"
