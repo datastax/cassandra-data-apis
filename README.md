@@ -1,4 +1,4 @@
-# DataStax GraphQL and REST endpoints
+# Data APIs for Apache Cassandra
 
 ## Getting started
 
