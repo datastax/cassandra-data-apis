@@ -15,6 +15,7 @@ import (
 	log2 "log"
 	"net/http"
 	"os"
+	"strings"
 )
 
 const defaultGraphQLPath = "/graphql"
@@ -41,6 +42,10 @@ var serverCmd = &cobra.Command{
 
 		startGraphQL := viper.GetBool("start-graphql")
 		startREST := viper.GetBool("start-rest")
+
+		if startREST {
+			return errors.New("REST endpoint is not currently supported")
+		}
 		if !startGraphQL && !startREST {
 			return errors.New("at least one endpoint type should be started")
 		}
@@ -57,7 +62,7 @@ var serverCmd = &cobra.Command{
 		startREST := viper.GetBool("start-rest")
 
 		if graphqlPort == restPort {
-			router := httprouter.New()
+			router := createRouter()
 			endpointNames := ""
 			if startGraphQL {
 				addGraphQLRoutes(router, endpoint)
@@ -70,11 +75,11 @@ var serverCmd = &cobra.Command{
 				}
 				endpointNames += "REST"
 			}
-			listenAndServe(maybeAddRequestLogging(router), graphqlPort, endpointNames)
+			listenAndServe(maybeAddCORS(maybeAddRequestLogging(router)), graphqlPort, endpointNames)
 		} else {
 			finish := make(chan bool)
 			if startGraphQL {
-				router := httprouter.New()
+				router := createRouter()
 				addGraphQLRoutes(router, endpoint)
 				go listenAndServe(maybeAddRequestLogging(router), graphqlPort, "GraphQL")
 			}
@@ -113,17 +118,19 @@ func Execute() {
 		"TableCreate",
 		"KeyspaceCreate",
 	}, "list of supported table and keyspace management operations. options: TableCreate,TableDrop,TableAlterAdd,TableAlterDrop,KeyspaceCreate,KeyspaceDrop")
+	flags.String("access-control-allow-origin", "", "Access-Control-Allow-Origin header value")
 
 	// GraphQL specific flags
 	flags.Bool("start-graphql", true, "start the GraphQL endpoint")
-	flags.String("graphql-path", defaultGraphQLPath, "path for the GraphQL endpoint")
-	flags.String("graphql-schema-path", defaultGraphQLSchemaPath, "path for the GraphQL schema management")
-	flags.Int("graphql-port", 8080, "port for the GraphQL endpoint")
+	flags.String("graphql-path", defaultGraphQLPath, "GraphQL endpoint path")
+	flags.String("graphql-schema-path", defaultGraphQLSchemaPath, "GraphQL schema management path")
+	flags.Int("graphql-port", 8080, "GraphQL endpoint port")
 
+	// TODO:
 	// REST specific flags
-	flags.Bool("start-rest", false, "start the REST endpoint")
-	flags.String("rest-path", defaultRESTPath, "path for the REST endpoint")
-	flags.Int("rest-port", 8080, "port for the REST endpoint")
+	// flags.Bool("start-rest", false, "start the REST endpoint")
+	// flags.String("rest-path", defaultRESTPath, "REST endpoint path")
+	// flags.Int("rest-port", 8080, "REST endpoint port")
 
 	flags.VisitAll(func(flag *pflag.Flag) {
 		if flag.Name != "config" {
@@ -134,6 +141,7 @@ func Execute() {
 	cobra.OnInitialize(initialize)
 
 	viper.SetEnvPrefix(envVarPrefix)
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
 
 	if err := serverCmd.Execute(); err != nil {
@@ -216,6 +224,16 @@ func maybeAddRequestLogging(handler http.Handler) http.Handler {
 	return handler
 }
 
+func maybeAddCORS(handler http.Handler) http.Handler {
+	if value := viper.GetString("access-control-allow-origin"); value != "" {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", value)
+			handler.ServeHTTP(w, r)
+		})
+	}
+	return handler
+}
+
 func initialize() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
@@ -224,6 +242,23 @@ func initialize() {
 				"file", viper.ConfigFileUsed())
 		}
 	}
+}
+
+func createRouter() *httprouter.Router {
+	router := httprouter.New()
+	if value := viper.GetString("access-control-allow-origin"); value != "" {
+		router.GlobalOPTIONS = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Access-Control-Request-Method") != "" {
+				header := w.Header()
+				header.Set("Access-Control-Allow-Method", r.Header.Get("Access-Control-Request-Method"))
+				header.Set("Access-Control-Allow-Headers", r.Header.Get("Access-Control-Request-Headers"))
+				header.Set("Access-Control-Allow-Origin", value)
+			}
+
+			w.WriteHeader(http.StatusNoContent)
+		})
+	}
+	return router
 }
 
 func listenAndServe(handler http.Handler, port int, endpointNames string) {
