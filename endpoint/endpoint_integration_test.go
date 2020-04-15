@@ -15,6 +15,9 @@ import (
 	"github.com/gocql/gocql"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"net/http"
+	"net/http/httptest"
+	"path"
 	"sort"
 	"testing"
 	"time"
@@ -304,6 +307,12 @@ var _ = Describe("DataEndpoint", func() {
 				for _, name := range names {
 					quirky.InsertAndSelect(routes, name)
 				}
+			})
+
+			It("Should support case sensitive column names", func() {
+				routes := getRoutes(config, keyspace)
+				quirky.InsertWeirdCase(routes, 1)
+				quirky.SelectWeirdCase(routes, 1)
 			})
 		})
 	})

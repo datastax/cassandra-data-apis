@@ -29,3 +29,25 @@ func InsertAndSelect(routes []graphql.Route, name string) {
 	data := schemas.DecodeDataAsSliceOfMaps(buffer, strcase.ToLowerCamel(name), "values")
 	Expect(data[0]["value"]).To(Equal(value))
 }
+
+func InsertWeirdCase(routes []graphql.Route, id int) {
+	query := `mutation { 
+	  insertWEIRDCASE(data: { id: %d, aBCdef: "one", qAData: "two", abcXYZ: "three" }) {
+		applied
+	  }
+	}`
+	buffer := schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(query, id))
+	data := schemas.DecodeData(buffer, "insertWEIRDCASE")
+	Expect(data["applied"]).To(Equal(true))
+}
+
+func SelectWeirdCase(routes []graphql.Route, id int) {
+	query := `{
+	  wEIRDCASE(data: {id: %d }) { 
+		values { aBCdef, abcXYZ, qAData }
+	  }
+	}`
+	buffer := schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(query, id))
+	data := schemas.DecodeData(buffer, "wEIRDCASE")
+	Expect(data["values"]).To(ConsistOf(map[string]interface{}{"aBCdef": "one", "abcXYZ": "three", "qAData": "two"}))
+}

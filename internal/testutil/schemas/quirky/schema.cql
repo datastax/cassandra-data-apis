@@ -29,3 +29,5 @@ CREATE TABLE data_type (id int PRIMARY KEY, value text);
 // Table names that generate the same type name
 CREATE TABLE tester_abc (id int PRIMARY KEY, value text);
 CREATE TABLE "testerAbc" (id int PRIMARY KEY, value text);
+
+CREATE TABLE "WEIRD_CASE" ("ID" int PRIMARY KEY, "ABCdef" text, "QA_data" text, "abc_XYZ" text);
