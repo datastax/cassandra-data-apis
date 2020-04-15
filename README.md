@@ -8,8 +8,8 @@ the routes within your HTTP request router.
 ### Run as a container (GraphQL only)
 
 ```bash
-docker build -t data-endpoints .
-docker run -p 8080:8080 -e "ENDPOINT_HOSTS=<cassandra_hosts_here>" data-endpoints
+docker build -t cassandra-data-apis .
+docker run -p 8080:8080 -e "ENDPOINT_HOSTS=<cassandra_hosts_here>" cassandra-data-apis
 ```
 
 Or to use with a configuration file, create a file with the following contents:
@@ -26,22 +26,22 @@ hosts:
 Then start the endpoints with:
 
 ```bash
-docker run -p 8080:8080 -v "${PWD}/<your_config_file>.yaml:/root/config.yaml" data-endpoints
+docker run -p 8080:8080 -v "${PWD}/<your_config_file>.yaml:/root/config.yaml" cassandra-data-apis
 ```
 
 #### Use with single node, local Cassandra cluster
 
 ```bash
-docker build -t data-endpoints .
+docker build -t cassandra-data-apis .
 
 # On Linux (with a cluster started on the docker bridge: 172.17.0.1)
-docker run -p 8080:8080 -e "ENDPOINT_HOSTS=172.17.0.1" data-endpoints
+docker run -p 8080:8080 -e "ENDPOINT_HOSTS=172.17.0.1" cassandra-data-apis
 
 # Or (with a cluster bound to 0.0.0.0)
-run --network host -e "ENDPOINT_HOSTS=127.0.0.1" data-endpoints
+run --network host -e "ENDPOINT_HOSTS=127.0.0.1" cassandra-data-apis
 
 # On macOS (with a cluster bound to 0.0.0.0)
-docker run -p 8080:8080 -e "ENDPOINT_HOSTS=host.docker.internal" data-endpoints
+docker run -p 8080:8080 -e "ENDPOINT_HOSTS=host.docker.internal" cassandra-data-apis
 ```
 
 These host values can also be used in the configuration file approach used in

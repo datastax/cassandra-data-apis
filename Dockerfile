@@ -18,7 +18,7 @@ FROM alpine:3.11
 
 WORKDIR /root
 
-COPY --from=builder /build/data-endpoints .
+COPY --from=builder /build/cassandra-data-apis .
 COPY --from=builder /build/config.yaml .
 
-CMD [ "/root/data-endpoints", "--config", "/root/config.yaml" ]
+CMD [ "/root/cassandra-data-apis", "--config", "/root/config.yaml" ]
