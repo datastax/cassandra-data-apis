@@ -21,6 +21,7 @@ import (
 const defaultGraphQLPath = "/graphql"
 const defaultGraphQLSchemaPath = "/graphql-schema"
 const defaultRESTPath = "/todo"
+const defaultGraphQLPlaygroundPath = "/graphql-playground"
 
 // Environment variables prefixed with "DATA_API_" can override settings e.g. "DATA_API_HOSTS"
 const envVarPrefix = "data_api"
@@ -124,6 +125,7 @@ func Execute() {
 	flags.Bool("start-graphql", true, "start the GraphQL endpoint")
 	flags.String("graphql-path", defaultGraphQLPath, "GraphQL endpoint path")
 	flags.String("graphql-schema-path", defaultGraphQLSchemaPath, "GraphQL schema management path")
+	flags.String("graphql-playground-path", defaultGraphQLPlaygroundPath, "path for the GraphQL playground static file")
 	flags.Int("graphql-port", 8080, "GraphQL endpoint port")
 
 	// TODO:
@@ -179,6 +181,7 @@ func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint
 
 	singleKeyspace := viper.GetString("keyspace")
 	rootPath := viper.GetString("graphql-path")
+	playgroundPath := viper.GetString("graphql-playground-path")
 
 	if singleKeyspace != "" {
 		routes, err = endpoint.RoutesKeyspaceGraphQL(rootPath, singleKeyspace)
@@ -194,6 +197,8 @@ func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint
 	for _, route := range routes {
 		router.Handler(route.Method, route.Pattern, route.Handler)
 	}
+
+	router.GET(playgroundPath, graphql.GetPlaygroundHandle(rootPath, viper.GetInt("graphql-port")))
 
 	supportedOps := viper.GetStringSlice("operations")
 	ops, err := config.Ops(supportedOps...)
