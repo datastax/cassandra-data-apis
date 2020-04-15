@@ -68,6 +68,9 @@ func (sg *SchemaGenerator) queryFieldResolver(
 		}
 
 		pageState, err := base64.StdEncoding.DecodeString(options.PageState)
+		if err != nil {
+			return nil, err
+		}
 
 		result, err := sg.dbClient.Select(
 			&db.SelectInfo{
