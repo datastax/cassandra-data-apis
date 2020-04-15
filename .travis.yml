@@ -3,4 +3,5 @@ language: go
 go:
   - "1.14"
 
-script: go test -v ./...
+script: 
+  - docker build -t test .
