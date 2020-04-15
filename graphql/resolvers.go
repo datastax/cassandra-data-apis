@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
-	"github.com/iancoleman/strcase"
 	"github.com/mitchellh/mapstructure"
 	"github.com/riptano/data-endpoints/db"
 	"github.com/riptano/data-endpoints/types"
@@ -16,18 +15,21 @@ import (
 	"time"
 )
 
+type mutationOperation int
+
+const (
+	insertOperation mutationOperation = iota
+	updateOperation
+	deleteOperation
+)
+
 func (sg *SchemaGenerator) queryFieldResolver(
-	keyspace *gocql.KeyspaceMetadata,
+	table *gocql.TableMetadata,
 	ksSchema *KeyspaceGraphQLSchema,
+	isFilter bool,
 ) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
-		fieldName := params.Info.FieldName
-		// TODO: Get the table metadata from the closure
-		var table *gocql.TableMetadata
-		// TODO: Remove
 		// GraphQL operation is lower camel
-		typeName := strcase.ToCamel(fieldName)
-		table, tableFound := keyspace.Tables[ksSchema.naming.ToCQLTable(typeName)]
 		var data map[string]interface{}
 		if params.Args["data"] != nil {
 			data = params.Args["data"].(map[string]interface{})
@@ -37,7 +39,7 @@ func (sg *SchemaGenerator) queryFieldResolver(
 
 		var whereClause []types.ConditionItem
 
-		if tableFound {
+		if !isFilter {
 			whereClause = make([]types.ConditionItem, 0, len(data))
 			for key, value := range data {
 				whereClause = append(whereClause, types.ConditionItem{
@@ -46,15 +48,8 @@ func (sg *SchemaGenerator) queryFieldResolver(
 					Value:    adaptParameterValue(value),
 				})
 			}
-		} else if strings.HasSuffix(typeName, "Filter") {
-			table, tableFound = keyspace.Tables[ksSchema.naming.ToCQLTable(strings.TrimSuffix(typeName, "Filter"))]
-			if !tableFound {
-				return nil, fmt.Errorf("unable to find table '%s'", params.Info.FieldName)
-			}
-
-			whereClause = ksSchema.adaptCondition(table.Name, data)
 		} else {
-			return nil, fmt.Errorf("Unable to find table for '%s'", params.Info.FieldName)
+			whereClause = ksSchema.adaptCondition(table.Name, data)
 		}
 
 		var orderBy []interface{}
@@ -76,7 +71,7 @@ func (sg *SchemaGenerator) queryFieldResolver(
 
 		result, err := sg.dbClient.Select(
 			&db.SelectInfo{
-				Keyspace: keyspace.Name,
+				Keyspace: table.Keyspace,
 				Table:    table.Name,
 				Where:    whereClause,
 				OrderBy:  parseColumnOrder(orderBy),
@@ -101,86 +96,80 @@ func (sg *SchemaGenerator) queryFieldResolver(
 }
 
 func (sg *SchemaGenerator) mutationFieldResolver(
-	keyspace *gocql.KeyspaceMetadata,
+	table *gocql.TableMetadata,
 	ksSchema *KeyspaceGraphQLSchema,
+	operation mutationOperation,
 ) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
-		fieldName := params.Info.FieldName
-		// TODO: Get the table name from the closure
-		operation, typeName := mutationPrefix(fieldName)
-		if table, ok := keyspace.Tables[ksSchema.naming.ToCQLTable(typeName)]; ok {
-			data := params.Args["data"].(map[string]interface{})
-			columnNames := make([]string, 0, len(data))
-			queryParams := make([]interface{}, 0, len(data))
+		data := params.Args["data"].(map[string]interface{})
+		columnNames := make([]string, 0, len(data))
+		queryParams := make([]interface{}, 0, len(data))
 
-			for key, value := range data {
-				columnNames = append(columnNames, ksSchema.naming.ToCQLColumn(table.Name, key))
-				queryParams = append(queryParams, adaptParameterValue(value))
-			}
-
-			var options types.MutationOptions
-			if err := mapstructure.Decode(params.Args["options"], &options); err != nil {
-				return nil, err
-			}
-
-			userOrRole, err := sg.checkUserOrRoleAuth(params)
-			if err != nil {
-				return nil, err
-			}
-
-			queryOptions := db.NewQueryOptions().
-				WithUserOrRole(userOrRole).
-				WithConsistency(gocql.Consistency(options.Consistency)).
-				WithSerialConsistency(gocql.SerialConsistency(options.SerialConsistency))
-
-			var result db.ResultSet
-
-			switch operation {
-			case insertPrefix:
-				ifNotExists := params.Args["ifNotExists"] == true
-				result, err = sg.dbClient.Insert(&db.InsertInfo{
-					Keyspace:    keyspace.Name,
-					Table:       table.Name,
-					Columns:     columnNames,
-					QueryParams: queryParams,
-					IfNotExists: ifNotExists,
-					TTL:         options.TTL,
-				}, queryOptions)
-			case deletePrefix:
-				var ifCondition []types.ConditionItem
-				if params.Args["ifCondition"] != nil {
-					ifCondition = ksSchema.adaptCondition(
-						table.Name, params.Args["ifCondition"].(map[string]interface{}))
-				}
-				result, err = sg.dbClient.Delete(&db.DeleteInfo{
-					Keyspace:    keyspace.Name,
-					Table:       table.Name,
-					Columns:     columnNames,
-					QueryParams: queryParams,
-					IfCondition: ifCondition,
-					IfExists:    params.Args["ifExists"] == true}, queryOptions)
-			case updatePrefix:
-				var ifCondition []types.ConditionItem
-				if params.Args["ifCondition"] != nil {
-					ifCondition = ksSchema.adaptCondition(
-						table.Name, params.Args["ifCondition"].(map[string]interface{}))
-				}
-				result, err = sg.dbClient.Update(&db.UpdateInfo{
-					Keyspace:    keyspace.Name,
-					Table:       table,
-					Columns:     columnNames,
-					QueryParams: queryParams,
-					IfCondition: ifCondition,
-					TTL:         options.TTL,
-					IfExists:    params.Args["ifExists"] == true}, queryOptions)
-			default:
-				return false, fmt.Errorf("operation '%s' not supported", operation)
-			}
-
-			return ksSchema.getModificationResult(table.Name, result, err)
-		} else {
-			return nil, fmt.Errorf("unable to find table for type name '%s'", params.Info.FieldName)
+		for key, value := range data {
+			columnNames = append(columnNames, ksSchema.naming.ToCQLColumn(table.Name, key))
+			queryParams = append(queryParams, adaptParameterValue(value))
 		}
+
+		var options types.MutationOptions
+		if err := mapstructure.Decode(params.Args["options"], &options); err != nil {
+			return nil, err
+		}
+
+		userOrRole, err := sg.checkUserOrRoleAuth(params)
+		if err != nil {
+			return nil, err
+		}
+
+		queryOptions := db.NewQueryOptions().
+			WithUserOrRole(userOrRole).
+			WithConsistency(gocql.Consistency(options.Consistency)).
+			WithSerialConsistency(gocql.SerialConsistency(options.SerialConsistency))
+
+		var result db.ResultSet
+
+		switch operation {
+		case insertOperation:
+			ifNotExists := params.Args["ifNotExists"] == true
+			result, err = sg.dbClient.Insert(&db.InsertInfo{
+				Keyspace:    table.Keyspace,
+				Table:       table.Name,
+				Columns:     columnNames,
+				QueryParams: queryParams,
+				IfNotExists: ifNotExists,
+				TTL:         options.TTL,
+			}, queryOptions)
+		case deleteOperation:
+			var ifCondition []types.ConditionItem
+			if params.Args["ifCondition"] != nil {
+				ifCondition = ksSchema.adaptCondition(
+					table.Name, params.Args["ifCondition"].(map[string]interface{}))
+			}
+			result, err = sg.dbClient.Delete(&db.DeleteInfo{
+				Keyspace:    table.Keyspace,
+				Table:       table.Name,
+				Columns:     columnNames,
+				QueryParams: queryParams,
+				IfCondition: ifCondition,
+				IfExists:    params.Args["ifExists"] == true}, queryOptions)
+		case updateOperation:
+			var ifCondition []types.ConditionItem
+			if params.Args["ifCondition"] != nil {
+				ifCondition = ksSchema.adaptCondition(
+					table.Name, params.Args["ifCondition"].(map[string]interface{}))
+			}
+			result, err = sg.dbClient.Update(&db.UpdateInfo{
+				Keyspace:    table.Keyspace,
+				Table:       table,
+				Columns:     columnNames,
+				QueryParams: queryParams,
+				IfCondition: ifCondition,
+				TTL:         options.TTL,
+				IfExists:    params.Args["ifExists"] == true}, queryOptions)
+		default:
+			return false, fmt.Errorf("operation not supported")
+		}
+
+		return ksSchema.getModificationResult(table.Name, result, err)
 	}
 }
 
@@ -226,18 +215,6 @@ func adaptCollectionParameter(value interface{}) interface{} {
 	}
 
 	return value
-}
-
-func mutationPrefix(value string) (string, string) {
-	mutationPrefixes := []string{insertPrefix, deletePrefix, updatePrefix}
-
-	for _, prefix := range mutationPrefixes {
-		if strings.Index(value, prefix) == 0 {
-			return prefix, value[len(prefix):]
-		}
-	}
-
-	panic("Unsupported mutation")
 }
 
 func parseColumnOrder(values []interface{}) []db.ColumnOrder {
