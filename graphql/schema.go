@@ -17,8 +17,6 @@ const (
 	updatePrefix = "update"
 )
 
-const AuthUserOrRole = "userOrRole"
-
 var systemKeyspaces = []string{
 	"system", "system_auth", "system_distributed", "system_schema", "system_traces", "system_views", "system_virtual_schema",
 	"dse_insights", "dse_insights_local", "dse_leases", "dse_perf", "dse_security", "dse_system", "dse_system_local",
@@ -54,33 +52,32 @@ func NewSchemaGenerator(dbClient *db.Db, cfg config.Config) *SchemaGenerator {
 
 func (sg *SchemaGenerator) buildQueriesFields(
 	ksSchema *KeyspaceGraphQLSchema,
-	tables map[string]*gocql.TableMetadata,
-	resolve graphql.FieldResolveFn,
+	keyspace *gocql.KeyspaceMetadata,
 ) graphql.Fields {
 	fields := graphql.Fields{}
-	for name, table := range tables {
+	for _, table := range keyspace.Tables {
 		if ksSchema.ignoredTables[table.Name] {
 			continue
 		}
 
-		fields[ksSchema.naming.ToGraphQLOperation("", name)] = &graphql.Field{
+		fields[ksSchema.naming.ToGraphQLOperation("", table.Name)] = &graphql.Field{
 			Type: ksSchema.resultSelectTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
 				"data":    {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
 				"orderBy": {Type: graphql.NewList(ksSchema.orderEnums[table.Name])},
 				"options": {Type: inputQueryOptions, DefaultValue: inputQueryOptionsDefault},
 			},
-			Resolve: resolve,
+			Resolve: sg.queryFieldResolver(table, ksSchema, false),
 		}
 
-		fields[ksSchema.naming.ToGraphQLOperation("", name)+"Filter"] = &graphql.Field{
+		fields[ksSchema.naming.ToGraphQLOperation("", table.Name)+"Filter"] = &graphql.Field{
 			Type: ksSchema.resultSelectTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
 				"filter":  {Type: graphql.NewNonNull(ksSchema.tableOperatorInputTypes[table.Name])},
 				"orderBy": {Type: graphql.NewList(ksSchema.orderEnums[table.Name])},
 				"options": {Type: inputQueryOptions, DefaultValue: inputQueryOptionsDefault},
 			},
-			Resolve: resolve,
+			Resolve: sg.queryFieldResolver(table, ksSchema, true),
 		}
 	}
 	return fields
@@ -88,25 +85,25 @@ func (sg *SchemaGenerator) buildQueriesFields(
 
 func (sg *SchemaGenerator) buildQuery(
 	schema *KeyspaceGraphQLSchema,
-	tables map[string]*gocql.TableMetadata,
-	resolve graphql.FieldResolveFn,
+	keyspace *gocql.KeyspaceMetadata,
 ) *graphql.Object {
 	return graphql.NewObject(
 		graphql.ObjectConfig{
 			Name:   "TableQuery",
-			Fields: sg.buildQueriesFields(schema, tables, resolve),
+			Fields: sg.buildQueriesFields(schema, keyspace),
 		})
 }
 
-func (sg *SchemaGenerator) buildMutationFields(ksSchema *KeyspaceGraphQLSchema,
-	tables map[string]*gocql.TableMetadata,
-	resolve graphql.FieldResolveFn,
+func (sg *SchemaGenerator) buildMutationFields(
+	ksSchema *KeyspaceGraphQLSchema,
+	keyspace *gocql.KeyspaceMetadata,
 ) graphql.Fields {
 	fields := graphql.Fields{}
-	for name, table := range tables {
+	for name, table := range keyspace.Tables {
 		if ksSchema.ignoredTables[table.Name] {
 			continue
 		}
+
 		fields[ksSchema.naming.ToGraphQLOperation(insertPrefix, name)] = &graphql.Field{
 			Type: ksSchema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
@@ -114,7 +111,7 @@ func (sg *SchemaGenerator) buildMutationFields(ksSchema *KeyspaceGraphQLSchema,
 				"ifNotExists": {Type: graphql.Boolean},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
 			},
-			Resolve: resolve,
+			Resolve: sg.mutationFieldResolver(table, ksSchema, insertOperation),
 		}
 
 		fields[ksSchema.naming.ToGraphQLOperation(deletePrefix, name)] = &graphql.Field{
@@ -125,7 +122,7 @@ func (sg *SchemaGenerator) buildMutationFields(ksSchema *KeyspaceGraphQLSchema,
 				"ifCondition": {Type: ksSchema.tableOperatorInputTypes[table.Name]},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
 			},
-			Resolve: resolve,
+			Resolve: sg.mutationFieldResolver(table, ksSchema, deleteOperation),
 		}
 
 		fields[ksSchema.naming.ToGraphQLOperation(updatePrefix, name)] = &graphql.Field{
@@ -136,7 +133,7 @@ func (sg *SchemaGenerator) buildMutationFields(ksSchema *KeyspaceGraphQLSchema,
 				"ifCondition": {Type: ksSchema.tableOperatorInputTypes[table.Name]},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
 			},
-			Resolve: resolve,
+			Resolve: sg.mutationFieldResolver(table, ksSchema, updateOperation),
 		}
 	}
 	return fields
@@ -144,13 +141,12 @@ func (sg *SchemaGenerator) buildMutationFields(ksSchema *KeyspaceGraphQLSchema,
 
 func (sg *SchemaGenerator) buildMutation(
 	schema *KeyspaceGraphQLSchema,
-	tables map[string]*gocql.TableMetadata,
-	resolveFn graphql.FieldResolveFn,
+	keyspace *gocql.KeyspaceMetadata,
 ) *graphql.Object {
 	return graphql.NewObject(
 		graphql.ObjectConfig{
 			Name:   "TableMutation",
-			Fields: sg.buildMutationFields(schema, tables, resolveFn),
+			Fields: sg.buildMutationFields(schema, keyspace),
 		})
 }
 
@@ -174,18 +170,15 @@ func (sg *SchemaGenerator) BuildSchema(keyspaceName string) (graphql.Schema, err
 		return graphql.Schema{}, err
 	}
 
-	queryResolveFn := sg.queryFieldResolver(keyspace, keyspaceSchema)
-	mutationResolveFn := sg.mutationFieldResolver(keyspace, keyspaceSchema)
-
 	return graphql.NewSchema(
 		graphql.SchemaConfig{
-			Query:    sg.buildQuery(keyspaceSchema, keyspace.Tables, queryResolveFn),
-			Mutation: sg.buildMutation(keyspaceSchema, keyspace.Tables, mutationResolveFn),
+			Query:    sg.buildQuery(keyspaceSchema, keyspace),
+			Mutation: sg.buildMutation(keyspaceSchema, keyspace),
 		},
 	)
 }
 
-func (sg* SchemaGenerator) isKeyspaceExcluded(ksName string) bool {
+func (sg *SchemaGenerator) isKeyspaceExcluded(ksName string) bool {
 	return sg.ksExcluded[ksName]
 }
 
