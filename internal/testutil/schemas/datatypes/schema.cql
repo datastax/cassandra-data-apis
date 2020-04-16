@@ -18,7 +18,7 @@ CREATE TABLE scalars (
     varint_col varint,
     decimal_col decimal,
     float_col float,
-    double_col float,
+    double_col double,
     boolean_col boolean,
     uuid_col uuid,
     timeuuid_col timeuuid,

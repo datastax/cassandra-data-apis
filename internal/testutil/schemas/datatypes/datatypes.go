@@ -11,7 +11,15 @@ import (
 
 var index int32 = 0
 
-func MutateAndQueryScalar(routes []graphql.Route, datatype string, value interface{}, format string) {
+type ConvertFn func(value interface{}) interface{}
+
+func MutateAndQueryScalar(
+	routes []graphql.Route,
+	datatype string,
+	value interface{},
+	format string,
+	convert ConvertFn,
+) {
 	insertQuery := `mutation {
 	  insertScalars(data:{id:%d, %sCol:%s}) {
 		applied
@@ -40,6 +48,11 @@ func MutateAndQueryScalar(routes []graphql.Route, datatype string, value interfa
 	id := atomic.AddInt32(&index, 1)
 	var buffer *bytes.Buffer
 	var data []map[string]interface{}
+	if convert == nil {
+		convert = func(value interface{}) interface{} {
+			return value
+		}
+	}
 
 	// Insert
 	buffer = schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(insertQuery, id, datatype, valueStr))
@@ -48,7 +61,7 @@ func MutateAndQueryScalar(routes []graphql.Route, datatype string, value interfa
 	// Select
 	buffer = schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(selectQuery, id, datatype))
 	data = schemas.DecodeDataAsSliceOfMaps(buffer, "scalars", "values")
-	Expect(data[0][datatype+"Col"]).To(Equal(value))
+	Expect(convert(data[0][datatype+"Col"])).To(Equal(value))
 
 	// Delete
 	buffer = schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(deleteQuery, id))
@@ -65,5 +78,5 @@ func MutateAndQueryScalar(routes []graphql.Route, datatype string, value interfa
 	// Verify updated
 	buffer = schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(selectQuery, id, datatype))
 	data = schemas.DecodeDataAsSliceOfMaps(buffer, "scalars", "values")
-	Expect(data[0][datatype+"Col"]).To(Equal(value))
+	Expect(convert(data[0][datatype+"Col"])).To(Equal(value))
 }

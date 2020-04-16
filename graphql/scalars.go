@@ -8,6 +8,7 @@ import (
 	"github.com/graphql-go/graphql/language/ast"
 	"gopkg.in/inf.v0"
 	"math/big"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -34,6 +35,20 @@ var decimal = newStringScalar(
 var varint = newStringScalar(
 	"Varint", "The `Varint` scalar type represents a CQL varint as a string.",
 	serializeStringer, deserializeVarint)
+
+var float32Scalar = graphql.NewScalar(graphql.ScalarConfig{
+	Name:        "Float32",
+	Description: "The `Float32` scalar type represents a CQL float (single-precision fractional values)",
+	Serialize:   identityFn,
+	ParseValue:  deserializeFloat32,
+	ParseLiteral: func(valueAST ast.Value) interface{} {
+		switch valueAST := valueAST.(type) {
+		case *ast.FloatValue:
+			return deserializeFloat32(valueAST.Value)
+		}
+		return nil
+	},
+})
 
 var blob = newStringScalar(
 	"Blob", "The `Blob` scalar type represents a CQL blob as a base64 encoded byte array.",
@@ -187,6 +202,21 @@ func deserializeLocalTime(value interface{}) interface{} {
 			return nil
 		}
 		return duration
+	default:
+		return value
+	}
+}
+
+func deserializeFloat32(value interface{}) interface{} {
+	switch value := value.(type) {
+	case float64:
+		return float32(value)
+	case string:
+		float64Value, err := strconv.ParseFloat(value, 32)
+		if err != nil {
+			return nil
+		}
+		return float32(float64Value)
 	default:
 		return value
 	}

@@ -77,7 +77,9 @@ func (s *KeyspaceGraphQLSchema) buildType(typeInfo gocql.TypeInfo, isInput bool)
 	switch typeInfo.Type() {
 	case gocql.TypeInt, gocql.TypeTinyInt, gocql.TypeSmallInt:
 		return graphql.Int, nil
-	case gocql.TypeFloat, gocql.TypeDouble:
+	case gocql.TypeFloat:
+		return float32Scalar, nil
+	case gocql.TypeDouble:
 		return graphql.Float, nil
 	case gocql.TypeAscii:
 		return ascii, nil

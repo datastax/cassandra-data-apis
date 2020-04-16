@@ -14,6 +14,7 @@ import (
 	"github.com/gocql/gocql"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"math"
 	"sort"
 	"testing"
 	"time"
@@ -337,26 +338,53 @@ var _ = Describe("DataEndpoint", func() {
 		})
 
 		Context("With datatypes schema", func() {
-			config := NewEndpointConfigWithLogger(TestLogger(), host)
-			keyspace := "datatypes"
 			var routes []graphql.Route
+			config := NewEndpointConfigWithLogger(TestLogger(), host)
 
 			BeforeEach(func() {
-				routes = getRoutes(config, keyspace)
+				routes = getRoutes(config, "datatypes")
 			})
 
 			It("Should support text and varchar data types", func() {
 				values := []string{"Привет мир", "नमस्ते दुनिया", "Jürgen"}
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "text", value, `"%s"`)
-					datatypes.MutateAndQueryScalar(routes, "varchar", value, `"%s"`)
+					datatypes.MutateAndQueryScalar(routes, "text", value, `"%s"`, nil)
+					datatypes.MutateAndQueryScalar(routes, "varchar", value, `"%s"`, nil)
 				}
 			})
 
 			It("Should support ascii data type", func() {
 				values := []string{"ABC", "><=;#{}[]", "abc"}
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "ascii", value, `"%s"`)
+					datatypes.MutateAndQueryScalar(routes, "ascii", value, `"%s"`, nil)
+				}
+			})
+
+			It("Should support int data type", func() {
+				values := []int{1, -2, 0, math.MaxInt32, math.MinInt32}
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "int", value, "%d", jsonNumberToInt)
+				}
+			})
+
+			It("Should support tinyint data type", func() {
+				values := []int8{1, -2, 0, math.MaxInt8, math.MinInt8}
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "int", value, "%d", jsonNumberToInt8)
+				}
+			})
+
+			It("Should support float data type", func() {
+				values := []float32{1, -2, 0, 1.123, -1.31}
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "float", value, "%f", jsonNumberToFloat32)
+				}
+			})
+
+			It("Should support double data type", func() {
+				values := []float64{1, -2, 0, 1.123, -1.31}
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "double", value, "%f", nil)
 				}
 			})
 		})
@@ -384,4 +412,28 @@ func getRoutes(config *DataEndpointConfig, keyspace string) []graphql.Route {
 	routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", keyspace)
 	Expect(err).ToNot(HaveOccurred())
 	return routes
+}
+
+func jsonNumberToFloat32(value interface{}) interface{} {
+	switch value := value.(type) {
+	case float64:
+		return float32(value)
+	}
+	panic("unexpected type")
+}
+
+func jsonNumberToInt(value interface{}) interface{} {
+	switch value := value.(type) {
+	case float64:
+		return int(value)
+	}
+	panic("unexpected type")
+}
+
+func jsonNumberToInt8(value interface{}) interface{} {
+	switch value := value.(type) {
+	case float64:
+		return int8(value)
+	}
+	panic("unexpected type")
 }
