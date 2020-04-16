@@ -50,7 +50,9 @@ func DecodeResponse(buffer *bytes.Buffer) ResponseBody {
 }
 
 func DecodeData(buffer *bytes.Buffer, key string) map[string]interface{} {
-	return DecodeResponse(buffer).Data[key].(map[string]interface{})
+	response := DecodeResponse(buffer)
+	Expect(response.Errors).To(HaveLen(0))
+	return response.Data[key].(map[string]interface{})
 }
 
 func DecodeDataAsSliceOfMaps(buffer *bytes.Buffer, key string, property string) []map[string]interface{} {

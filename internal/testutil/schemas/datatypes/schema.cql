@@ -10,7 +10,7 @@ CREATE TABLE scalars (
     id int PRIMARY KEY,
     text_col text,
     varchar_col varchar,
-    --ascii_col ascii,
+    ascii_col ascii,
     tinyint_col tinyint,
     --smallint_col smallint,
     int_col int,

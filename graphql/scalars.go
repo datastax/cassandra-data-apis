@@ -24,6 +24,9 @@ var bigint = newStringNativeScalar(
 var counter = newStringNativeScalar(
 	"Counter", "The `Counter` scalar type represents a CQL counter (64-bit signed integer) as a string.")
 
+var ascii = newStringNativeScalar(
+	"Ascii", "The `Ascii` scalar type represents CQL ascii character values as a string.")
+
 var decimal = newStringScalar(
 	"Decimal", "The `Decimal` scalar type represents a CQL decimal as a string.",
 	serializeStringer, deserializeDecimal)

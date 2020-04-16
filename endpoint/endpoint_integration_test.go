@@ -345,10 +345,18 @@ var _ = Describe("DataEndpoint", func() {
 				routes = getRoutes(config, keyspace)
 			})
 
-			It("Should support text and varchar datatypes", func() {
+			It("Should support text and varchar data types", func() {
 				values := []string{"Привет мир", "नमस्ते दुनिया", "Jürgen"}
 				for _, value := range values {
 					datatypes.MutateAndQueryScalar(routes, "text", value, `"%s"`)
+					datatypes.MutateAndQueryScalar(routes, "varchar", value, `"%s"`)
+				}
+			})
+
+			It("Should support ascii data type", func() {
+				values := []string{"ABC", "><=;#{}[]", "abc"}
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "ascii", value, `"%s"`)
 				}
 			})
 		})

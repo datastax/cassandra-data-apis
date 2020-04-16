@@ -79,6 +79,8 @@ func (s *KeyspaceGraphQLSchema) buildType(typeInfo gocql.TypeInfo, isInput bool)
 		return graphql.Int, nil
 	case gocql.TypeFloat, gocql.TypeDouble:
 		return graphql.Float, nil
+	case gocql.TypeAscii:
+		return ascii, nil
 	case gocql.TypeText, gocql.TypeVarchar:
 		return graphql.String, nil
 	case gocql.TypeBigInt:
