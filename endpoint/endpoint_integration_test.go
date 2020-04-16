@@ -8,6 +8,7 @@ import (
 	"github.com/datastax/cassandra-data-apis/graphql"
 	. "github.com/datastax/cassandra-data-apis/internal/testutil"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas"
+	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas/datatypes"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas/killrvideo"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas/quirky"
 	"github.com/gocql/gocql"
@@ -334,6 +335,23 @@ var _ = Describe("DataEndpoint", func() {
 				quirky.SelectWeirdCase(routes, 1)
 			})
 		})
+
+		Context("With datatypes schema", func() {
+			config := NewEndpointConfigWithLogger(TestLogger(), host)
+			keyspace := "datatypes"
+			var routes []graphql.Route
+
+			BeforeEach(func() {
+				routes = getRoutes(config, keyspace)
+			})
+
+			It("Should support text and varchar datatypes", func() {
+				values := []string{"Привет мир", "नमस्ते दुनिया", "Jürgen"}
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "text", value, `"%s"`)
+				}
+			})
+		})
 	})
 })
 
@@ -341,6 +359,7 @@ var _ = BeforeSuite(func() {
 	session = SetupIntegrationTestFixture()
 	CreateSchema("killrvideo")
 	CreateSchema("quirky")
+	CreateSchema("datatypes")
 })
 
 var _ = AfterSuite(func() {

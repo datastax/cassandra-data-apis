@@ -99,7 +99,7 @@ func TestLogger() log.Logger {
 		if err != nil {
 			panic(err)
 		}
-		log.NewZapLogger(logger)
+		return log.NewZapLogger(logger)
 	}
 
 	return log.NewZapLogger(zap.NewNop())
