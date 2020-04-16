@@ -96,8 +96,7 @@ func TestDataEndpoint_Auth(t *testing.T) {
 				NewQueryOptions().
 				WithUserOrRole("user1").
 				WithPageState([]byte{}).
-				WithConsistency(gocql.LocalQuorum).
-				WithSerialConsistency(gocql.Serial),
+				WithConsistency(gocql.LocalQuorum),
 			mock.Anything).
 		Return(resultMock, nil)
 
@@ -154,8 +153,7 @@ func TestDataEndpoint_AuthNotProvided(t *testing.T) {
 			db.
 				NewQueryOptions().
 				WithUserOrRole("user1").
-				WithConsistency(gocql.LocalQuorum).
-				WithSerialConsistency(gocql.Serial),
+				WithConsistency(gocql.LocalQuorum),
 			mock.Anything).
 		Return(resultMock, errors.New("invalid cre"))
 
