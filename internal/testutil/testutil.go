@@ -2,11 +2,14 @@ package testutil
 
 import (
 	"fmt"
+	"github.com/datastax/cassandra-data-apis/log"
 	"github.com/gocql/gocql"
+	"go.uber.org/zap"
 	"os"
 	"os/exec"
 	"path"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -88,4 +91,16 @@ func PanicIfError(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func TestLogger() log.Logger {
+	if strings.ToUpper(os.Getenv("TEST_TRACE")) == "ON" {
+		logger, err := zap.NewProduction()
+		if err != nil {
+			panic(err)
+		}
+		log.NewZapLogger(logger)
+	}
+
+	return log.NewZapLogger(zap.NewNop())
 }

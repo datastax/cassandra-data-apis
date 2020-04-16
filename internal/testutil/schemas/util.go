@@ -39,7 +39,7 @@ const GraphQLTypesQuery = `{
 
 const (
 	postIndex = 1
-	Host      = "127.0.0.1"
+	host      = "127.0.0.1"
 )
 
 func DecodeResponse(buffer *bytes.Buffer) ResponseBody {
@@ -91,8 +91,23 @@ func NewUuid() string {
 func ExecutePost(routes []graphql.Route, target string, body string) *bytes.Buffer {
 	b, err := json.Marshal(graphql.RequestBody{Query: body})
 	Expect(err).ToNot(HaveOccurred())
-	r := httptest.NewRequest(http.MethodPost, path.Join(fmt.Sprintf("http://%s", Host), target), bytes.NewReader(b))
+	r := httptest.NewRequest(http.MethodPost, path.Join(fmt.Sprintf("http://%s", host), target), bytes.NewReader(b))
 	w := httptest.NewRecorder()
 	routes[postIndex].Handler.ServeHTTP(w, r)
 	return w.Body
+}
+
+func ExpectQueryToReturnError(routes []graphql.Route, query string, expectedMessage string) {
+	b, err := json.Marshal(graphql.RequestBody{Query: query})
+	Expect(err).ToNot(HaveOccurred())
+	r := httptest.NewRequest(http.MethodPost, path.Join(fmt.Sprintf("http://%s", host), "/graphql"), bytes.NewReader(b))
+	w := httptest.NewRecorder()
+	routes[postIndex].Handler.ServeHTTP(w, r)
+	// GraphQL spec defines the error as a field and HTTP status code should still be 200
+	// http://spec.graphql.org/June2018/#sec-Errors
+	Expect(w.Code).To(Equal(http.StatusOK))
+	response := DecodeResponse(w.Body)
+	Expect(response.Data).To(HaveLen(0))
+	Expect(response.Errors).To(HaveLen(1))
+	Expect(response.Errors[0].Message).To(ContainSubstring(expectedMessage))
 }

@@ -3,8 +3,6 @@
 package endpoint
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/graphql"
@@ -15,9 +13,6 @@ import (
 	"github.com/gocql/gocql"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"net/http"
-	"net/http/httptest"
-	"path"
 	"sort"
 	"testing"
 	"time"
@@ -28,7 +23,7 @@ var session *gocql.Session
 var _ = Describe("DataEndpoint", func() {
 	Describe("RoutesKeyspaceGraphQL()", func() {
 		Context("With killrvideo schema", func() {
-			config, _ := NewEndpointConfig(host)
+			config := NewEndpointConfigWithLogger(TestLogger(), host)
 			keyspace := "killrvideo"
 			It("Should insert and select users", func() {
 				routes := getRoutes(config, keyspace)
@@ -247,32 +242,56 @@ var _ = Describe("DataEndpoint", func() {
 			})
 
 			It("Should return an error when query is not found", func() {
-				routes := getRoutes(config, keyspace)
 				query := `query {
 				 insertNotFound {
 					values {
 					  name
-					  description
 					}
 				 }
 				}`
-				b, err := json.Marshal(graphql.RequestBody{Query: query})
-				Expect(err).ToNot(HaveOccurred())
-				r := httptest.NewRequest(http.MethodPost, path.Join(fmt.Sprintf("http://%s", schemas.Host), "/graphql"), bytes.NewReader(b))
-				w := httptest.NewRecorder()
-				routes[postIndex].Handler.ServeHTTP(w, r)
-				// GraphQL spec defines the error as a field and HTTP status code should still be 200
-				// http://spec.graphql.org/June2018/#sec-Errors
-				Expect(w.Code).To(Equal(http.StatusOK))
-				response := schemas.DecodeResponse(w.Body)
-				Expect(response.Data).To(HaveLen(0))
-				Expect(response.Errors).To(HaveLen(1))
-				Expect(response.Errors[0].Message).To(ContainSubstring("Cannot query field"))
+				schemas.ExpectQueryToReturnError(getRoutes(config, keyspace), query, "Cannot query field")
+			})
+
+			It("Should return an error when selection field is not found", func() {
+				query := `query {
+				 videosByTag (data: { tag: "a"}) {
+					values {
+					  tag
+					  fieldNotFound
+					}
+				 }
+				}`
+				schemas.ExpectQueryToReturnError(
+					getRoutes(config, keyspace), query, `Cannot query field "fieldNotFound" on type`)
+			})
+
+			It("Should return an error when condition field is not found", func() {
+				query := `query {
+				 videosByTag (data: { fieldNotFound: "a"}) {
+					values {
+					  tag
+					}
+				 }
+				}`
+				schemas.ExpectQueryToReturnError(
+					getRoutes(config, keyspace), query, `Argument "data" has invalid value`)
+			})
+
+			It("Should return an error when parameter is not found", func() {
+				query := `query {
+				 videosByTag (data: { tag: "a"}, paramNotFound: true) {
+					values {
+					  tag
+					}
+				 }
+				}`
+				schemas.ExpectQueryToReturnError(
+					getRoutes(config, keyspace), query, `Unknown argument "paramNotFound" on field "videosByTag"`)
 			})
 		})
 
 		Context("With quirky schema", func() {
-			config, _ := NewEndpointConfig(host)
+			config := NewEndpointConfigWithLogger(TestLogger(), host)
 			keyspace := "quirky"
 
 			It("Should build tables with supported types", func() {
