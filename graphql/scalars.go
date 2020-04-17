@@ -45,6 +45,8 @@ var float32Scalar = graphql.NewScalar(graphql.ScalarConfig{
 		switch valueAST := valueAST.(type) {
 		case *ast.FloatValue:
 			return deserializeFloat32(valueAST.Value)
+		case *ast.IntValue:
+			return deserializeFloat32(valueAST.Value)
 		}
 		return nil
 	},

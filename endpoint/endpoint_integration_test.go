@@ -409,15 +409,33 @@ var _ = Describe("DataEndpoint", func() {
 				toFloat32 := jsonNumberTo(func(v float64) interface{} {
 					return float32(v)
 				})
+				toString := jsonNumberTo(func(v float64) interface{} {
+					return fmt.Sprintf("%g", v)
+				})
+
 				for _, value := range values {
 					datatypes.MutateAndQueryScalar(routes, "float", value, "%f", toFloat32)
+				}
+
+				stringValues := []string{"1", "0", "-1", "123.46"}
+				for _, value := range stringValues {
+					datatypes.MutateAndQueryScalar(routes, "float", value, "%s", toString)
 				}
 			})
 
 			It("Should support double data type", func() {
+				toString := jsonNumberTo(func(v float64) interface{} {
+					return fmt.Sprintf("%g", v)
+				})
 				values := []float64{1, -2, 0, 1.123, -1.31}
+
 				for _, value := range values {
 					datatypes.MutateAndQueryScalar(routes, "double", value, "%f", nil)
+				}
+
+				stringValues := []string{"1", "0", "-1", "123.46"}
+				for _, value := range stringValues {
+					datatypes.MutateAndQueryScalar(routes, "double", value, "%s", toString)
 				}
 			})
 
@@ -486,6 +504,34 @@ var _ = Describe("DataEndpoint", func() {
 				}
 				for _, value := range values {
 					datatypes.MutateAndQueryScalar(routes, "timeuuid", value, `"%s"`, nil)
+				}
+			})
+
+			Context("With invalid values", func() {
+				items := [][]string{
+					{"float", "abc", `"abc"`},
+					{"double", "abc", `"abc"`},
+					{"tinyint", "abc", `"abc"`},
+					{"int", "abc", `"abc"`},
+					{"bigint", "123", `"abc"`},
+					{"varint", "123", `"abc"`},
+					{"decimal", "123", `"abc"`},
+					{"timeuuid", `"1234-"`, "123"},
+					{"uuid", `"1234-"`, "123"},
+					{"inet", `"a.b.c.d"`, "123"},
+					{"blob", `"ZZZ!"`},
+					{"timestamp", `"ZZZ!"`, "123"},
+					{"time", `"ZZZ!"`, "123"},
+				}
+
+				for _, itemEach := range items {
+					// Capture item
+					item := itemEach
+					It("Should return an error for "+item[0], func() {
+						for i := 1; i < len(item); i++ {
+							datatypes.InsertScalarErrors(routes, item[0], item[i])
+						}
+					})
 				}
 			})
 		})

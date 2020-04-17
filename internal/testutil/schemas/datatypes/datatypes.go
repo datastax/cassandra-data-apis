@@ -77,3 +77,16 @@ func MutateAndQueryScalar(
 	data = schemas.DecodeDataAsSliceOfMaps(buffer, "scalars", "values")
 	Expect(convert(data[0][datatype+"Col"])).To(Equal(value))
 }
+
+func InsertScalarErrors(routes []graphql.Route, datatype string, value string) {
+	insertQuery := `mutation {
+	  insertScalars(data:{id:"%s", %sCol:%s}) {
+		applied
+	  }
+	}`
+
+	buffer := schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(insertQuery, schemas.NewUuid(), datatype, value))
+	response := schemas.DecodeResponse(buffer)
+	Expect(response.Errors).To(HaveLen(1))
+	Expect(response.Errors[0].Message).To(ContainSubstring("invalid"))
+}
