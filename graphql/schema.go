@@ -80,6 +80,17 @@ func (sg *SchemaGenerator) buildQueriesFields(
 			Resolve: sg.queryFieldResolver(table, ksSchema, true),
 		}
 	}
+
+	if len(keyspace.Tables) == 0 {
+		// graphql-go requires at least a single query and a single mutation
+		fields["__keyspaceEmptyQuery"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Resolve: func(params graphql.ResolveParams) (interface{}, error) {
+				return true, nil
+			},
+		}
+	}
+
 	return fields
 }
 
@@ -136,6 +147,17 @@ func (sg *SchemaGenerator) buildMutationFields(
 			Resolve: sg.mutationFieldResolver(table, ksSchema, updateOperation),
 		}
 	}
+
+	if len(keyspace.Tables) == 0 {
+		// graphql-go requires at least a single query and a single mutation
+		fields["__keyspaceEmptyMutation"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Resolve: func(params graphql.ResolveParams) (interface{}, error) {
+				return true, nil
+			},
+		}
+	}
+
 	return fields
 }
 
