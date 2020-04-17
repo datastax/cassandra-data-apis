@@ -37,8 +37,7 @@ var inputQueryOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 		"limit":             {Type: graphql.Int},
 		"pageSize":          {Type: graphql.Int},
 		"pageState":         {Type: graphql.String},
-		"consistency":       {Type: consistencyEnum, DefaultValue: gocql.LocalQuorum},
-		"serialConsistency": {Type: consistencyEnum, DefaultValue: gocql.Serial},
+		"consistency":       {Type: queryConsistencyEnum, DefaultValue: gocql.LocalQuorum},
 	},
 })
 
@@ -46,8 +45,8 @@ var inputMutationOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 	Name: "UpdateOptions",
 	Fields: graphql.InputObjectConfigFieldMap{
 		"ttl":               {Type: graphql.Int, DefaultValue: -1},
-		"consistency":       {Type: consistencyEnum, DefaultValue: gocql.LocalQuorum},
-		"serialConsistency": {Type: consistencyEnum, DefaultValue: gocql.Serial},
+		"consistency":       {Type: mutationConsistencyEnum, DefaultValue: gocql.LocalQuorum},
+		"serialConsistency": {Type: serialConsistencyEnum, DefaultValue: gocql.Serial},
 	},
 })
 
@@ -62,12 +61,29 @@ var inputMutationOptionsDefault = types.MutationOptions{
 	SerialConsistency: int(gocql.Serial),
 }
 
-var consistencyEnum = graphql.NewEnum(graphql.EnumConfig{
-	Name: "Consistency",
+var queryConsistencyEnum = graphql.NewEnum(graphql.EnumConfig{
+	Name: "QueryConsistency",
 	Values: graphql.EnumValueConfigMap{
 		"LOCAL_ONE":    {Value: gocql.LocalOne},
 		"LOCAL_QUORUM": {Value: gocql.LocalQuorum},
 		"ALL":          {Value: gocql.All},
+		"SERIAL":       {Value: gocql.Serial},
+		"LOCAL_SERIAL": {Value: gocql.LocalSerial},
+	},
+})
+
+var mutationConsistencyEnum = graphql.NewEnum(graphql.EnumConfig{
+	Name: "MutationConsistency",
+	Values: graphql.EnumValueConfigMap{
+		"LOCAL_ONE":    {Value: gocql.LocalOne},
+		"LOCAL_QUORUM": {Value: gocql.LocalQuorum},
+		"ALL":          {Value: gocql.All},
+	},
+})
+
+var serialConsistencyEnum = graphql.NewEnum(graphql.EnumConfig{
+	Name: "SerialConsistency",
+	Values: graphql.EnumValueConfigMap{
 		"SERIAL":       {Value: gocql.Serial},
 		"LOCAL_SERIAL": {Value: gocql.LocalSerial},
 	},

@@ -84,8 +84,7 @@ func (sg *SchemaGenerator) queryFieldResolver(
 				WithUserOrRole(userOrRole).
 				WithPageSize(options.PageSize).
 				WithPageState(pageState).
-				WithConsistency(gocql.Consistency(options.Consistency)).
-				WithSerialConsistency(gocql.SerialConsistency(options.SerialConsistency)))
+				WithConsistency(gocql.Consistency(options.Consistency)))
 
 		if err != nil {
 			return nil, err
