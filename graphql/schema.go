@@ -6,7 +6,6 @@ import (
 	"github.com/datastax/cassandra-data-apis/config"
 	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/log"
-	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
 )
@@ -30,8 +29,6 @@ type SchemaGenerator struct {
 	ksExcluded        map[string]bool
 	logger            log.Logger
 }
-
-var appliedModificationResult = types.ModificationResult{Applied: true}
 
 func NewSchemaGenerator(dbClient *db.Db, cfg config.Config) *SchemaGenerator {
 	ksExcluded := map[string]bool{}

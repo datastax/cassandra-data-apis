@@ -3,7 +3,6 @@ package graphql
 import (
 	"fmt"
 	"github.com/datastax/cassandra-data-apis/config"
-	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
@@ -386,21 +385,10 @@ func (s *KeyspaceGraphQLSchema) adaptResult(tableName string, values []map[strin
 	return result
 }
 
-func (s *KeyspaceGraphQLSchema) getModificationResult(
+func (s *KeyspaceGraphQLSchema) getAppliedModificationResult(
 	tableName string,
-	rs db.ResultSet,
-	err error,
+	rows []map[string]interface{},
 ) (*types.ModificationResult, error) {
-	if err != nil {
-		return nil, err
-	}
-
-	rows := rs.Values()
-
-	if len(rows) == 0 {
-		return &appliedModificationResult, nil
-	}
-
 	result := types.ModificationResult{}
 	row := rows[0]
 	applied := row["[applied]"].(*bool)
