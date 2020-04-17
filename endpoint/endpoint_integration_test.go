@@ -363,6 +363,27 @@ var _ = Describe("DataEndpoint", func() {
 				}
 			})
 
+			It("Should support inet data type", func() {
+				values := []string{"127.0.0.1", "::1", "10.1.2.250", "8.8.8.8", "fe80::aede:48ff:fe00:1122"}
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "inet", value, `"%s"`, nil)
+				}
+			})
+
+			It("Should support blob data type", func() {
+				values := []string{"VGhl", "ABEi", "AA==", "ESIira0="}
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "blob", value, `"%s"`, nil)
+				}
+			})
+
+			It("Should support boolean data type", func() {
+				values := []bool{true, false}
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "boolean", value, `%t`, nil)
+				}
+			})
+
 			It("Should support int data type", func() {
 				values := []int{1, -2, 0, math.MaxInt32, math.MinInt32}
 				toInt := jsonNumberTo(func(v float64) interface{} {
@@ -434,6 +455,37 @@ var _ = Describe("DataEndpoint", func() {
 				})
 				for _, value := range values {
 					datatypes.MutateAndQueryScalar(routes, "decimal", value, `"%s"`, toDec)
+				}
+			})
+
+			It("Should support time data type", func() {
+				values := []string{"00:00:01.000000001", "14:29:31.800600000", "08:00:00", "21:59:32.800000000"}
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "time", value, `"%s"`, nil)
+				}
+			})
+
+			It("Should timestamp data type", func() {
+				values := []string{"1983-02-23T00:00:50Z", "2010-04-29T23:20:21.52Z"}
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "timestamp", value, `"%s"`, nil)
+				}
+			})
+
+			It("Should uuid data type", func() {
+				values := []string{schemas.NewUuid(), schemas.NewUuid(), schemas.NewUuid()}
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "uuid", value, `"%s"`, nil)
+				}
+			})
+
+			It("Should timeuuid data type", func() {
+				values := []string{
+					gocql.TimeUUID().String(),
+					gocql.UUIDFromTime(time.Date(2005, 8, 5, 0, 0, 0, 0, time.UTC)).String(),
+				}
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "timeuuid", value, `"%s"`, nil)
 				}
 			})
 		})

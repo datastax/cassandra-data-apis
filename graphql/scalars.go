@@ -56,7 +56,7 @@ var blob = newStringScalar(
 
 var timestamp = newStringScalar(
 	"Timestamp", "The `Timestamp` scalar type represents a DateTime."+
-		" The Timestamp is serialized as an RFC 3339 quoted string",
+		" The Timestamp is serialized as a RFC 3339 quoted string",
 	serializeTimestamp, deserializeTimestamp)
 
 var localTime = newStringScalar(
