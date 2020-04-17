@@ -14,8 +14,11 @@ import (
 	"github.com/gocql/gocql"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"gopkg.in/inf.v0"
 	"math"
+	"math/big"
 	"sort"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -362,22 +365,31 @@ var _ = Describe("DataEndpoint", func() {
 
 			It("Should support int data type", func() {
 				values := []int{1, -2, 0, math.MaxInt32, math.MinInt32}
+				toInt := jsonNumberTo(func(v float64) interface{} {
+					return int(v)
+				})
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "int", value, "%d", jsonNumberToInt)
+					datatypes.MutateAndQueryScalar(routes, "int", value, "%d", toInt)
 				}
 			})
 
 			It("Should support tinyint data type", func() {
 				values := []int8{1, -2, 0, math.MaxInt8, math.MinInt8}
+				toInt8 := jsonNumberTo(func(v float64) interface{} {
+					return int8(v)
+				})
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "int", value, "%d", jsonNumberToInt8)
+					datatypes.MutateAndQueryScalar(routes, "int", value, "%d", toInt8)
 				}
 			})
 
 			It("Should support float data type", func() {
 				values := []float32{1, -2, 0, 1.123, -1.31}
+				toFloat32 := jsonNumberTo(func(v float64) interface{} {
+					return float32(v)
+				})
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "float", value, "%f", jsonNumberToFloat32)
+					datatypes.MutateAndQueryScalar(routes, "float", value, "%f", toFloat32)
 				}
 			})
 
@@ -385,6 +397,43 @@ var _ = Describe("DataEndpoint", func() {
 				values := []float64{1, -2, 0, 1.123, -1.31}
 				for _, value := range values {
 					datatypes.MutateAndQueryScalar(routes, "double", value, "%f", nil)
+				}
+			})
+
+			It("Should support bigint data type", func() {
+				values := []int64{1, -2, 0, math.MaxInt64, math.MinInt64}
+				toBigInt := jsonStringTo(func(v string) interface{} {
+					i, _ := strconv.ParseInt(v, 10, 64)
+					return i
+				})
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "bigint", value, `"%d"`, toBigInt)
+				}
+			})
+
+			It("Should support varint data type", func() {
+				values := []*big.Int{
+					big.NewInt(0), big.NewInt(-1), big.NewInt(0).Mul(big.NewInt(math.MaxInt64), big.NewInt(123)),
+				}
+				toInt := jsonStringTo(func(v string) interface{} {
+					i := new(big.Int)
+					i.SetString(v, 10)
+					return i
+				})
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "varint", value, `"%s"`, toInt)
+				}
+			})
+
+			It("Should support decimal data type", func() {
+				values := []*inf.Dec{inf.NewDec(123, 2), inf.NewDec(0, 0), inf.NewDec(-1, 0)}
+				toDec := jsonStringTo(func(v string) interface{} {
+					i := new(inf.Dec)
+					i.SetString(v)
+					return i
+				})
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "decimal", value, `"%s"`, toDec)
 				}
 			})
 		})
@@ -414,26 +463,22 @@ func getRoutes(config *DataEndpointConfig, keyspace string) []graphql.Route {
 	return routes
 }
 
-func jsonNumberToFloat32(value interface{}) interface{} {
-	switch value := value.(type) {
-	case float64:
-		return float32(value)
+func jsonStringTo(f func(string) interface{}) func(interface{}) interface{} {
+	return func(value interface{}) interface{} {
+		switch value := value.(type) {
+		case string:
+			return f(value)
+		}
+		panic("unexpected type")
 	}
-	panic("unexpected type")
 }
 
-func jsonNumberToInt(value interface{}) interface{} {
-	switch value := value.(type) {
-	case float64:
-		return int(value)
+func jsonNumberTo(f func(float64) interface{}) func(interface{}) interface{} {
+	return func(value interface{}) interface{} {
+		switch value := value.(type) {
+		case float64:
+			return f(value)
+		}
+		panic("unexpected type")
 	}
-	panic("unexpected type")
-}
-
-func jsonNumberToInt8(value interface{}) interface{} {
-	switch value := value.(type) {
-	case float64:
-		return int8(value)
-	}
-	panic("unexpected type")
 }

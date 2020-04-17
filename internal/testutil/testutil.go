@@ -35,7 +35,10 @@ func executeCcm(command string) {
 	ccmCommand := fmt.Sprintf("ccm %s", command)
 	cmd := exec.Command("bash", "-c", ccmCommand)
 	output, err := cmd.CombinedOutput()
-	fmt.Println("Output", string(output))
+	outputStr := string(output)
+	if outputStr != "" {
+		fmt.Println("Output", outputStr)
+	}
 	if err != nil {
 		fmt.Println("Error", err)
 		panic(err)

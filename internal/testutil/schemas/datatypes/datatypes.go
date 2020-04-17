@@ -6,10 +6,7 @@ import (
 	"github.com/datastax/cassandra-data-apis/graphql"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas"
 	. "github.com/onsi/gomega"
-	"sync/atomic"
 )
-
-var index int32 = 0
 
 type ConvertFn func(value interface{}) interface{}
 
@@ -21,12 +18,12 @@ func MutateAndQueryScalar(
 	convert ConvertFn,
 ) {
 	insertQuery := `mutation {
-	  insertScalars(data:{id:%d, %sCol:%s}) {
+	  insertScalars(data:{id:"%s", %sCol:%s}) {
 		applied
 	  }
 	}`
 	selectQuery := `query {
-	  scalars(data:{id:%d}) {
+	  scalars(data:{id:"%s"}) {
 		values {
 		  id
 		  %sCol
@@ -34,18 +31,18 @@ func MutateAndQueryScalar(
 	  }
 	}`
 	deleteQuery := `mutation {
-	  deleteScalars(data:{id:%d}) {
+	  deleteScalars(data:{id:"%s"}) {
 		applied
 	  }
 	}`
 	updateQuery := `mutation {
-	  updateScalars(data:{id:%d, %sCol:%s}) {
+	  updateScalars(data:{id:"%s", %sCol:%s}) {
 		applied
 	  }
 	}`
 
 	valueStr := fmt.Sprintf(format, value)
-	id := atomic.AddInt32(&index, 1)
+	id := schemas.NewUuid()
 	var buffer *bytes.Buffer
 	var data []map[string]interface{}
 	if convert == nil {

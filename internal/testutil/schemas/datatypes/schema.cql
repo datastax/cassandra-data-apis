@@ -7,14 +7,14 @@ CREATE KEYSPACE datatypes WITH REPLICATION = { 'class' : 'SimpleStrategy', 'repl
 use datatypes;
 
 CREATE TABLE scalars (
-    id int PRIMARY KEY,
+    id uuid PRIMARY KEY,
     text_col text,
     varchar_col varchar,
     ascii_col ascii,
     tinyint_col tinyint,
     --smallint_col smallint,
     int_col int,
-    bigint_col int,
+    bigint_col bigint,
     varint_col varint,
     decimal_col decimal,
     float_col float,
