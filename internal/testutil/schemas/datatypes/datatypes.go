@@ -92,7 +92,6 @@ func InsertScalarErrors(routes []graphql.Route, datatype string, value string) {
 }
 
 func InsertAndUpdateNulls(routes []graphql.Route, datatype string, jsonValue interface{}) {
-
 	insertQuery := `mutation {
 	  insertScalars(data:{id:"%s", %sCol:%s}) {
 		applied
@@ -137,4 +136,40 @@ func InsertAndUpdateNulls(routes []graphql.Route, datatype string, jsonValue int
 	buffer = schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(selectQuery, id, datatype))
 	data = schemas.DecodeDataAsSliceOfMaps(buffer, "scalars", "values")
 	Expect(data[0][datatype+"Col"]).To(BeNil())
+}
+
+func MutateAndQueryCollection(
+	routes []graphql.Route,
+	fieldName string,
+	stringValue string,
+	jsonValue []interface{},
+	isMap bool,
+) {
+	updateQuery := `mutation {
+	  updateCollections(data:{id: "%s", %s: %s}) {
+		applied
+	  }
+	}`
+	selectQuery := `query {
+	  collections(data:{id:"%s"}) {
+		values {
+		  id
+		  %s
+		}
+	  }
+	}`
+
+	id := schemas.NewUuid()
+	buffer := schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(updateQuery, id, fieldName, stringValue))
+	Expect(schemas.DecodeData(buffer, "updateCollections")["applied"]).To(Equal(true))
+
+	selectFieldName := fieldName
+	if isMap {
+		selectFieldName = fmt.Sprintf("%s {key, value}", fieldName)
+	}
+
+	buffer = schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(selectQuery, id, selectFieldName))
+	data := schemas.DecodeDataAsSliceOfMaps(buffer, "collections", "values")
+	value := data[0][fieldName]
+	Expect(value).To(Equal(jsonValue))
 }

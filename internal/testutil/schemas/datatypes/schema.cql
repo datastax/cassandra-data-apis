@@ -28,4 +28,13 @@ CREATE TABLE scalars (
     time_col time
 );
 
+CREATE TABLE collections (
+    id uuid PRIMARY KEY ,
+    list_text list<text>,
+    list_float frozen<list<float>>,
+    set_uuid set<uuid>,
+    set_int frozen<set<int>>,
+    map_bigint_blob map<bigint, blob>,
+);
+
 CREATE TABLE sample_table (id int PRIMARY KEY);

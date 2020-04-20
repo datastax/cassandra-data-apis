@@ -564,6 +564,37 @@ var _ = Describe("DataEndpoint", func() {
 					})
 				}
 			})
+
+			It("should support list and sets", func() {
+				items := [][]interface{}{
+					{"listText", `["a", "b"]`, []interface{}{"a", "b"}},
+					{"listFloat", `[1.25, 1]`, []interface{}{1.25, float64(1)}},
+					{"setUuid", `["85414228-7a6d-4992-915d-0171f18de601"]`,
+						[]interface{}{"85414228-7a6d-4992-915d-0171f18de601"}},
+					{"setInt", `[2, 1]`, []interface{}{float64(1), float64(2)}},
+				}
+
+				for _, item := range items {
+					datatypes.MutateAndQueryCollection(
+						routes,
+						item[0].(string),
+						item[1].(string),
+						item[2].([]interface{}),
+						false)
+				}
+			})
+
+			It("should maps", func() {
+				datatypes.MutateAndQueryCollection(
+					routes,
+					"mapBigintBlob",
+					`[{key: "123", value: "VGhl"}, {key: "4", value: "asfR"}]`,
+					[]interface{}{
+						map[string]interface{}{"key": "4", "value": "asfR"},
+						map[string]interface{}{"key": "123", "value": "VGhl"},
+					},
+					true)
+			})
 		})
 
 		Context("With empty keyspace", func() {
