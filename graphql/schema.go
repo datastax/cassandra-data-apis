@@ -63,7 +63,7 @@ func (sg *SchemaGenerator) buildQueriesFields(
 		fields[ksSchema.naming.ToGraphQLOperation("", table.Name)] = &graphql.Field{
 			Type: ksSchema.resultSelectTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"data":    {Type: ksSchema.tableScalarInputTypes[table.Name]},
+				"value":    {Type: ksSchema.tableScalarInputTypes[table.Name]},
 				"orderBy": {Type: graphql.NewList(ksSchema.orderEnums[table.Name])},
 				"options": {Type: inputQueryOptions, DefaultValue: inputQueryOptionsDefault},
 			},
@@ -118,7 +118,7 @@ func (sg *SchemaGenerator) buildMutationFields(
 		fields[ksSchema.naming.ToGraphQLOperation(insertPrefix, name)] = &graphql.Field{
 			Type: ksSchema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"data":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
+				"value":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
 				"ifNotExists": {Type: graphql.Boolean},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
 			},
@@ -128,7 +128,7 @@ func (sg *SchemaGenerator) buildMutationFields(
 		fields[ksSchema.naming.ToGraphQLOperation(deletePrefix, name)] = &graphql.Field{
 			Type: ksSchema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"data":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
+				"value":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
 				"ifExists":    {Type: graphql.Boolean},
 				"ifCondition": {Type: ksSchema.tableOperatorInputTypes[table.Name]},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
@@ -139,7 +139,7 @@ func (sg *SchemaGenerator) buildMutationFields(
 		fields[ksSchema.naming.ToGraphQLOperation(updatePrefix, name)] = &graphql.Field{
 			Type: ksSchema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"data":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
+				"value":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
 				"ifExists":    {Type: graphql.Boolean},
 				"ifCondition": {Type: ksSchema.tableOperatorInputTypes[table.Name]},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},

@@ -10,12 +10,12 @@ import (
 
 func InsertAndSelect(routes []graphql.Route, name string) {
 	insertQuery := `mutation {
-	  insert%s(data:{id:%d, value:"%s"}) {
+	  insert%s(value:{id:%d, value:"%s"}) {
 		applied
 	  }
 	}`
 	selectQuery := `query {
-	  %s(data:{id:%d}) {
+	  %s(value:{id:%d}) {
 		values {
 		  id
 		  value
@@ -26,13 +26,13 @@ func InsertAndSelect(routes []graphql.Route, name string) {
 	value := schemas.NewUuid()
 	schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(insertQuery, name, 1, value))
 	buffer := schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(selectQuery, strcase.ToLowerCamel(name), 1))
-	data := schemas.DecodeDataAsSliceOfMaps(buffer, strcase.ToLowerCamel(name), "values")
-	Expect(data[0]["value"]).To(Equal(value))
+	values := schemas.DecodeDataAsSliceOfMaps(buffer, strcase.ToLowerCamel(name), "values")
+	Expect(values[0]["value"]).To(Equal(value))
 }
 
 func InsertWeirdCase(routes []graphql.Route, id int) {
 	query := `mutation { 
-	  insertWEIRDCASE(data: { id: %d, aBCdef: "one", qAData: "two", abcXYZ: "three" }) {
+	  insertWEIRDCASE(value: { id: %d, aBCdef: "one", qAData: "two", abcXYZ: "three" }) {
 		applied
 	  }
 	}`
@@ -43,7 +43,7 @@ func InsertWeirdCase(routes []graphql.Route, id int) {
 
 func SelectWeirdCase(routes []graphql.Route, id int) {
 	query := `{
-	  wEIRDCASE(data: {id: %d }) { 
+	  wEIRDCASE(value: {id: %d }) { 
 		values { aBCdef, abcXYZ, qAData }
 	  }
 	}`

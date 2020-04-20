@@ -281,7 +281,7 @@ var _ = Describe("DataEndpoint", func() {
 
 			It("Should return an error when selection field is not found", func() {
 				query := `query {
-				 videosByTag (data: { tag: "a"}) {
+				 videosByTag (value: { tag: "a"}) {
 					values {
 					  tag
 					  fieldNotFound
@@ -294,19 +294,19 @@ var _ = Describe("DataEndpoint", func() {
 
 			It("Should return an error when condition field is not found", func() {
 				query := `query {
-				 videosByTag (data: { fieldNotFound: "a"}) {
+				 videosByTag (value: { fieldNotFound: "a"}) {
 					values {
 					  tag
 					}
 				 }
 				}`
 				schemas.ExpectQueryToReturnError(
-					getRoutes(config, keyspace), query, `Argument "data" has invalid value`)
+					getRoutes(config, keyspace), query, `Argument "value" has invalid value`)
 			})
 
 			It("Should return an error when parameter is not found", func() {
 				query := `query {
-				 videosByTag (data: { tag: "a"}, paramNotFound: true) {
+				 videosByTag (value: { tag: "a"}, paramNotFound: true) {
 					values {
 					  tag
 					}

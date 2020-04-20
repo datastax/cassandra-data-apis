@@ -30,18 +30,18 @@ func (sg *SchemaGenerator) queryFieldResolver(
 ) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
 		// GraphQL operation is lower camel
-		var data map[string]interface{}
+		var value map[string]interface{}
 		if isFilter {
-			data = params.Args["filter"].(map[string]interface{})
-		} else if params.Args["data"] != nil {
-			data = params.Args["data"].(map[string]interface{})
+			value = params.Args["filter"].(map[string]interface{})
+		} else if params.Args["value"] != nil {
+			value = params.Args["value"].(map[string]interface{})
 		}
 
 		var whereClause []types.ConditionItem
 
 		if !isFilter {
-			whereClause = make([]types.ConditionItem, 0, len(data))
-			for key, value := range data {
+			whereClause = make([]types.ConditionItem, 0, len(value))
+			for key, value := range value {
 				whereClause = append(whereClause, types.ConditionItem{
 					Column:   ksSchema.naming.ToCQLColumn(table.Name, key),
 					Operator: "=",
@@ -49,7 +49,7 @@ func (sg *SchemaGenerator) queryFieldResolver(
 				})
 			}
 		} else {
-			whereClause = ksSchema.adaptCondition(table.Name, data)
+			whereClause = ksSchema.adaptCondition(table.Name, value)
 		}
 
 		var orderBy []interface{}
@@ -103,11 +103,11 @@ func (sg *SchemaGenerator) mutationFieldResolver(
 	operation mutationOperation,
 ) graphql.FieldResolveFn {
 	return func(params graphql.ResolveParams) (interface{}, error) {
-		data := params.Args["data"].(map[string]interface{})
-		columnNames := make([]string, 0, len(data))
-		queryParams := make([]interface{}, 0, len(data))
+		value := params.Args["value"].(map[string]interface{})
+		columnNames := make([]string, 0, len(value))
+		queryParams := make([]interface{}, 0, len(value))
 
-		for key, value := range data {
+		for key, value := range value {
 			columnNames = append(columnNames, ksSchema.naming.ToCQLColumn(table.Name, key))
 			queryParams = append(queryParams, adaptParameterValue(value))
 		}
