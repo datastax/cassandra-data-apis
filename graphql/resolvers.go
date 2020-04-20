@@ -171,19 +171,7 @@ func (sg *SchemaGenerator) mutationFieldResolver(
 			return false, fmt.Errorf("operation not supported")
 		}
 
-		if err != nil {
-			return nil, err
-		}
-
-		rows := result.Values()
-		if len(rows) == 0 {
-			return &types.ModificationResult{
-				Applied: true,
-				Value: data,
-			}, nil
-		}
-
-		return ksSchema.getAppliedModificationResult(table.Name, rows)
+		return ksSchema.getModificationResult(table, data, result, err)
 	}
 }
 

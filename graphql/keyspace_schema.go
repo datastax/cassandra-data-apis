@@ -3,6 +3,7 @@ package graphql
 import (
 	"fmt"
 	"github.com/datastax/cassandra-data-apis/config"
+	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
@@ -33,10 +34,10 @@ type KeyspaceGraphQLSchema struct {
 var inputQueryOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 	Name: "QueryOptions",
 	Fields: graphql.InputObjectConfigFieldMap{
-		"limit":             {Type: graphql.Int},
-		"pageSize":          {Type: graphql.Int},
-		"pageState":         {Type: graphql.String},
-		"consistency":       {Type: queryConsistencyEnum, DefaultValue: gocql.LocalQuorum},
+		"limit":       {Type: graphql.Int},
+		"pageSize":    {Type: graphql.Int},
+		"pageState":   {Type: graphql.String},
+		"consistency": {Type: queryConsistencyEnum, DefaultValue: gocql.LocalQuorum},
 	},
 })
 
@@ -233,7 +234,7 @@ func (s *KeyspaceGraphQLSchema) buildOrderEnums(keyspace *gocql.KeyspaceMetadata
 		for _, column := range table.Columns {
 			field := s.naming.ToGraphQLField(table.Name, column.Name)
 			values[field+"_ASC"] = &graphql.EnumValueConfig{
-				Value: column.Name + "_ASC",
+				Value:       column.Name + "_ASC",
 				Description: fmt.Sprintf("Order %s by %s in a	scending order", table.Name, column.Name),
 			}
 			values[field+"_DESC"] = &graphql.EnumValueConfig{
@@ -385,21 +386,44 @@ func (s *KeyspaceGraphQLSchema) adaptResult(tableName string, values []map[strin
 	return result
 }
 
-func (s *KeyspaceGraphQLSchema) getAppliedModificationResult(
-	tableName string,
-	rows []map[string]interface{},
+func (s *KeyspaceGraphQLSchema) getModificationResult(
+	table *gocql.TableMetadata,
+	inputValues map[string]interface{},
+	rs db.ResultSet,
+	err error,
 ) (*types.ModificationResult, error) {
+	if err != nil {
+		return nil, err
+	}
+
+	rows := rs.Values()
+	if len(rows) == 0 {
+		return &types.ModificationResult{
+			Applied: true,
+			Value:   inputValues,
+		}, nil
+	}
+
 	result := types.ModificationResult{}
 	row := rows[0]
 	applied := row["[applied]"].(*bool)
 	result.Applied = applied != nil && *applied
 
 	result.Value = make(map[string]interface{})
+
+	for k, v := range inputValues {
+		column, ok := table.Columns[s.naming.ToCQLColumn(table.Name, k)]
+		isKeyColumn := ok && (column.Kind == gocql.ColumnPartitionKey || column.Kind == gocql.ColumnClusteringKey)
+		if result.Applied || isKeyColumn {
+			result.Value[k] = v
+		}
+	}
+
 	for k, v := range row {
 		if k == "[applied]" {
 			continue
 		}
-		result.Value[s.naming.ToGraphQLField(tableName, k)] = adaptResultValue(v)
+		result.Value[s.naming.ToGraphQLField(table.Name, k)] = adaptResultValue(v)
 	}
 
 	return &result, nil
