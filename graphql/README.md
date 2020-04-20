@@ -94,8 +94,8 @@ in your database will no longer be accessible via `/graphql/<keyspace>`.
 ### API Generation
 
 For each table in your Cassandra schema, several fields are created for handling
-queries and mutations.  For example, the `books` table's GraphQL schema looks
-like this:
+queries and mutations. For example, the generated `books` table's GraphQL schema
+looks like this:
 
 ```graphql
 schema {
@@ -141,12 +141,20 @@ As more tables are added to a keyspace additional fields will be added to the
 `TableQuery` and `TableMutation` types to handle queries and mutations for those
 new tables.
 
+### API Naming Convention
+
+The default naming convention converts CQL (tables and columns) names to
+`lowerCamelCase` for GraphQL fields and `UpperCameCase` for GraphQL types. If
+the naming convention rules result in a naming conflict then a number is added
+as a suffix e.g. `someExistingColumn` --> `someExistingColumn2`. If a naming
+conflict is not resolved within the maximum suffix value of `999` it will result
+in a error.
+
 ### Using the API
 
-Using the schema has been created in the previous you start adding and querying
-values. Navigate to your keyspace inside the playground by going to
-http://localhost:8080/graphql/library and start adding some entries.
-
+Building on the `books` schema created in previous steps this section will show
+you how to add and query books.  Navigate to your keyspace inside the playground
+by going to http://localhost:8080/graphql/library and start adding some entries.
 
 #### Insert Books
 
@@ -164,7 +172,6 @@ mutation {
   }
 }
 ```
-
 
 #### Query Books
 
@@ -232,9 +239,9 @@ query {
 
 ## Using Apollo Client
 
-This is a basic guide to get started with Apollo Client 2.x in node. First
-you'll need to install dependencies. These examples utilize the `books` schema
-created in the previous schema section.
+This is a basic guide for getting started with Apollo Client 2.x in Node. First
+you'll need to install dependencies. These examples also utilize the `books`
+schema created in the schema section.
 
 ### Node
 
@@ -243,7 +250,7 @@ npm install apollo-client apollo-cache-inmemory apollo-link-http \
       apollo-link-error apollo-link graphql-tag --save
 ```
 
-After the dependencies are installed you should be able to connect to you local
+After the dependencies are installed you should be able to connect to your local
 server.
 
 ```js
@@ -280,24 +287,116 @@ client.query({
 ### In the Browser
 
 The Apollo Client can also be used inside the browser:
-https://jsfiddle.net/1n8f0cgt/, but [CORS] needs to be enabled. This can be
-done by starting the Docker image with the environment variable `-e
+https://jsfiddle.net/1n8f0cgt/, but [CORS] needs to be enabled. This can be done
+by starting the Docker image with the environment variable `-e
 DATA_API_ACCESS_CONTROL_ALLOW_ORIGIN=*`
-
 
 ## API Features
 
-### Filtering
-
 ### Paging
 
-### Conditional Inserts
+Query paging can be controlled by modifying the values of `pagingSize` and
+`pageState` in the input type `QueryOptions` argument. The default `pageSize` is
+100 values.
 
-### Conditional Updates
+```
+input QueryOptions {
+  pageSize: Int
+  pageState: String
+  # ...
+}
+```
+
+The `pageState` is return in the data result of queries. It is a marker that can
+be passed to subsequent queries to get the following page.
+
+``` graphql
+query {
+    books (options:{pageSize: 10}) {
+      values {
+        # ...
+      }
+      pageState # Return the page state
+    }
+}
+
+The `pageState` value is returned in the GraphQL data result.
+
+```json
+{
+  "data": {
+    "books": {
+      "pageState": "CENhdGNoLTIyAPB////+AA==",
+      "values": [
+        # ...
+      ]
+    }
+  }
+}
+```
+
+The resulting `pageState` can be passed into the next query.
+
+```graphql
+query {
+    books (options:{pageSize: 10, pageState: "CENhdGNoLTIyAPB////+AA=="}) {
+      # ...
+    }
+}
+```
+
+### Order By
+
+The order of values returned can be controlled by passing an enumeration value
+argument, `orderBy`, for the given field.
+
+Given the schema below this would return the books written by `"Herman
+Melville"` in order of the size of his books by page length.
+
+```graphql
+query {
+  bookBySize(value:{author:"Herman Melville"}, orderBy: pages_DESC) {
+    values {
+      title
+      pages
+    }
+  }
+}
+```
+
+```graphql
+enum BookBySizeOrder {
+  author_ASC
+  author_DESC
+  pages_ASC
+  pages_DESC
+  title_ASC
+  title_DESC
+}
+
+# ...
+
+bookBySize(
+options: QueryOptions
+value: BookBySizeInput
+orderBy: [BookBySizeOrder]): BookBySizeResult
+```
 
 ### Consistency
 
 ### Time To Live (TTL)
+
+### Filtering
+
+```graphql
+someTableFilter(filter: <TableName>FilterInput!, 
+                  orderBy: [<TableName>Order], 
+                  options: QueryOptions): <TableName>Result
+```
+
+### Conditional Inserts
+
+### Conditional Updates
 
 ## Advance Configuration
 
