@@ -14,8 +14,8 @@ the future.
 ### Installation
 
 ```sh
-docker pull datastax/cassandra-data-apis
-docker run --rm -d -p 8080:8080 -e DATA_API_HOSTS=<cassandra_hosts_here> datastax/cassandra-data-apis
+docker pull datastaxlabs/cassandra-data-apis
+docker run --rm -d -p 8080:8080 -e DATA_API_HOSTS=<cassandra_hosts_here> datastaxlabs/cassandra-data-apis
 ```
 
 You can also manually build the docker image and/or the server using the
