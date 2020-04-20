@@ -511,6 +511,7 @@ var _ = Describe("DataEndpoint", func() {
 				items := [][]string{
 					{"float", "abc", `"abc"`},
 					{"double", "abc", `"abc"`},
+					{"boolean", "abc", `"abc"`, "1", "0"},
 					{"tinyint", "abc", `"abc"`},
 					{"int", "abc", `"abc"`},
 					{"bigint", "123", `"abc"`},
@@ -531,6 +532,35 @@ var _ = Describe("DataEndpoint", func() {
 						for i := 1; i < len(item); i++ {
 							datatypes.InsertScalarErrors(routes, item[0], item[i])
 						}
+					})
+				}
+			})
+
+			Context("With null values", func() {
+				items := [][]interface{}{
+					{"float", float64(0)},
+					{"double", float64(1)},
+					{"double", float64(1)},
+					{"boolean", true},
+					{"tinyint", float64(1)},
+					{"int", float64(2)},
+					{"bigint", "123"},
+					{"varint", "123"},
+					{"decimal", "123.08"},
+					{"timeuuid", gocql.TimeUUID().String()},
+					{"uuid", schemas.NewUuid()},
+					{"inet", "10.11.150.201"},
+					{"blob", "ABEi"},
+					{"timestamp", "2005-08-05T13:20:21.52Z"},
+					{"time", "08:45:02"},
+				}
+
+				for _, itemEach := range items {
+					// Capture item
+					item := itemEach
+					datatype := item[0].(string)
+					It("Should set the tombstones for values of type"+datatype, func() {
+						datatypes.InsertAndUpdateNulls(routes, datatype, item[1])
 					})
 				}
 			})
