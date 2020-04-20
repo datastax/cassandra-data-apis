@@ -2,6 +2,8 @@ package killrvideo
 
 import (
 	"fmt"
+	"github.com/gocql/gocql"
+	. "github.com/onsi/gomega"
 )
 
 func InsertUserMutation(id interface{}, firstname interface{}, email interface{}, ifNotExists bool) string {
@@ -93,6 +95,27 @@ func SelectTagsByLetter(firstLetter string, pageSize int, pageState string) stri
 	}`
 
 	return fmt.Sprintf(query, asGraphQLString(firstLetter), pageSize, asGraphQLString(pageState))
+}
+
+func SelectTagsByLetterNoWhereClause(pageState string) string {
+	query := `{
+		tagsByLetter%s {
+  		  pageState
+		  values{ tag }}
+	}`
+
+	params := ""
+	if pageState != "" {
+		params = fmt.Sprintf(`(options: {pageState: "%s"})`, pageState)
+	}
+
+	return fmt.Sprintf(query, params)
+}
+
+func CqlInsertTagByLetter(session *gocql.Session, tag string) {
+	query := "INSERT INTO killrvideo.tags_by_letter (first_letter, tag) VALUES (?, ?)"
+	err := session.Query(query, tag[0:1], tag).Exec()
+	Expect(err).ToNot(HaveOccurred())
 }
 
 func SelectCommentsByVideoGreaterThan(videoId string, startCommentId string) string {

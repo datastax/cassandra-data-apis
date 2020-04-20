@@ -202,6 +202,10 @@ var _ = Describe("db", func() {
 		}{
 			{"a single condition", []types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, nil,
 				`SELECT * FROM "ks1"."tbl1" WHERE "a" = ?`},
+			{"no where clause", []types.ConditionItem{}, &types.QueryOptions{}, nil,
+				`SELECT * FROM "ks1"."tbl1"`},
+			{"no where clause and limit", []types.ConditionItem{}, &types.QueryOptions{Limit: 1}, nil,
+				`SELECT * FROM "ks1"."tbl1" LIMIT ?`},
 			{"multiple conditions", []types.ConditionItem{{"a", "=", 1}, {"B", ">", 2}}, &types.QueryOptions{}, nil,
 				`SELECT * FROM "ks1"."tbl1" WHERE "a" = ? AND "B" > ?`},
 			{"relational operators", []types.ConditionItem{{"a", "=", 1}, {"b", ">", 2}, {"b", "<=", 5}},

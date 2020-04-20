@@ -72,11 +72,9 @@ var _ = Describe("DataEndpoint", func() {
 
 			It("Should support page size and state", func() {
 				// Insert some data
-				insertQuery := "INSERT INTO killrvideo.tags_by_letter (first_letter, tag) VALUES (?, ?)"
 				length := 5
 				for i := 1; i <= length; i++ {
-					err := session.Query(insertQuery, "a", fmt.Sprintf("a%d", i)).Exec()
-					Expect(err).ToNot(HaveOccurred())
+					killrvideo.CqlInsertTagByLetter(session, fmt.Sprintf("a%d", i))
 				}
 
 				routes := getRoutes(config, keyspace)
@@ -103,6 +101,30 @@ var _ = Describe("DataEndpoint", func() {
 				pageState = queryTags(pageState, []map[string]interface{}{{"tag": "a5"}})
 				// No more pages
 				Expect(pageState).To(HaveLen(0))
+			})
+
+			It("Should support querying without where clause", func() {
+				// Insert some data
+				length := graphql.DefaultPageSize + 2
+				for i := 1; i <= length; i++ {
+					killrvideo.CqlInsertTagByLetter(session, fmt.Sprintf("b%d", i))
+				}
+
+				routes := getRoutes(config, keyspace)
+				query := killrvideo.SelectTagsByLetterNoWhereClause("")
+				buffer := schemas.ExecutePost(routes, "/graphql", query)
+				data := schemas.DecodeData(buffer, "tagsByLetter")
+				Expect(data["values"]).To(HaveLen(graphql.DefaultPageSize))
+				pageState := data["pageState"]
+				// Further pages should be signaled
+				Expect(pageState).NotTo(BeEmpty())
+
+				// query the following page
+				query = killrvideo.SelectTagsByLetterNoWhereClause(pageState.(string))
+				buffer = schemas.ExecutePost(routes, "/graphql", query)
+				data = schemas.DecodeData(buffer, "tagsByLetter")
+				Expect(data["values"]).NotTo(BeEmpty())
+				Expect(data["pageState"]).NotTo(Equal(pageState))
 			})
 
 			It("Should support normal and conditional updates", func() {

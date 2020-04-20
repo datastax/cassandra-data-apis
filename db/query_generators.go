@@ -51,7 +51,11 @@ type ColumnOrder struct {
 func (db *Db) Select(info *SelectInfo, options *QueryOptions) (ResultSet, error) {
 	values := make([]interface{}, 0, len(info.Where))
 	whereClause := buildCondition(info.Where, &values)
-	query := fmt.Sprintf(`SELECT * FROM "%s"."%s" WHERE %s`, info.Keyspace, info.Table, whereClause)
+	query := fmt.Sprintf(`SELECT * FROM "%s"."%s"`, info.Keyspace, info.Table)
+
+	if whereClause != "" {
+		query += fmt.Sprintf(" WHERE %s", whereClause)
+	}
 
 	if len(info.OrderBy) > 0 {
 		query += " ORDER BY "
@@ -180,16 +184,22 @@ func buildWhereClause(columnNames []string) string {
 	for _, name := range columnNames {
 		whereClause += fmt.Sprintf(` AND "%s" = ?`, name)
 	}
+
 	// Remove initial " AND " characters
 	return whereClause[5:]
 }
 
 func buildCondition(condition []types.ConditionItem, queryParameters *[]interface{}) string {
+	if len(condition) == 0 {
+		return ""
+	}
+
 	conditionClause := ""
 	for _, item := range condition {
 		conditionClause += fmt.Sprintf(` AND "%s" %s ?`, item.Column, item.Operator)
 		*queryParameters = append(*queryParameters, item.Value)
 	}
+
 	// Remove initial " AND " characters
 	return conditionClause[5:]
 }
