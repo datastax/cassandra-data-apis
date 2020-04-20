@@ -63,7 +63,7 @@ func (sg *SchemaGenerator) buildQueriesFields(
 		fields[ksSchema.naming.ToGraphQLOperation("", table.Name)] = &graphql.Field{
 			Type: ksSchema.resultSelectTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"data":    {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
+				"data":    {Type: ksSchema.tableScalarInputTypes[table.Name]},
 				"orderBy": {Type: graphql.NewList(ksSchema.orderEnums[table.Name])},
 				"options": {Type: inputQueryOptions, DefaultValue: inputQueryOptionsDefault},
 			},

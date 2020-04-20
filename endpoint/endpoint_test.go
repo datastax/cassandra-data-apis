@@ -96,7 +96,8 @@ func TestDataEndpoint_Auth(t *testing.T) {
 				NewQueryOptions().
 				WithUserOrRole("user1").
 				WithPageState([]byte{}).
-				WithConsistency(gocql.LocalQuorum),
+				WithPageSize(graphql.DefaultPageSize).
+				WithConsistency(graphql.DefaultConsistencyLevel),
 			mock.Anything).
 		Return(resultMock, nil)
 

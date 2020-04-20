@@ -9,6 +9,12 @@ import (
 	"github.com/graphql-go/graphql"
 )
 
+const (
+	DefaultPageSize               = 100
+	DefaultConsistencyLevel       = gocql.LocalQuorum
+	DefaultSerialConsistencyLevel = gocql.Serial
+)
+
 type KeyspaceGraphQLSchema struct {
 	// A set of ignored tables
 	ignoredTables map[string]bool
@@ -34,10 +40,10 @@ type KeyspaceGraphQLSchema struct {
 var inputQueryOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 	Name: "QueryOptions",
 	Fields: graphql.InputObjectConfigFieldMap{
-		"limit":             {Type: graphql.Int},
-		"pageSize":          {Type: graphql.Int},
-		"pageState":         {Type: graphql.String},
-		"consistency":       {Type: queryConsistencyEnum, DefaultValue: gocql.LocalQuorum},
+		"limit":       {Type: graphql.Int},
+		"pageSize":    {Type: graphql.Int},
+		"pageState":   {Type: graphql.String},
+		"consistency": {Type: queryConsistencyEnum, DefaultValue: gocql.LocalQuorum},
 	},
 })
 
@@ -51,14 +57,15 @@ var inputMutationOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 })
 
 var inputQueryOptionsDefault = types.QueryOptions{
-	Consistency:       int(gocql.LocalQuorum),
-	SerialConsistency: int(gocql.Serial),
+	Consistency:       int(DefaultConsistencyLevel),
+	PageSize:          DefaultPageSize,
+	SerialConsistency: int(DefaultSerialConsistencyLevel),
 }
 
 var inputMutationOptionsDefault = types.MutationOptions{
 	TTL:               -1,
-	Consistency:       int(gocql.LocalQuorum),
-	SerialConsistency: int(gocql.Serial),
+	Consistency:       int(DefaultConsistencyLevel),
+	SerialConsistency: int(DefaultSerialConsistencyLevel),
 }
 
 var queryConsistencyEnum = graphql.NewEnum(graphql.EnumConfig{

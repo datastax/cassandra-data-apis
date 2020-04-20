@@ -31,10 +31,10 @@ func (sg *SchemaGenerator) queryFieldResolver(
 	return func(params graphql.ResolveParams) (interface{}, error) {
 		// GraphQL operation is lower camel
 		var data map[string]interface{}
-		if params.Args["data"] != nil {
-			data = params.Args["data"].(map[string]interface{})
-		} else {
+		if isFilter {
 			data = params.Args["filter"].(map[string]interface{})
+		} else if params.Args["data"] != nil {
+			data = params.Args["data"].(map[string]interface{})
 		}
 
 		var whereClause []types.ConditionItem
