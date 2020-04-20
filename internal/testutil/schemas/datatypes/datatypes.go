@@ -171,5 +171,9 @@ func MutateAndQueryCollection(
 	buffer = schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(selectQuery, id, selectFieldName))
 	data := schemas.DecodeDataAsSliceOfMaps(buffer, "collections", "values")
 	value := data[0][fieldName]
-	Expect(value).To(Equal(jsonValue))
+	if !isMap {
+		Expect(value).To(Equal(jsonValue))
+	} else {
+		Expect(value).To(ContainElements(jsonValue))
+	}
 }

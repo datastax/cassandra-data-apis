@@ -612,8 +612,8 @@ var _ = Describe("DataEndpoint", func() {
 					"mapBigintBlob",
 					`[{key: "123", value: "VGhl"}, {key: "4", value: "asfR"}]`,
 					[]interface{}{
-						map[string]interface{}{"key": "4", "value": "asfR"},
 						map[string]interface{}{"key": "123", "value": "VGhl"},
+						map[string]interface{}{"key": "4", "value": "asfR"},
 					},
 					true)
 			})
