@@ -535,6 +535,25 @@ var _ = Describe("DataEndpoint", func() {
 				}
 			})
 		})
+
+		Context("With empty keyspace", func() {
+			const keyspace = "ks_empty"
+			config := NewEndpointConfigWithLogger(TestLogger(), host)
+
+			BeforeEach(func() {
+				query := fmt.Sprintf(
+					"CREATE KEYSPACE IF NOT EXISTS %s "+
+						"WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 1}",
+					keyspace)
+				err := session.Query(query).Exec()
+				PanicIfError(err)
+			})
+
+			It("Should build an empty schema", func() {
+				// getRoutes() validates that there wasn't an error
+				getRoutes(config, keyspace)
+			})
+		})
 	})
 })
 
