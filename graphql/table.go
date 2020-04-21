@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"errors"
 	"fmt"
 	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/gocql/gocql"
@@ -173,19 +174,30 @@ func getTables(keyspace *gocql.KeyspaceMetadata, args map[string]interface{}) (i
 		if table == nil {
 			return nil, fmt.Errorf("unable to find table '%s'", name)
 		}
+
+		columns, err := toColumnValues(table.Columns)
+		if err != nil {
+			return nil, err
+		}
+
 		return []*tableValue{
 			{
 				Name:    table.Name,
-				Columns: toColumnValues(table.Columns),
+				Columns: columns,
 			},
 		}, nil
 	}
 
 	tableValues := make([]*tableValue, 0)
 	for _, table := range keyspace.Tables {
+		columns, err := toColumnValues(table.Columns)
+		if err != nil {
+			return nil, err
+		}
+
 		tableValues = append(tableValues, &tableValue{
 			Name:    table.Name,
-			Columns: toColumnValues(table.Columns),
+			Columns: columns,
 		})
 	}
 	return tableValues, nil
@@ -199,11 +211,17 @@ func decodeColumns(columns []interface{}) ([]*gocql.ColumnMetadata, error) {
 			return nil, err
 		}
 
+		columnType, err := toDbColumnType(value.Type)
+
+		if err != nil {
+			return nil, err
+		}
+
 		// Adapt from GraphQL column to gocql column
 		cqlColumn := &gocql.ColumnMetadata{
 			Name: value.Name,
 			Kind: value.Kind,
-			Type: toDbColumnType(value.Type),
+			Type: columnType,
 		}
 
 		columnValues = append(columnValues, cqlColumn)
@@ -219,11 +237,17 @@ func decodeClusteringInfo(columns []interface{}) ([]*gocql.ColumnMetadata, error
 			return nil, err
 		}
 
+		columnType, err := toDbColumnType(value.Type)
+
+		if err != nil {
+			return nil, err
+		}
+
 		// Adapt from GraphQL column to gocql column
 		cqlColumn := &gocql.ColumnMetadata{
 			Name: value.Name,
 			Kind: value.Kind,
-			Type: toDbColumnType(value.Type),
+			Type: columnType,
 			//TODO: Use enums
 			ClusteringOrder: value.Order,
 		}
@@ -337,64 +361,110 @@ func (sg *SchemaGenerator) dropTable(params graphql.ResolveParams) (interface{},
 		Table:    tableName}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 }
 
-func toColumnType(info gocql.TypeInfo) *dataTypeValue {
+func toColumnType(info gocql.TypeInfo) (*dataTypeValue, error) {
 	var subTypeInfo *dataTypeInfo = nil
 	switch info.Type() {
 	case gocql.TypeList, gocql.TypeSet:
 		collectionInfo := info.(gocql.CollectionType)
+		subType, err := toColumnType(collectionInfo.Elem)
+
+		if err != nil {
+			return nil, err
+		}
+
 		subTypeInfo = &dataTypeInfo{
-			SubTypes: []dataTypeValue{*toColumnType(collectionInfo.Elem)},
+			SubTypes: []dataTypeValue{*subType},
 		}
 	case gocql.TypeMap:
 		collectionInfo := info.(gocql.CollectionType)
+
+		keyType, err := toColumnType(collectionInfo.Key)
+		if err != nil {
+			return nil, err
+		}
+
+		valueType, err := toColumnType(collectionInfo.Elem)
+		if err != nil {
+			return nil, err
+		}
+
 		subTypeInfo = &dataTypeInfo{
-			SubTypes: []dataTypeValue{*toColumnType(collectionInfo.Key), *toColumnType(collectionInfo.Elem)},
+			SubTypes: []dataTypeValue{*keyType, *valueType},
 		}
 	case gocql.TypeCustom:
 		subTypeInfo = &dataTypeInfo{
 			Name: info.Custom(),
 		}
 	case gocql.TypeUDT, gocql.TypeTuple:
-		panic("Not yet supported")
+		return nil, errors.New("Not yet supported")
 	}
 
 	return &dataTypeValue{
 		Basic:    info.Type(),
 		TypeInfo: subTypeInfo,
-	}
+	}, nil
 }
 
-func toDbColumnType(info *dataTypeValue) gocql.TypeInfo {
+func toDbColumnType(info *dataTypeValue) (gocql.TypeInfo, error) {
 	switch info.Basic {
 	case gocql.TypeList, gocql.TypeSet:
+		if info.TypeInfo == nil && len(info.TypeInfo.SubTypes) != 1 {
+			return nil, errors.New("you must provide one sub type for list and set data types")
+		}
+
+		subType, err := toDbColumnType(&info.TypeInfo.SubTypes[0])
+		if err != nil {
+			return nil, err
+		}
+
 		return gocql.CollectionType{
 			NativeType: gocql.NewNativeType(0, info.Basic, ""),
 			Key:        nil,
-			Elem:       toDbColumnType(&info.TypeInfo.SubTypes[0]),
-		}
+			Elem:       subType,
+		}, nil
 	case gocql.TypeMap:
+		if info.TypeInfo == nil && len(info.TypeInfo.SubTypes) != 2 {
+			return nil, errors.New("you must provide the key and value sub type for map data types")
+		}
+
+		keyType, err := toDbColumnType(&info.TypeInfo.SubTypes[0])
+		if err != nil {
+			return nil, err
+		}
+
+		valueType, err := toDbColumnType(&info.TypeInfo.SubTypes[0])
+		if err != nil {
+			return nil, err
+		}
+
 		return gocql.CollectionType{
 			NativeType: gocql.NewNativeType(0, info.Basic, ""),
-			Key:        toDbColumnType(&info.TypeInfo.SubTypes[0]),
-			Elem:       toDbColumnType(&info.TypeInfo.SubTypes[1]),
-		}
+			Key:        keyType,
+			Elem:       valueType,
+		}, nil
 	case gocql.TypeCustom:
-		return gocql.NewNativeType(0, info.Basic, info.TypeInfo.Name)
+		return gocql.NewNativeType(0, info.Basic, info.TypeInfo.Name), nil
 	case gocql.TypeUDT, gocql.TypeTuple:
-		panic("Not yet supported")
+		return nil, errors.New("udts and tuples are not supported yet")
 	default:
-		return gocql.NewNativeType(0, info.Basic, "")
+		return gocql.NewNativeType(0, info.Basic, ""), nil
 	}
 }
 
-func toColumnValues(columns map[string]*gocql.ColumnMetadata) []*columnValue {
+func toColumnValues(columns map[string]*gocql.ColumnMetadata) ([]*columnValue, error) {
 	columnValues := make([]*columnValue, 0)
 	for _, column := range columns {
+		columnType, err := toColumnType(column.Type)
+
+		if err != nil {
+			return nil, err
+		}
+
 		columnValues = append(columnValues, &columnValue{
 			Name: column.Name,
 			Kind: column.Kind,
-			Type: toColumnType(column.Type),
+			Type: columnType,
 		})
 	}
-	return columnValues
+	return columnValues, nil
 }
