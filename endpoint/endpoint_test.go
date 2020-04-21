@@ -147,7 +147,7 @@ func TestDataEndpoint_PageSize(t *testing.T) {
 
 	query := `SELECT * FROM "store"."books" WHERE "title" = ?`
 	graphqlQuery := `query {
-	  books(data:{title:"abc"}%s) {
+	  books(value:{title:"abc"}%s) {
 		values {
 		  pages
 		  title
