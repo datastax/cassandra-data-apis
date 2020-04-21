@@ -127,9 +127,9 @@ type TableMutation {
   then the first 100 (default pagesize) values are returned.
 
 * `booksFilter`: Query book values by filtering the result with relational
-  operators e.g.  `gt` (greater than), `lt` (less than) etc. The `books()`
-  equality style query should be preferred if your queries don't require the use
-  of these more complex operators.
+  operators e.g. `gt` (greater than), `lt` (less than) etc. The `books()`
+  equality style query is preferable if your queries don't require the use
+  non-equality operators.
 
 #### Mutations:
   
@@ -137,10 +137,12 @@ type TableMutation {
   update the value of existing books if they already exists unless `ifNotExists`
   is set to `true`. Using `ifNotExists` causes the mutation to use a lightweight
   transaction (LWT) adding significant overhead.
+
 * `updateBooks()`: Update an existing book. This is also an "upsert" and will
   create a new book if one doesn't exists unless `ifExists` is set to `true`.
   Using `ifExists` or `ifCondition` causes the mutation to use a lightweight
   transaction (LWT) adding significant overhead.
+
 * `deleteBooks()`: Deletes a book.  Using `ifExists` or `ifCondition` causes the
    mutation to use a lightweight transaction (LWT) adding significant overhead.
 
