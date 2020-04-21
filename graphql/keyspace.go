@@ -54,23 +54,14 @@ var keyspaceType = graphql.NewObject(graphql.ObjectConfig{
 		"dcs": &graphql.Field{
 			Type: graphql.NewList(dataCenterType),
 		},
-		"table": &graphql.Field{
-			Type: tableType,
-			Args: graphql.FieldConfigArgument{
-				"name": &graphql.ArgumentConfig{
-					Type: graphql.NewNonNull(graphql.String),
-				},
-			},
-			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
-				parent := p.Source.(ksValue)
-				return getTable(parent.keyspace, p.Args)
-			},
-		},
 		"tables": &graphql.Field{
 			Type: graphql.NewList(tableType),
+			Args: graphql.FieldConfigArgument{
+				"name": {Type: graphql.String},
+			},
 			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
 				parent := p.Source.(ksValue)
-				return getTables(parent.keyspace)
+				return getTables(parent.keyspace, p.Args)
 			},
 		},
 	},
