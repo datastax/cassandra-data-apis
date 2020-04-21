@@ -338,7 +338,9 @@ Query consistency controls the number of replicas that must agree before returni
 your query result. This is used to tune the balance between data consistency and
 availability for reads. `SERIAL` and `LOCAL_SERIAL` are for use when doing
 conditional inserts and updates which are also known as lightweight transactions
-(LWTs), they are similar to `QUORUM` and `LOCAL_QUORUM`, respectively.
+(LWTs), they are similar to `QUORUM` and `LOCAL_QUORUM`, respectively. More
+information about read consistency levels can be found in [How is the
+consistency level configured?].
 
 ```graphql
 enum QueryConsistency {
@@ -495,7 +497,9 @@ input MutationOptions {
 
 Mutation consistency controls the number of replicas that must acknowledge a
 mutation before returning. This is used to tune the balance between data
-consistency and availability for writes. 
+consistency and availability for writes. More information about write
+consistency levels can be found in [How is the consistency level configured?].
+
 
 ```graphql
 enum MutationConsistency {
@@ -517,18 +521,21 @@ enum SerialConsistency {
 }
 ```
 
-#### Time To Live (TTL)
+#### Time-to-live (TTL)
 
 Time to live (TTL), defined in seconds, controls the amount of time a value
 lives in the database before expiring e.g. `ttl: 60` means the associated values
-are no longer readable after 60 seconds.
+are no longer readable after 60 seconds. More information about TTL can be found
+in [Expiring data with time-to-live].
 
 ### Conditional Inserts, Updates, and Deletes
 
 Conditional mutations are mechanism to add or modify field values only when a
 provided condition, `ifExists`, `ifNotExists, and `ifCondition`, is satisfied.
 These conditional mutations require the use lightweight transactions (LWTs)
-which are significantly more expensive than regular mutations.
+which are significantly more expensive than regular mutations. More information
+about LWTs can be found in [Using lightweight transactions].
+
 
 The following book will only be added if an existing entry does not exist. The
 `applied` field can be used to determine if the mutation succeeded. If the
@@ -599,3 +606,6 @@ Result:
 ```
 
 [CORS]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+[Expiring data with time-to-live]: https://docs.datastax.com/en/cql-oss/3.x/cql/cql_using/useExpire.html
+[Using lightweight transactions]: https://docs.datastax.com/en/cassandra-oss/3.x/cassandra/dml/dmlLtwtTransactions.html
+[How is the consistency level configured?]: https://docs.datastax.com/en/cassandra-oss/3.x/cassandra/dml/dmlConfigConsistency.html
