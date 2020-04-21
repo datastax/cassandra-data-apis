@@ -51,7 +51,7 @@ hosts:
 # username: cassandra
 # password: cassandra
 
-# Additional configuration here
+# See the "Settings" section for additional configuration
 
 ```
 
@@ -66,17 +66,52 @@ docker run -p 8080:8080 -v "${PWD}/<your_config_file>.yaml:/root/config.yaml" ca
 | Name | Type | Env. Variable | Description |
 | --- | --- | --- | --- |
 | hosts                  | strings  | DATA_API_HOSTS                  | Hosts for connecting to the database |
-| username               | string   | DATA_API_USERNAME               | connect with database username |
 | keyspace               | string   | DATA_API_KEYSPACE               | Only allow access to a single keyspace |
 | excluded-keyspaces     | strings  | DATA_API_EXCLUDED_KEYSPACES     | Keyspaces to exclude from the endpoint |
+| username               | string   | DATA_API_USERNAME               | Connect with database user |
 | password               | string   | DATA_API_PASSWORD               | Database user's password |
-| operations             | strings  | DATA_API_OPERATIONS             | List of supported table and keyspace management operations. options: TableCreate,TableDrop,TableAlterAdd,TableAlterDrop,KeyspaceCreate,KeyspaceDrop (default [TableCreate,KeyspaceCreate]) |
+| operations             | strings  | DATA_API_OPERATIONS             | A list of supported schema management operations. See below. (default `"TableCreate, KeyspaceCreate"`) |
 | request-logging        | bool     | DATA_API_REQUEST_LOGGING        | Enable request logging |
-| schema-update-interval | duration | DATA_API_SCHEMA_UPDATE_INTERVAL | interval in seconds used to update the graphql schema (default 10s) |
-| start-graphql          | bool     | DATA_API_START_GRAPHQL          | start the GraphQL endpoint (default true) |
-| graphql-path           | string   | DATA_API_GRAPHQL_PATH           | Path for the GraphQL endpoint (default "/graphql") |
-| graphql-port           | int      | DATA_API_GRAPHQL_PORT           | Port for the GraphQL endpoint (default 8080) |
-| graphql-schema-path    | string   | DATA_API_GRAPHQL_SCHEMA_PATH    | Path for the GraphQL schema management (default "/graphql-schema") |
+| schema-update-interval | duration | DATA_API_SCHEMA_UPDATE_INTERVAL | Interval in seconds used to update the graphql schema (default `10s`) |
+| start-graphql          | bool     | DATA_API_START_GRAPHQL          | Start the GraphQL endpoint (default `true`) |
+| graphql-path           | string   | DATA_API_GRAPHQL_PATH           | GraphQL endpoint path (default `"/graphql"`) |
+| graphql-port           | int      | DATA_API_GRAPHQL_PORT           | GraphQL endpoint port (default `8080`) |
+| graphql-schema-path    | string   | DATA_API_GRAPHQL_SCHEMA_PATH    | GraphQL schema management path (default `"/graphql-schema"`) |
+
+#### Configuration Types
+
+The `strings` type expects a comma-delimited list e.g. `127.0.0.1, 127.0.0.2,
+127.0.0.3` when using environment variables or a command flag, and it expects
+an array type when using a configuration file.
+
+YAML:
+
+```yaml
+--- 
+host: 
+  - "127.0.0.1"
+  - "127.0.0.2"
+  - "127.0.0.3"
+
+```
+
+JSON:
+```json
+{
+	"hosts": ["127.0.0.1", "127.0.0.2", "127.0.0.3"]
+}
+```
+
+#### Schema Management Operations
+
+| Operation | Allows |
+| --- | --- |
+| `TableCreate`    | Creation of tables    |
+| `TableDrop`      | Removal of tables     |
+| `TableAlterAdd`  | Add new table columns |
+| `TableAlterDrop` | Remove table columns  |
+| `KeyspaceCreate` | Creation of keyspaces |
+| `KeyspaceDrop`   | Removal of keyspaces  |
 
 ## Building 
 
