@@ -4,15 +4,15 @@
 
 The easiest way to get started is to use the built-in GraphQL playground. After
 running the commands from the installation step the GraphQL playground can be
-accessed by going to http://localhost:8080/graphql-playground. This will allow
-you to create new schema and interact with your GraphQL APIs.
+accessed by going to http://localhost:8080/graphql-playground. Once in the
+playground, you can create new schema and interact with the GraphQL APIs.
 
 ### Creating Schema
 
-Before you can get started using your GraphQL APIs you'll need to create a
-keyspace and at least one table. If your Cassandra database already has existing
-schema then the server has already imported your schema and you might skip this
-step. Otherwise, use the following steps to create new schema.
+Before you can get started using GraphQL APIs you must create a keyspace and at
+least one table. If your Cassandra database already has existing schema then the
+server has already imported your schema and you might skip this step.
+Otherwise, use the following steps to create new schema.
 
 Inside the playground, navigate to http://localhost:8080/graphql-schema, then
 create a keyspace by executing:
@@ -26,7 +26,7 @@ mutation {
 }
 ```
 
-After the keyspace is created you can create a table by executing:
+After the keyspace is created you can create tables by executing:
 
 ```graphql
 mutation {
@@ -53,8 +53,8 @@ mutation {
 }
 ```
 
-Or you can create the schema using `cqlsh` and the server will automatically
-pick up your schema changes.
+You can also create the schema using `cqlsh` and the server will automatically
+apply your schema changes.
 
 ```cql
 CREATE KEYSPACE library WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': '3'};
@@ -73,22 +73,22 @@ CREATE TABLE library.authors (
 
 ### Path Layout
 
-By default, this is how the server paths are structured:
+By default, the server paths are structured to provide:
 
-* `/graphql-playground`: Provides an interactive playground to explore your
+* `/graphql-playground`: An interactive playground to explore your
 GraphQL APIs.
-* `/graphql-schema`: Provides an API for exploring and creating schema, in
+* `/graphql-schema`: An API for exploring and creating schema, in
 database terminology this is know as: Data Definition Language (DDL). In
 Cassandra these are the queries used to create, modify, drop keyspaces and
 tables e.g. `CREATE KEYSPACE ...`, `CREATE TABLE ...`, `DROP TABLE ...`.
-* `/graphql/<keyspace>`: Provides an API for querying and modifying your Cassandra
+* `/graphql/<keyspace>`: An API for querying and modifying your Cassandra
 tables using GraphQL fields.
 
 #### Keyspaces
 
 For each keyspace created in your Cassandra schema, a new path is created under
 the root `graphql-path` (default is: `/graphql`). For example, a path
-`/graphql/library` would created for the `library` keyspace when it is added to
+`/graphql/library` is created for the `library` keyspace when it is added to
 the Cassandra schema.
 
 **Tip:** If your application wants to focus on a single keyspace, then the
@@ -127,22 +127,22 @@ type TableMutation {
   then the first 100 (default pagesize) values are returned.
 
 * `booksFilter`: Query book values by filtering the result with relational
-  operators e.g.  `gt` (greater than), `lt` (less than) etc. the `books()`
+  operators e.g.  `gt` (greater than), `lt` (less than) etc. The `books()`
   equality style query should be preferred if your queries don't require the use
   of these more complex operators.
 
 #### Mutations:
   
 * `insertBooks()`: Insert a new book. This is an "upsert" operation that will
-  update the value of exiting books if they already exists unless `ifNotExists`
-  is set to `true`. Using `ifNotExists` uses a lightweight transaction (LWT)
-  which adds significant overhead to the mutation.
+  update the value of existing books if they already exists unless `ifNotExists`
+  is set to `true`. Using `ifNotExists` causes the mutation to use a lightweight
+  transaction (LWT) adding significant overhead.
 * `updateBooks()`: Update an existing book. This is also an "upsert" and will
   create a new book if one doesn't exists unless `ifExists` is set to `true`.
-  Using `ifExists` or `ifCondition` uses a lightweight transaction (LWT) which
-  adds significant overhead to the mutation.
-* `deleteBooks()`: Deletes a book. Using `ifExists` or `ifCondition` uses a
-  lightweight transaction (LWT) which adds significant overhead to the mutation.
+  Using `ifExists` or `ifCondition` causes the mutation to use a lightweight
+  transaction (LWT) adding significant overhead.
+* `deleteBooks()`: Deletes a book.  Using `ifExists` or `ifCondition` causes the
+   mutation to use a lightweight transaction (LWT) adding significant overhead.
 
 As more tables are added to a keyspace additional fields will be added to the
 `TableQuery` and `TableMutation` types to handle queries and mutations for those
@@ -151,17 +151,16 @@ new tables.
 ### API Naming Convention
 
 The default naming convention converts CQL (tables and columns) names to
-`lowerCamelCase` for GraphQL fields and `UpperCameCase` for GraphQL types. If
-the naming convention rules result in a naming conflict then a number suffix is
+`lowerCamelCase` for GraphQL fields and `UpperCamelCase` for GraphQL types. If
+the naming convention rules result in a naming conflict, a number suffix is
 appended to the name e.g. `someExistingColumn` --> `someExistingColumn2`. If a
 naming conflict is not resolved within the maximum suffix value of `999` it will
 result in a error.
 
 ### Using the API
 
-Building on the `books` schema created in previous schema step this section will
-show you how to add and query books.  Navigate to your keyspace inside the
-playground by going to http://localhost:8080/graphql/library and start adding
+This section will show you how to add and query books. Navigate to your keyspace
+inside the playground by going to http://localhost:8080/graphql/library and add
 some entries.
 
 #### Insert Books
@@ -183,7 +182,7 @@ mutation {
 
 #### Query Books
 
-To query those values you can run the following.
+To query those values you can run the following:
 
 ```graphql
 query {
@@ -217,7 +216,7 @@ query {
 
 #### Query a Single Book
 
-A specific book can be queried by providing a key value.
+A specific book can be queried by providing a key value:
 
 ```graphql
 query {
@@ -296,7 +295,7 @@ client.query({
 Then run then example.
 
 ```sh
-$ node index.js # Or use the name of the file you created in the previous step
+$ node index.js # Use the name of the file you created in the previous step
 {
   data: { books: { values: [Array], __typename: 'BooksResult' } },
   loading: false,
@@ -363,7 +362,7 @@ Query paging can be controlled by modifying the values of `pagingSize` and
 
 
 The `pageState` is returned in the data result of queries. It is a marker that
-can be passed to subsequent queries to get the following page.
+can be passed to subsequent queries to get the next page.
 
 ``` graphql
 query {
@@ -506,7 +505,7 @@ enum MutationConsistency {
 
 #### Serial Consistency
 
-Serial consistency is use in conjunction with conditional inserts and updates
+Serial consistency is used in conjunction with conditional inserts and updates
 (LWTs) and in all other mutations types it is ignored if provided.
 
 ```graphql
@@ -548,9 +547,9 @@ mutation {
 #### Return values
 
 When mutations fail with `applied: false`, the most up-to-date, existing values
-are returned in the result. Using previous query, if the book already exists
+are returned in the result. Using the previous query, if the book already exists
 then the result would return a value for the `author`. Values that part of the
-paritition and clustering keys are always returned in the result independent of
+paritition and clustering keys are always returned in the result, independent of
 whether the mutation was applied.
 
 ```json

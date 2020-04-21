@@ -118,18 +118,18 @@ func Execute() {
 		"TableCreate",
 		"KeyspaceCreate",
 	}, "list of supported table and keyspace management operations. options: TableCreate,TableDrop,TableAlterAdd,TableAlterDrop,KeyspaceCreate,KeyspaceDrop")
-	flags.String("access-control-allow-origin", "", "value to use for the Access-Control-Allow-Origin header")
+	flags.String("access-control-allow-origin", "", "Access-Control-Allow-Origin header value")
 
 	// GraphQL specific flags
 	flags.Bool("start-graphql", true, "start the GraphQL endpoint")
-	flags.String("graphql-path", defaultGraphQLPath, "path for the GraphQL endpoint")
-	flags.String("graphql-schema-path", defaultGraphQLSchemaPath, "path for the GraphQL schema management")
-	flags.Int("graphql-port", 8080, "port for the GraphQL endpoint")
+	flags.String("graphql-path", defaultGraphQLPath, "GraphQL endpoint path")
+	flags.String("graphql-schema-path", defaultGraphQLSchemaPath, "GraphQL schema management path")
+	flags.Int("graphql-port", 8080, "GraphQL endpoint port")
 
 	// REST specific flags
 	flags.Bool("start-rest", false, "start the REST endpoint")
-	flags.String("rest-path", defaultRESTPath, "path for the REST endpoint")
-	flags.Int("rest-port", 8080, "port for the REST endpoint")
+	flags.String("rest-path", defaultRESTPath, "REST endpoint path")
+	flags.Int("rest-port", 8080, "REST endpoint port")
 
 	flags.VisitAll(func(flag *pflag.Flag) {
 		if flag.Name != "config" {

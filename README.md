@@ -80,8 +80,7 @@ docker run -p 8080:8080 -v "${PWD}/<your_config_file>.yaml:/root/config.yaml" ca
 
 ## Building 
 
-This section is mostly for developers. It's recommended that you use the
-pre-built docker image.
+This section is mostly for developers. Pre-built docker image recommended.
 
 ### Building the Docker Image
 
@@ -99,7 +98,7 @@ docker build -t cassandra-data-apis .
 # On Linux (with a cluster started on the docker bridge: 172.17.0.1)
 docker run -p 8080:8080 -e "DATA_API_HOSTS=172.17.0.1" cassandra-data-apis
 
-# Or (with a cluster bound to 0.0.0.0)
+# With a cluster bound to 0.0.0.0
 run --network host -e "DATA_API_HOSTS=127.0.0.1" cassandra-data-apis
 
 # On macOS (with a cluster bound to 0.0.0.0)
@@ -119,7 +118,7 @@ If you want to run this module as a standalone webserver, use:
 go build run.exe && ./run.exe --hosts 127.0.0.1 --keyspace store
 ```
 
-Or your settings can be persisted using a configuration file:
+Your settings can be persisted using a configuration file:
 
 ```yaml
 hosts:
@@ -157,7 +156,7 @@ go get github.com/datastax/cassandra-data-apis
 
 #### Using the API
 
-If you want to add the routes to your existing HTTP request router, use:
+To add the routes to your existing HTTP request router, use:
 
 ```go
 cfg := endpoint.NewEndpointConfig("your.first.contact.point", "your.second.contact.point")
