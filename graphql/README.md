@@ -11,18 +11,17 @@ you to create new schema and interact with your GraphQL APIs.
 
 Before you can get started using your GraphQL APIs you'll need to create a
 keyspace and at least one table. If your Cassandra database already has existing
-schema then the server has already imported your schema the you might skip this
+schema then the server has already imported your schema and you might skip this
 step. Otherwise, use the following steps to create new schema.
 
-Inside the playground, navigate to http://localhost:8080/graphql-schema
-
-First create a keyspace by executing:
+Inside the playground, navigate to http://localhost:8080/graphql-schema, then
+create a keyspace by executing:
 
 ```graphql
 mutation {
   createKeyspace(
     name:"library", # The name of your keyspace
-    dcs: {name:"dc1", replicas: 3} # Controls how your data is replicated
+    dcs: { name:"dc1", replicas: 3 } # Controls how your data is replicated
   )
 }
 ```
@@ -47,7 +46,7 @@ mutation {
     partitionKeys: [
       { name: "name", type: {basic: TEXT} }
     ]
-    clusteringKeys: [ # Secondary key used to access and sort your data
+    clusteringKeys: [ # Secondary key used to access values within the partition
       { name: "title", type: {basic: TEXT} }
   	]
   )
@@ -80,10 +79,17 @@ By default, this is how the server paths are structured:
 GraphQL APIs.
 * `/graphgl-schema`: Provides an API for exploring and creating schema, in
 database terminology this is know as: Data Definition Language (DDL). In
-Cassandra these are the queries that create, modify, drop keyspaces and
+Cassandra these are the queries used to create, modify, drop keyspaces and
 tables e.g. `CREATE KEYSPACE ...`, `CREATE TABLE ...`, `DROP TABLE ...`.
 * `/graphql/<keyspace>`: Provides an API for querying and modifying your Cassandra
 tables using GraphQL fields.
+
+#### Keyspaces
+
+For each keyspace created in your Cassandra schema, a new path is created under
+the root `graphql-path` (default is: `/graphql`). For example, a path
+`/graphql/library` would created for the `library` keyspace when it is added to
+the Cassandra schema.
 
 **Tip:** If your application wants to focus on a single keyspace then the
 environment variable `DATA_API_KEYSPACE=<your keyspace>` can be added to the
@@ -94,7 +100,7 @@ in your database will no longer be accessible via `/graphql/<keyspace>`.
 ### API Generation
 
 For each table in your Cassandra schema, several fields are created for handling
-queries and mutations. For example, the generated `books` table's GraphQL schema
+queries and mutations. For example, the generated `books` table's GraphQL API
 looks like this:
 
 ```graphql
@@ -121,8 +127,9 @@ type TableMutation {
   then the first 100 (default pagesize) values are returned.
 
 * `booksFilter`: Query book values by filtering the result with relational
-  operators e.g.  greater than (`gt`), less than (`lt`) etc. `books()` should be
-  prefer if your queries don't require the use of these more complex operators.
+  operators e.g.  `gt` (greater than), `lt` (less than) etc. the `books()`
+  equality style query should be prefer if your queries don't require the use of
+  these more complex operators.
 
 #### Mutations:
   
@@ -145,16 +152,17 @@ new tables.
 
 The default naming convention converts CQL (tables and columns) names to
 `lowerCamelCase` for GraphQL fields and `UpperCameCase` for GraphQL types. If
-the naming convention rules result in a naming conflict then a number is added
-as a suffix e.g. `someExistingColumn` --> `someExistingColumn2`. If a naming
-conflict is not resolved within the maximum suffix value of `999` it will result
-in a error.
+the naming convention rules result in a naming conflict then a number suffix is
+appended to the name e.g. `someExistingColumn` --> `someExistingColumn2`. If a
+naming conflict is not resolved within the maximum suffix value of `999` it will
+result in a error.
 
 ### Using the API
 
-Building on the `books` schema created in previous steps this section will show
-you how to add and query books.  Navigate to your keyspace inside the playground
-by going to http://localhost:8080/graphql/library and start adding some entries.
+Building on the `books` schema created in previous schema step this section will
+show you how to add and query books.  Navigate to your keyspace inside the
+playground by going to http://localhost:8080/graphql/library and start adding
+some entries.
 
 #### Insert Books
 
@@ -246,12 +254,13 @@ schema created in the schema section.
 ### Node
 
 ```sh
-npm install apollo-client apollo-cache-inmemory apollo-link-http \
-      apollo-link-error apollo-link graphql-tag --save
+$ npm init # Follow prompts
+$ npm install apollo-client apollo-cache-inmemory apollo-link-http \
+  apollo-link-error apollo-link graphql graphql-tag node-fetch --save
 ```
 
-After the dependencies are installed you should be able to connect to your local
-server.
+Copy this into a file of your chose or your `main` entry point, usually
+`index.js`.
 
 ```js
 const { HttpLink } = require('apollo-link-http')
@@ -284,12 +293,29 @@ client.query({
 })
 ```
 
+Then run then example.
+
+```sh
+$ node index.js # Or use the name of the file you created in the previous step
+{
+  data: { books: { values: [Array], __typename: 'BooksResult' } },
+  loading: false,
+  networkStatus: 7,
+  stale: false
+}
+```
+
 ### In the Browser
 
 The Apollo Client can also be used inside the browser:
 https://jsfiddle.net/1n8f0cgt/, but [CORS] needs to be enabled. This can be done
 by starting the Docker image with the environment variable `-e
 DATA_API_ACCESS_CONTROL_ALLOW_ORIGIN=*`
+
+```sh
+docker run --rm -d -p 8080:8080 -e DATA_API_HOSTS=<cassandra_hosts_here> \
+  -e DATA_API_ACCESS_CONTROL_ALLOW_ORIGIN="*" datastaxlabs/cassandra-data-apis
+```
 
 ## API Features
 
@@ -520,5 +546,25 @@ mutation {
 ```
 
 #### Return values
+
+When mutations fail with `applied: false`, the most up-to-date, existing values
+are returned in the result. Using previous query, if the book already exists
+then the result would return a value for the `author`. Values that part of the
+paritition and clustering keys are always returned in the result independent of
+whether the mutation was applied.
+
+```json
+{
+  "data": {
+    "insertBooks": {
+      "applied": false,
+      "value": {
+        "author": "Miguel De Cervantes",
+        "title": "Don Quixote"
+      }
+    }
+  }
+}
+```
 
 [CORS]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
