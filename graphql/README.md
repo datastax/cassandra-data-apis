@@ -126,10 +126,10 @@ type TableMutation {
 * `books()`: Query book values by equality. If no `value` argument is provided
   then the first 100 (default pagesize) values are returned.
 
-* `booksFilter`: Query book values by filtering the result with relational
-  operators e.g. `gt` (greater than), `lt` (less than) etc. The `books()`
-  equality style query is preferable if your queries don't require the use
-  non-equality operators.
+* `booksFilter`: Query book values by filtering the result with additional
+  operators e.g. `gt` (greater than), `lt` (less than), `in` (in a list of
+  values) etc. The `books()` equality style query is preferable if your queries
+  don't require the use non-equality operators.
 
 #### Mutations:
   
@@ -449,7 +449,7 @@ enum BookBySizeOrder {
 
 ### Filtering
 
-Filter queries allow for the use of relational operators to control which values
+Filter queries allow for the use of additional operators to control which values
 are returned. 
 
 The `filter` parameter allows for using more flexible conditional operators,
@@ -481,6 +481,19 @@ query {
   }
 }
 ```
+
+#### Supported Operators
+
+| Operator | Example | Description | 
+| --- | --- | --- |
+| `eq` | `filter: { title: { eq: "Moby Dick" }`  | Equals              |
+| `ne` | `filter: { title: { ne: "Moby Dick" }`  | Not equals          |
+| `lt` | `filter: { pages: { lt: 800 }`          | Less than           |
+| `lte`| `filter: { pages: { lte: 799 }`         | Less than equals    |
+| `gt` | `filter: { pages: { gt: 100 }`          | Greater than        |
+| `gte`| `filter: { pages: { gte: 99 }`          | Greater than equal  |
+| `in` | `title: {in: ["Moby Dick", "Redburn"]}` | In a list of values |
+
 
 ### Mutation Options
 
