@@ -47,8 +47,8 @@ mutation {
     partitionKeys: [
       { name: "name", type: {basic: TEXT} }
     ]
-    clusteringKeys: [ # TODO: explain this
-      { name: "title", type: {basic:TEXT} }
+    clusteringKeys: [ # Secondary key used to access and sort your data
+      { name: "title", type: {basic: TEXT} }
   	]
   )
 }
@@ -293,19 +293,48 @@ DATA_API_ACCESS_CONTROL_ALLOW_ORIGIN=*`
 
 ## API Features
 
-### Paging
+### Query Options
+
+Query field operations have an `options` argument which can be used to control
+the behavior queries.
+
+```
+input QueryOptions {
+  consistency: QueryConsistency
+  limit: Int
+  pageSize: Int
+  pageState: String
+}
+```
+
+#### Consistency
+
+Query consistency controls the number of replicas that must agree before returning
+your query result. This is used to tune the balance between data consistency and
+availability for reads. `SERIAL` and `LOCAL_SERIAL` are for use when doing
+condition inserts and updates which are also know as lightweight transactions
+(LWTs), they are similar to `QUORUM` and `LOCAL_QUORUM`, respectively.
+
+```graphql
+enum QueryConsistency {
+  LOCAL_ONE    # Only wait for one replica in the local data center
+  LOCAL_QUORUM # Wait for a quorum, floor(total_replicas / 2 + 1), of replics in the local data center
+  ALL          # Wait for all replicas in all data centers
+  SERIAL       # Used to read the latest value checking for inflight updates
+  LOCAL_SERIAL # Same as `SERIAL, but only in the local data center
+}
+```
+
+#### Limit
+
+Limit sets the maximum number of values a query returns. 
+
+#### PageSize and PageState
 
 Query paging can be controlled by modifying the values of `pagingSize` and
 `pageState` in the input type `QueryOptions` argument. The default `pageSize` is
 100 values.
 
-```
-input QueryOptions {
-  pageSize: Int
-  pageState: String
-  # ...
-}
-```
 
 The `pageState` is return in the data result of queries. It is a marker that can
 be passed to subsequent queries to get the following page.
@@ -364,7 +393,16 @@ query {
 }
 ```
 
+Each query field has an `orderBy` argument and a specific order enumeration
+type, in this case, `BookBySizeOrder`.
+
 ```graphql
+type TableQuery {
+  bookBySize(options: QueryOptions, value: BookBySizeInput, orderBy: [BookBySizeOrder]): BookBySizeResult
+  
+  # ...
+}
+
 enum BookBySizeOrder {
   author_ASC
   author_DESC
@@ -376,28 +414,111 @@ enum BookBySizeOrder {
 
 # ...
 
-bookBySize(
-options: QueryOptions
-value: BookBySizeInput
-orderBy: [BookBySizeOrder]): BookBySizeResult
 ```
-
-### Consistency
-
-### Time To Live (TTL)
 
 ### Filtering
 
+Filter queries allow for the use of relational operators to control which values
+are returned. 
+
+The `filter` parameter allows for using more flexible conditional operators,
+`eq` (equal), `gte` (greater than, or equal), `lte` (less than, or equal), etc.
+This query returns all the books by "Herman Melville" with a length between 100
+and 800 pages.
+
 ```graphql
-someTableFilter(filter: <TableName>FilterInput!, 
-                  orderBy: [<TableName>Order], 
-                  options: QueryOptions): <TableName>Result
+query {
+  bookBySizeFilter(filter:{author: {eq: "Herman Melville"}, pages: {gte: 100, lte: 800}}) {
+    values {
+      title
+      pages
+    }
+  }
+}
 ```
 
-### Conditional Inserts
+The `in` operator allow for filtering a specific set of values. This query
+returns the books by "Herman Melville` in the provided `in` set.
 
-### Conditional Updates
+```graphql
+query {
+  bookBySizeFilter(filter:{author: {eq: "Herman Melville"}, title: {in: ["Moby Dick", "Redburn"]}) {
+    values {
+      title
+      pages
+    }
+  }
+}
+```
 
-## Advance Configuration
+### Mutation Options
+
+Mutation field operations have an `options` argument which can be used to control
+the behavior mutations (inserts, updates, and deletes).
+
+```graphql
+input MutationOptions {
+  consistency: MutationConsistency
+  serialConsistency: SerialConsistency
+  ttl: Int = -1
+}
+```
+
+#### Consistency
+
+Mutation consistency controls the number of replicas that must acknowledge a
+mutation before returning. This is used to tune the balance between data
+consistency and availability for writes. 
+
+```graphql
+enum MutationConsistency {
+  LOCAL_ONE    # Acknowledge only a single replica in the local data center
+  LOCAL_QUORUM # Acknowledge a quorum of replicas in the local data center
+  ALL          # Acknowledge all replicas
+}
+```
+
+#### Serial Consistency
+
+Serial consistency is use in conjunction with conditional inserts and updates
+(LWTs) and in all other mutations types it is ignored if provided.
+
+```graphql
+enum SerialConsistency {
+  SERIAL       # Linearizable consistency for conditional inserts and updates
+  LOCAL_SERIAL # Same as `SERIAL`, but local to a single data center
+}
+```
+
+#### Time To Live (TTL)
+
+Time to live (TTL), defined in seconds, controls the amount of time a value
+lives in the database before expiring e.g. `ttl: 60` means the associated values
+are no longer valid after 60 seconds.
+
+### Conditional Inserts, Updates, and Deletes
+
+Condition mutations are mechanism to add or modify field values only when a
+provided condition, `ifExists`, `ifNotExists, and `ifCondition`, is satisfied.
+These conditional mutations require the use lightweight transactions (LWTs)
+which are significantly more expensive than regular mutations.
+
+The follow book will only be added if an existing entry does not exist. The
+`applied` field can be used to determine if the mutation succeeded. If the
+mutation succeeded then `applied: true` is returned.
+
+```graphql
+mutation {
+  insertBooks(value: {title: "Don Quixote", author: "Miguel De Cervantes"}, ifNotExists: true) {
+    applied
+    value {
+      title
+      author
+    }
+  }
+}
+```
+
+#### Return values
 
 [CORS]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
