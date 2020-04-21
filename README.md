@@ -29,15 +29,14 @@ documentation](/graphql/README.md) for getting started.
 
 ## Configuration
 
-There are a few ways configuration can be provided. When using Docker, settings
-can be provided as either environment variables or by mounting a configuration
-file.
+Configuration for Docker can be done using either environment variables, a
+mounted configuration file, or both.
 
-Additional configuration can be added using environment variables by adding them
-to your `docker run` command.
+Add additional configuration using environment variables by adding them to the
+`docker run` command.
 
 ```
-... -e DATA_API_HOSTS=127.0.0.1 -e DATA_API_KEYSPACE=example 
+docker run -e DATA_API_HOSTS=127.0.0.1 -e DATA_API_KEYSPACE=example ...
 ```
 
 ### Using a configuration file
