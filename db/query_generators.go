@@ -122,16 +122,9 @@ func (db *Db) Update(info *UpdateInfo, options *QueryOptions) (ResultSet, error)
 	setParameters := make([]interface{}, 0, len(info.QueryParams))
 	whereParameters := make([]interface{}, 0, len(info.QueryParams))
 
-	keys := make(map[string]bool)
-	for _, c := range info.Table.PartitionKey {
-		keys[c.Name] = true
-	}
-	for _, c := range info.Table.ClusteringColumns {
-		keys[c.Name] = true
-	}
-
 	for i, columnName := range info.Columns {
-		if keys[columnName] {
+		column, ok := info.Table.Columns[columnName]
+		if ok && (column.Kind == gocql.ColumnPartitionKey || column.Kind == gocql.ColumnClusteringKey) {
 			whereClause += fmt.Sprintf(` AND "%s" = ?`, columnName)
 			whereParameters = append(whereParameters, info.QueryParams[i])
 		} else {

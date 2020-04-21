@@ -241,7 +241,7 @@ func (s *KeyspaceGraphQLSchema) buildOrderEnums(keyspace *gocql.KeyspaceMetadata
 		for _, column := range table.Columns {
 			field := s.naming.ToGraphQLField(table.Name, column.Name)
 			values[field+"_ASC"] = &graphql.EnumValueConfig{
-				Value: column.Name + "_ASC",
+				Value:       column.Name + "_ASC",
 				Description: fmt.Sprintf("Order %s by %s in a	scending order", table.Name, column.Name),
 			}
 			values[field+"_DESC"] = &graphql.EnumValueConfig{
@@ -394,7 +394,8 @@ func (s *KeyspaceGraphQLSchema) adaptResult(tableName string, values []map[strin
 }
 
 func (s *KeyspaceGraphQLSchema) getModificationResult(
-	tableName string,
+	table *gocql.TableMetadata,
+	inputValues map[string]interface{},
 	rs db.ResultSet,
 	err error,
 ) (*types.ModificationResult, error) {
@@ -403,9 +404,11 @@ func (s *KeyspaceGraphQLSchema) getModificationResult(
 	}
 
 	rows := rs.Values()
-
 	if len(rows) == 0 {
-		return &appliedModificationResult, nil
+		return &types.ModificationResult{
+			Applied: true,
+			Value:   inputValues,
+		}, nil
 	}
 
 	result := types.ModificationResult{}
@@ -414,11 +417,20 @@ func (s *KeyspaceGraphQLSchema) getModificationResult(
 	result.Applied = applied != nil && *applied
 
 	result.Value = make(map[string]interface{})
+
+	for k, v := range inputValues {
+		column, ok := table.Columns[s.naming.ToCQLColumn(table.Name, k)]
+		isKeyColumn := ok && (column.Kind == gocql.ColumnPartitionKey || column.Kind == gocql.ColumnClusteringKey)
+		if result.Applied || isKeyColumn {
+			result.Value[k] = v
+		}
+	}
+
 	for k, v := range row {
 		if k == "[applied]" {
 			continue
 		}
-		result.Value[s.naming.ToGraphQLField(tableName, k)] = adaptResultValue(v)
+		result.Value[s.naming.ToGraphQLField(table.Name, k)] = adaptResultValue(v)
 	}
 
 	return &result, nil

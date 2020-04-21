@@ -171,7 +171,7 @@ func (sg *SchemaGenerator) mutationFieldResolver(
 			return false, fmt.Errorf("operation not supported")
 		}
 
-		return ksSchema.getModificationResult(table.Name, result, err)
+		return ksSchema.getModificationResult(table, data, result, err)
 	}
 }
 

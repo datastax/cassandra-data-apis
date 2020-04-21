@@ -106,9 +106,14 @@ var _ = Describe("db", func() {
 			It("Should generate UPDATE statement with "+item.description, func() {
 				table := &gocql.TableMetadata{
 					Name:              "tbl1",
-					PartitionKey:      []*gocql.ColumnMetadata{{Name: "pk1"}, {Name: "pk2"}},
-					ClusteringColumns: []*gocql.ColumnMetadata{{Name: "CK1"}},
+					Columns: map[string]*gocql.ColumnMetadata{
+						"pk1": {Name: "pk1", Kind: gocql.ColumnPartitionKey},
+						"pk2": {Name: "pk2", Kind: gocql.ColumnPartitionKey},
+						"CK1": {Name: "CK1", Kind: gocql.ColumnClusteringKey},
+					},
 				}
+				table.PartitionKey = createKey(table.Columns, gocql.ColumnPartitionKey)
+				table.ClusteringColumns = createKey(table.Columns, gocql.ColumnClusteringKey)
 				sessionMock := SessionMock{}
 				sessionMock.On("ExecuteIter", mock.Anything, mock.Anything, mock.Anything).Return(ResultMock{}, nil)
 				db := &Db{

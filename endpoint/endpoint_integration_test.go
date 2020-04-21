@@ -44,10 +44,10 @@ var _ = Describe("DataEndpoint", func() {
 					"applied": true,
 					"value": map[string]interface{}{
 						"createdDate": nil,
-						"email":       nil,
-						"firstname":   nil,
+						"email":       "john@email.com",
+						"firstname":   "John",
 						"lastname":    nil,
-						"userid":      nil,
+						"userid":      id,
 					},
 				})
 				Expect(schemas.DecodeResponse(buffer)).To(Equal(expected))
@@ -135,17 +135,23 @@ var _ = Describe("DataEndpoint", func() {
 					Query: killrvideo.UpdateUserMutation(id, "John", firstEmail, ""),
 				}, nil)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(schemas.DecodeData(buffer, "updateUsers")["applied"]).To(BeTrue())
+				data := schemas.DecodeData(buffer, "updateUsers")
+				Expect(data["applied"]).To(BeTrue())
+				Expect(data["value"]).To(Equal(map[string]interface{}{
+					"userid":    id,
+					"firstname": "John",
+					"email":     firstEmail,
+				}))
 
 				// This should not be applied
 				buffer, _ = executePost(routes, "/graphql", graphql.RequestBody{
 					Query: killrvideo.UpdateUserMutation(id, "John", "new_email@email.com", "email_old@email.com"),
 				}, nil)
-				data := schemas.DecodeData(buffer, "updateUsers")
+				data = schemas.DecodeData(buffer, "updateUsers")
 				// Verify that the mutation was not applied on C* side
 				Expect(data["applied"]).To(BeFalse())
 				Expect(data["value"]).To(Equal(map[string]interface{}{
-					"userid":    nil,
+					"userid":    id,
 					"firstname": nil,
 					"email":     firstEmail,
 				}))
@@ -175,6 +181,7 @@ var _ = Describe("DataEndpoint", func() {
 				Expect(err).ToNot(HaveOccurred())
 				data := schemas.DecodeData(buffer, "insertUsers")
 				Expect(data["applied"]).To(BeTrue())
+				Expect(data["value"]).To(Equal(value))
 
 				buffer, err = executePost(routes, "/graphql", graphql.RequestBody{
 					Query: killrvideo.InsertUserMutation(value["userid"], value["firstname"], value["email"], true),
@@ -201,7 +208,13 @@ var _ = Describe("DataEndpoint", func() {
 					Query: killrvideo.DeleteUserMutation(id1, ""),
 				}, nil)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(schemas.DecodeData(buffer, "deleteUsers")["applied"]).To(BeTrue())
+				data := schemas.DecodeData(buffer, "deleteUsers")
+				Expect(data["applied"]).To(BeTrue())
+				Expect(data["value"]).To(Equal(map[string]interface{}{
+					"userid":    id1,
+					"firstname": nil,
+					"email":     nil,
+				}))
 				iter := session.Query(selectQuery, id1).Iter()
 				Expect(iter.NumRows()).To(BeZero())
 				Expect(iter.Close()).ToNot(HaveOccurred())
@@ -211,8 +224,13 @@ var _ = Describe("DataEndpoint", func() {
 					Query: killrvideo.DeleteUserMutation(id2, name),
 				}, nil)
 				Expect(err).ToNot(HaveOccurred())
-				data := schemas.DecodeData(buffer, "deleteUsers")
+				data = schemas.DecodeData(buffer, "deleteUsers")
 				Expect(data["applied"]).To(BeFalse())
+				Expect(data["value"]).To(Equal(map[string]interface{}{
+					"userid":    id2,
+					"firstname": "John",
+					"email":     nil,
+				}))
 				iter = session.Query(selectQuery, id2).Iter()
 				Expect(iter.NumRows()).To(Equal(1))
 				Expect(iter.Close()).ToNot(HaveOccurred())
