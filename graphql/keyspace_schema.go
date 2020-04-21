@@ -41,9 +41,9 @@ var inputQueryOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 	Name: "QueryOptions",
 	Fields: graphql.InputObjectConfigFieldMap{
 		"limit":       {Type: graphql.Int},
-		"pageSize":    {Type: graphql.Int},
+		"pageSize":    {Type: graphql.Int, DefaultValue: DefaultPageSize},
 		"pageState":   {Type: graphql.String},
-		"consistency": {Type: queryConsistencyEnum, DefaultValue: gocql.LocalQuorum},
+		"consistency": {Type: queryConsistencyEnum, DefaultValue: DefaultConsistencyLevel},
 	},
 })
 
@@ -51,8 +51,8 @@ var inputMutationOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 	Name: "UpdateOptions",
 	Fields: graphql.InputObjectConfigFieldMap{
 		"ttl":               {Type: graphql.Int, DefaultValue: -1},
-		"consistency":       {Type: mutationConsistencyEnum, DefaultValue: gocql.LocalQuorum},
-		"serialConsistency": {Type: serialConsistencyEnum, DefaultValue: gocql.Serial},
+		"consistency":       {Type: mutationConsistencyEnum, DefaultValue: DefaultConsistencyLevel},
+		"serialConsistency": {Type: serialConsistencyEnum, DefaultValue: DefaultSerialConsistencyLevel},
 	},
 })
 
@@ -241,7 +241,7 @@ func (s *KeyspaceGraphQLSchema) buildOrderEnums(keyspace *gocql.KeyspaceMetadata
 		for _, column := range table.Columns {
 			field := s.naming.ToGraphQLField(table.Name, column.Name)
 			values[field+"_ASC"] = &graphql.EnumValueConfig{
-				Value:       column.Name + "_ASC",
+				Value: column.Name + "_ASC",
 				Description: fmt.Sprintf("Order %s by %s in a	scending order", table.Name, column.Name),
 			}
 			values[field+"_DESC"] = &graphql.EnumValueConfig{

@@ -135,6 +135,64 @@ func TestDataEndpoint_Auth(t *testing.T) {
 	assert.Equal(t, expected, resp)
 }
 
+func TestDataEndpoint_PageSize(t *testing.T) {
+	session, routes := createRoutes(t, createConfig(t), "/graphql", "store")
+	resultMock := &db.ResultMock{}
+	resultMock.
+		On("PageState").Return([]byte{}).
+		On("Values").Return([]map[string]interface{}{
+		{"title": "book1", "pages": 1},
+	}, nil)
+	session.On("ExecuteIter", mock.Anything, mock.Anything, mock.Anything).Return(resultMock, nil)
+
+	query := `SELECT * FROM "store"."books" WHERE "title" = ?`
+	graphqlQuery := `query {
+	  books(data:{title:"abc"}%s) {
+		values {
+		  pages
+		  title
+		}
+	  }
+	}`
+
+	var resp schemas.ResponseBody
+	dbQueryOptions := db.NewQueryOptions().
+		WithPageState([]byte{}).
+		WithPageSize(graphql.DefaultPageSize).
+		WithConsistency(graphql.DefaultConsistencyLevel)
+
+	// Query with no options
+	buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
+		Query: fmt.Sprintf(graphqlQuery, ""),
+	}, nil)
+	assert.NoError(t, err, "error executing query")
+	err = json.NewDecoder(buffer).Decode(&resp)
+	assert.NoError(t, err)
+	session.AssertCalled(t, "ExecuteIter", query, dbQueryOptions, mock.Anything)
+
+	// Query with consistency
+	buffer, err = executePost(routes, "/graphql", graphql.RequestBody{
+		Query: fmt.Sprintf(graphqlQuery, ", options: {consistency: LOCAL_ONE}"),
+	}, nil)
+	assert.NoError(t, err, "error executing query")
+	err = json.NewDecoder(buffer).Decode(&resp)
+	assert.NoError(t, err)
+	// Page size is still default (100)
+	dbQueryOptions.WithConsistency(gocql.LocalOne)
+	session.AssertCalled(t, "ExecuteIter", query, dbQueryOptions, mock.Anything)
+
+	// Query with limit
+	buffer, err = executePost(routes, "/graphql", graphql.RequestBody{
+		Query: fmt.Sprintf(graphqlQuery, ", options: {limit: 3}"),
+	}, nil)
+	assert.NoError(t, err, "error executing query")
+	err = json.NewDecoder(buffer).Decode(&resp)
+	assert.NoError(t, err)
+	// Page size is still default (100)
+	dbQueryOptions.WithConsistency(graphql.DefaultConsistencyLevel)
+	session.AssertCalled(t, "ExecuteIter", query+" LIMIT ?", dbQueryOptions, mock.Anything)
+}
+
 func TestDataEndpoint_AuthNotProvided(t *testing.T) {
 	session, routes := createRoutes(t,
 		createConfig(t).WithUseUserOrRoleAuth(true),
