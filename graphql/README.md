@@ -373,8 +373,9 @@ query {
       pageState # Return the page state
     }
 }
+```
 
-The `pageState` value is returned in the GraphQL data result.
+The `pageState` value is returned in the result:
 
 ```json
 {
@@ -389,7 +390,8 @@ The `pageState` value is returned in the GraphQL data result.
 }
 ```
 
-The resulting `pageState` can be passed into the next query.
+`pageState` from the previous result can be passed into a followup query to get
+the next page:
 
 ```graphql
 query {
@@ -544,6 +546,22 @@ mutation {
 }
 ```
 
+Result:
+
+```json
+{
+  "data": {
+    "insertBooks": {
+      "applied": true,
+      "value": {
+        "author": "Miguel De Cervantes",
+        "title": "Don Quixote"
+      }
+    }
+  }
+}
+```
+
 #### Return values
 
 When mutations fail with `applied: false`, the most up-to-date, existing values
@@ -551,6 +569,20 @@ are returned in the result. Using the previous query, if the book already exists
 then the result would return a value for the `author`. Values that part of the
 paritition and clustering keys are always returned in the result, independent of
 whether the mutation was applied.
+
+```graphql
+mutation {
+  insertBooks(value: {title: "Don Quixote", author: "Herman Melville"}, ifNotExists: true) {
+    applied
+    value {
+      title
+      author
+    }
+  }
+}
+```
+
+Result:
 
 ```json
 {
