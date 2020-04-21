@@ -43,7 +43,7 @@ func TestDataEndpoint_Query(t *testing.T) {
 
 	body := graphql.RequestBody{
 		Query: `query {
-  books(data:{title:"abc"}) {
+  books(value:{title:"abc"}) {
     values {
       pages
       title
@@ -103,7 +103,7 @@ func TestDataEndpoint_Auth(t *testing.T) {
 
 	body := graphql.RequestBody{
 		Query: `query {
-  books(data:{title:"abc"}) {
+  books(value:{title:"abc"}) {
     values {
       pages
       title
@@ -160,7 +160,7 @@ func TestDataEndpoint_AuthNotProvided(t *testing.T) {
 
 	body := graphql.RequestBody{
 		Query: `query {
-  books(data:{title:"abc"}) {
+  books(value:{title:"abc"}) {
     values {
       pages
       title

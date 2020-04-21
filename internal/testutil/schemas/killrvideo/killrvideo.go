@@ -8,7 +8,7 @@ import (
 
 func InsertUserMutation(id interface{}, firstname interface{}, email interface{}, ifNotExists bool) string {
 	query := `mutation {
-	  insertUsers(data:{userid:%s, firstname:%s, email:%s}%s) {
+	  insertUsers(value:{userid:%s, firstname:%s, email:%s}%s) {
 		applied
 		value {
 		  userid
@@ -31,7 +31,7 @@ func InsertUserMutation(id interface{}, firstname interface{}, email interface{}
 
 func UpdateUserMutation(id string, firstname string, email string, ifEmail string) string {
 	query := `mutation {
-	  updateUsers(data:{userid:%s, firstname:%s, email:%s}%s) {
+	  updateUsers(value:{userid:%s, firstname:%s, email:%s}%s) {
 		applied
 		value {
 		  userid
@@ -52,7 +52,7 @@ func UpdateUserMutation(id string, firstname string, email string, ifEmail strin
 
 func DeleteUserMutation(id string, ifNotName string) string {
 	query := `mutation {
-	  deleteUsers(data:{userid:%s}%s) {
+	  deleteUsers(value:{userid:%s}%s) {
 		applied
 		value {
 		  userid
@@ -72,7 +72,7 @@ func DeleteUserMutation(id string, ifNotName string) string {
 
 func SelectUserQuery(id string) string {
 	query := `query {
-	  users(data:{userid:%s}) {
+	  users(value:{userid:%s}) {
 		pageState
 		values {
 		  userid
@@ -89,7 +89,7 @@ func SelectUserQuery(id string) string {
 
 func SelectTagsByLetter(firstLetter string, pageSize int, pageState string) string {
 	query := `{
-		tagsByLetter(data: {firstLetter: %s}, options: {pageSize: %d, pageState: %s}){
+		tagsByLetter(value: {firstLetter: %s}, options: {pageSize: %d, pageState: %s}){
   		  pageState
 		  values{ tag }}
 	}`
