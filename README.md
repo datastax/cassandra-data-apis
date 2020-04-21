@@ -30,7 +30,7 @@ documentation](/graphql/README.md) for getting started.
 ## Configuration
 
 There are a few ways configuration can be provided. When using Docker, settings
-can be provide as either environment variables or by mounting a configuration
+can be provided as either environment variables or by mounting a configuration
 file.
 
 Additional configuration can be added using environment variables by adding them

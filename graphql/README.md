@@ -75,9 +75,9 @@ CREATE TABLE library.authors (
 
 By default, this is how the server paths are structured:
 
-* `/graphgl-playground`: Provides an interactive playground to explore your
+* `/graphql-playground`: Provides an interactive playground to explore your
 GraphQL APIs.
-* `/graphgl-schema`: Provides an API for exploring and creating schema, in
+* `/graphql-schema`: Provides an API for exploring and creating schema, in
 database terminology this is know as: Data Definition Language (DDL). In
 Cassandra these are the queries used to create, modify, drop keyspaces and
 tables e.g. `CREATE KEYSPACE ...`, `CREATE TABLE ...`, `DROP TABLE ...`.
@@ -91,7 +91,7 @@ the root `graphql-path` (default is: `/graphql`). For example, a path
 `/graphql/library` would created for the `library` keyspace when it is added to
 the Cassandra schema.
 
-**Tip:** If your application wants to focus on a single keyspace then the
+**Tip:** If your application wants to focus on a single keyspace, then the
 environment variable `DATA_API_KEYSPACE=<your keyspace>` can be added to the
 `docker run -e DATA_API_KEYSPACE=<your keyspace> ...` command. In this mode, the
 provided keyspace's GraphQL API will live under `/graphql` and other keyspaces
@@ -100,8 +100,8 @@ in your database will no longer be accessible via `/graphql/<keyspace>`.
 ### API Generation
 
 For each table in your Cassandra schema, several fields are created for handling
-queries and mutations. For example, the generated `books` table's GraphQL API
-looks like this:
+queries and mutations. For example, the GraphQL API generated for the `books`
+table looks like this:
 
 ```graphql
 schema {
@@ -128,8 +128,8 @@ type TableMutation {
 
 * `booksFilter`: Query book values by filtering the result with relational
   operators e.g.  `gt` (greater than), `lt` (less than) etc. the `books()`
-  equality style query should be prefer if your queries don't require the use of
-  these more complex operators.
+  equality style query should be preferred if your queries don't require the use
+  of these more complex operators.
 
 #### Mutations:
   
@@ -338,7 +338,7 @@ input QueryOptions {
 Query consistency controls the number of replicas that must agree before returning
 your query result. This is used to tune the balance between data consistency and
 availability for reads. `SERIAL` and `LOCAL_SERIAL` are for use when doing
-condition inserts and updates which are also know as lightweight transactions
+conditional inserts and updates which are also known as lightweight transactions
 (LWTs), they are similar to `QUORUM` and `LOCAL_QUORUM`, respectively.
 
 ```graphql
@@ -362,8 +362,8 @@ Query paging can be controlled by modifying the values of `pagingSize` and
 100 values.
 
 
-The `pageState` is return in the data result of queries. It is a marker that can
-be passed to subsequent queries to get the following page.
+The `pageState` is returned in the data result of queries. It is a marker that
+can be passed to subsequent queries to get the following page.
 
 ``` graphql
 query {
@@ -406,7 +406,7 @@ The order of values returned can be controlled by passing an enumeration value
 argument, `orderBy`, for the given field.
 
 Given the schema below this would return the books written by `"Herman
-Melville"` in order of the size of his books by page length.
+Melville"` in order of his books by page length.
 
 ```graphql
 query {
@@ -520,16 +520,16 @@ enum SerialConsistency {
 
 Time to live (TTL), defined in seconds, controls the amount of time a value
 lives in the database before expiring e.g. `ttl: 60` means the associated values
-are no longer valid after 60 seconds.
+are no longer readable after 60 seconds.
 
 ### Conditional Inserts, Updates, and Deletes
 
-Condition mutations are mechanism to add or modify field values only when a
+Conditional mutations are mechanism to add or modify field values only when a
 provided condition, `ifExists`, `ifNotExists, and `ifCondition`, is satisfied.
 These conditional mutations require the use lightweight transactions (LWTs)
 which are significantly more expensive than regular mutations.
 
-The follow book will only be added if an existing entry does not exist. The
+The following book will only be added if an existing entry does not exist. The
 `applied` field can be used to determine if the mutation succeeded. If the
 mutation succeeded then `applied: true` is returned.
 
