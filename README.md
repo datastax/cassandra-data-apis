@@ -58,7 +58,7 @@ hosts:
 Then start docker with:
 
 ```sh
-docker run -p 8080:8080 -v "${PWD}/<your_config_file>.yaml:/root/config.yaml" cassandra-data-apis
+docker run -p 8080:8080 -v "${PWD}/<your_config_file>.yaml:/root/config.yaml" datastaxlabs/cassandra-data-apis
 ```
 
 ### Settings
@@ -178,8 +178,6 @@ Settings can also be overridden using environment variables prefixed with
 ```bash
 DATA_API_HOSTS=127.0.0.1 DATA_API_KEYSPACE=store ./run.exe --config <your_config_file>.yaml
 ```
-
-Note `--start-rest` is not currently implemented.
 
 ### Plugin the routes within your HTTP request router
 

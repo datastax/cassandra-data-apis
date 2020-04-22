@@ -347,7 +347,7 @@ consistency level configured?].
 ```graphql
 enum QueryConsistency {
   LOCAL_ONE    # Only wait for one replica in the local data center
-  LOCAL_QUORUM # Wait for a quorum, floor(total_replicas / 2 + 1), of replics in the local data center
+  LOCAL_QUORUM # Wait for a quorum, `floor(total_replicas / 2 + 1)`, of replicas in the local data center
   ALL          # Wait for all replicas in all data centers
   SERIAL       # Used to read the latest value checking for inflight updates
   LOCAL_SERIAL # Same as `SERIAL, but only in the local data center

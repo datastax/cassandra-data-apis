@@ -126,10 +126,11 @@ func Execute() {
 	flags.String("graphql-schema-path", defaultGraphQLSchemaPath, "GraphQL schema management path")
 	flags.Int("graphql-port", 8080, "GraphQL endpoint port")
 
+	// TODO:
 	// REST specific flags
-	flags.Bool("start-rest", false, "start the REST endpoint")
-	flags.String("rest-path", defaultRESTPath, "REST endpoint path")
-	flags.Int("rest-port", 8080, "REST endpoint port")
+	// flags.Bool("start-rest", false, "start the REST endpoint")
+	// flags.String("rest-path", defaultRESTPath, "REST endpoint path")
+	// flags.Int("rest-port", 8080, "REST endpoint port")
 
 	flags.VisitAll(func(flag *pflag.Flag) {
 		if flag.Name != "config" {
