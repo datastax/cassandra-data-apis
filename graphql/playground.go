@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func GetPlaygroundHandle(path string, port int) httprouter.Handle {
+func GetPlaygroundHandle(defaultEndpointUrl string) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		html := `
 <!DOCTYPE html>
@@ -20,7 +20,6 @@ func GetPlaygroundHandle(path string, port int) httprouter.Handle {
   <link rel="shortcut icon" href="//cdn.jsdelivr.net/npm/graphql-playground-react/build/favicon.png" />
   <script src="//cdn.jsdelivr.net/npm/graphql-playground-react/build/static/js/middleware.js"></script>
 </head>
-
 <body>
   <div id="root">
     <style>
@@ -68,7 +67,7 @@ func GetPlaygroundHandle(path string, port int) httprouter.Handle {
 
 </html>
 `
-		html = fmt.Sprintf(html, fmt.Sprintf("http://localhost:%d%s", port, path))
+		html = fmt.Sprintf(html, defaultEndpointUrl)
 		fmt.Fprint(w, html)
 	}
 }

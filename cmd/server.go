@@ -34,8 +34,6 @@ var serverCmd = &cobra.Command{
 	Use:   os.Args[0] + " --hosts [HOSTS] [--start-graph|--start-rest] [OPTIONS]",
 	Short: "GraphQL and REST endpoints for Apache Cassandra",
 	Args: func(cmd *cobra.Command, args []string) error {
-		// TODO: Validate GraphQL/REST paths, should they be disjointed?
-
 		hosts := viper.GetStringSlice("hosts")
 		if len(hosts) == 0 {
 			return errors.New("hosts are required")
@@ -63,6 +61,10 @@ var serverCmd = &cobra.Command{
 		startREST := viper.GetBool("start-rest")
 
 		if graphqlPort == restPort {
+			if startGraphQL && startREST && viper.GetString("graphql-path") == viper.GetString("rest-path") {
+				logger.Fatal("graphql and rest paths can not be the same when using the same port")
+			}
+
 			router := createRouter()
 			endpointNames := ""
 			if startGraphQL {
@@ -125,6 +127,7 @@ func Execute() {
 	flags.Bool("start-graphql", true, "start the GraphQL endpoint")
 	flags.String("graphql-path", defaultGraphQLPath, "GraphQL endpoint path")
 	flags.String("graphql-schema-path", defaultGraphQLSchemaPath, "GraphQL schema management path")
+	flags.Bool("graphql-playground", true, "expose a GraphQL playground route")
 	flags.String("graphql-playground-path", defaultGraphQLPlaygroundPath, "path for the GraphQL playground static file")
 	flags.Int("graphql-port", 8080, "GraphQL endpoint port")
 
@@ -181,7 +184,6 @@ func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint
 
 	singleKeyspace := viper.GetString("keyspace")
 	rootPath := viper.GetString("graphql-path")
-	playgroundPath := viper.GetString("graphql-playground-path")
 
 	if singleKeyspace != "" {
 		routes, err = endpoint.RoutesKeyspaceGraphQL(rootPath, singleKeyspace)
@@ -198,8 +200,6 @@ func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint
 		router.Handler(route.Method, route.Pattern, route.Handler)
 	}
 
-	router.GET(playgroundPath, graphql.GetPlaygroundHandle(rootPath, viper.GetInt("graphql-port")))
-
 	supportedOps := viper.GetStringSlice("operations")
 	ops, err := config.Ops(supportedOps...)
 	if err != nil {
@@ -211,6 +211,23 @@ func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint
 	if err != nil {
 		logger.Fatal("unable to generate graphql schema routes",
 			"error", err)
+	}
+
+	if viper.GetBool("graphql-playground") {
+		playgroundPath := viper.GetString("graphql-playground-path")
+		path := rootPath
+		// Get the first POST GraphQL route
+		for _, route := range routes {
+			if route.Method == http.MethodPost && strings.HasPrefix(route.Pattern, rootPath) {
+				path = route.Pattern
+				break
+			}
+		}
+		hostAndPort := fmt.Sprintf("http://localhost:%d", viper.GetInt("graphql-port"))
+		defaultEndpointUrl := fmt.Sprintf("%s%s", hostAndPort, path)
+		logger.Info("get started by visiting the GraphQL playground",
+			"url", fmt.Sprintf("%s%s", hostAndPort, playgroundPath))
+		router.GET(playgroundPath, graphql.GetPlaygroundHandle(defaultEndpointUrl))
 	}
 
 	for _, route := range routes {
