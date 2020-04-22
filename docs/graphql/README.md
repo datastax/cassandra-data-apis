@@ -538,7 +538,7 @@ enum SerialConsistency {
 
 #### Time-to-live (TTL)
 
-Time to live (TTL), defined in seconds, controls the amount of time a value
+Time-to-live (TTL), defined in seconds, controls the amount of time a value
 lives in the database before expiring e.g. `ttl: 60` means the associated values
 are no longer readable after 60 seconds. More information about TTL can be found
 in [Expiring data with time-to-live].

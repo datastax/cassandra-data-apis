@@ -6,7 +6,7 @@ These APIs can be used as a standalone server using either Docker or manually
 running a server. They can also be embedded in existing applications using HTTP
 routes. 
 
-Currently, this project provides a GraphQL API. Other API types are possible in
+Currently, this project provides GraphQL APIs. Other API types are possible in
 the future.
 
 ## Getting Started
