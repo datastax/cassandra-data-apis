@@ -31,3 +31,8 @@ CREATE TABLE tester_abc (id int PRIMARY KEY, value text);
 CREATE TABLE "testerAbc" (id int PRIMARY KEY, value text);
 
 CREATE TABLE "WEIRD_CASE" ("ID" int PRIMARY KEY, "ABCdef" text, "QA_data" text, "abc_XYZ" text);
+
+// Views shouldn't allow direct mutations
+CREATE TABLE table_with_view (id int PRIMARY KEY, value text);
+CREATE MATERIALIZED VIEW tables_view AS SELECT value FROM table_with_view WHERE value IS NOT NULL PRIMARY KEY(value, id);
+

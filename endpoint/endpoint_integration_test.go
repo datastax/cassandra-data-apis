@@ -373,10 +373,39 @@ var _ = Describe("DataEndpoint", func() {
 				}
 			})
 
-			It("Should support case sensitive column names", func() {
+			It("Should not allow direct mutations on materialized views", func() {
 				routes := getRoutes(config, keyspace)
-				quirky.InsertWeirdCase(routes, 1)
-				quirky.SelectWeirdCase(routes, 1)
+
+				// Insert value into the view's table
+				quirky.InsertAndSelect(routes, "TableWithView")
+
+				// Queries should still work
+				query := `query {
+				  tablesView {
+				    values {
+				      id
+				    }
+				  }
+				}`
+
+				response := schemas.DecodeResponse(schemas.ExecutePost(routes, "/grqphql", query))
+				expected := schemas.NewResponseBody("tablesView", map[string]interface{}{
+					"values": []interface{} {
+						map[string]interface{} {
+							"id": float64(1),
+						},
+					},
+				})
+				Expect(response).To(Equal(expected))
+
+				// Mutations for the view should not be present
+				mutation := `mutation {
+				  insertTablesView(value: {id:1, value:"test"}) {
+				    applied
+				  }
+				}`
+
+				schemas.ExpectQueryToReturnError(routes, mutation, `Cannot query field "insertTablesView"`)
 			})
 		})
 
