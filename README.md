@@ -25,7 +25,7 @@ You can also manually build the docker image and/or the server using the
 ### Using GraphQL
 
 By default, a GraphQL endpoint is started. Use the [GraphQL
-documentation](/graphql/README.md) for getting started.
+documentation](/docs/graphql/README.md) for getting started.
 
 ## Configuration
 
