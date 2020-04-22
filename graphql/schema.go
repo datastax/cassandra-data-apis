@@ -100,7 +100,7 @@ func (sg *SchemaGenerator) buildQuery(
 ) *graphql.Object {
 	return graphql.NewObject(
 		graphql.ObjectConfig{
-			Name:   "TableQuery",
+			Name:   "Query",
 			Fields: sg.buildQueriesFields(schema, keyspace),
 		})
 }
@@ -167,7 +167,7 @@ func (sg *SchemaGenerator) buildMutation(
 ) *graphql.Object {
 	return graphql.NewObject(
 		graphql.ObjectConfig{
-			Name:   "TableMutation",
+			Name:   "Mutation",
 			Fields: sg.buildMutationFields(schema, keyspace),
 		})
 }

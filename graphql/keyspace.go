@@ -110,7 +110,7 @@ func (sg *SchemaGenerator) buildKeyspaceValue(keyspace *gocql.KeyspaceMetadata) 
 
 func (sg *SchemaGenerator) buildKeyspaceQuery() *graphql.Object {
 	return graphql.NewObject(graphql.ObjectConfig{
-		Name: "SchemaQuery",
+		Name: "Query",
 		Fields: graphql.Fields{
 			"keyspace": &graphql.Field{
 				Type: keyspaceType,
@@ -297,7 +297,7 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 	}
 
 	return graphql.NewObject(graphql.ObjectConfig{
-		Name:   "SchemaMutation",
+		Name:   "Mutation",
 		Fields: fields,
 	})
 }

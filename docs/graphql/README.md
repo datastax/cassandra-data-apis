@@ -105,16 +105,16 @@ table looks like this:
 
 ```graphql
 schema {
-  query: TableQuery
-  mutation: TableMutation
+  query: Query
+  mutation: Mutation
 }
 
-type TableQuery {
+type Query {
   books(value: BooksInput, orderBy: [BooksOrder], options: QueryOptions): BooksResult
   booksFilter(filter: BooksFilterInput!, orderBy: [BooksOrder], options: QueryOptions): BooksResult
 }
 
-type TableMutation {
+type Mutation {
   insertBooks(value: BooksInput!, ifNotExists: Boolean, options: UpdateOptions): BooksMutationResult
   updateBooks(value: BooksInput!, ifExists: Boolean, ifCondition: BooksFilterInput, options: UpdateOptions): BooksMutationResult
   deleteBooks(value: BooksInput!, ifExists: Boolean, ifCondition: BooksFilterInput, options: UpdateOptions): BooksMutationResult
@@ -147,7 +147,7 @@ type TableMutation {
    mutation to use a lightweight transaction (LWT) adding significant overhead.
 
 As more tables are added to a keyspace additional fields will be added to the
-`TableQuery` and `TableMutation` types to handle queries and mutations for those
+`Query` and `Mutation` types to handle queries and mutations for those
 new tables.
 
 ### API Naming Convention
@@ -428,7 +428,7 @@ Each query field has an `orderBy` argument and a specific order enumeration
 type, in this case, `BookBySizeOrder`.
 
 ```graphql
-type TableQuery {
+type Query {
   bookBySize(options: QueryOptions, value: BookBySizeInput, orderBy: [BookBySizeOrder]): BookBySizeResult
   
   # ...
