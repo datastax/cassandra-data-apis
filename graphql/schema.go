@@ -105,10 +105,11 @@ func (sg *SchemaGenerator) buildQuery(
 func (sg *SchemaGenerator) buildMutationFields(
 	ksSchema *KeyspaceGraphQLSchema,
 	keyspace *gocql.KeyspaceMetadata,
+	views map[string]bool,
 ) graphql.Fields {
 	fields := graphql.Fields{}
 	for name, table := range keyspace.Tables {
-		if ksSchema.ignoredTables[table.Name] {
+		if ksSchema.ignoredTables[table.Name] || views[name] {
 			continue
 		}
 
@@ -161,17 +162,23 @@ func (sg *SchemaGenerator) buildMutationFields(
 func (sg *SchemaGenerator) buildMutation(
 	schema *KeyspaceGraphQLSchema,
 	keyspace *gocql.KeyspaceMetadata,
+	views map[string]bool,
 ) *graphql.Object {
 	return graphql.NewObject(
 		graphql.ObjectConfig{
 			Name:   "Mutation",
-			Fields: sg.buildMutationFields(schema, keyspace),
+			Fields: sg.buildMutationFields(schema, keyspace, views),
 		})
 }
 
 // Build GraphQL schema for tables in the provided keyspace metadata
 func (sg *SchemaGenerator) BuildSchema(keyspaceName string) (graphql.Schema, error) {
 	keyspace, err := sg.dbClient.Keyspace(keyspaceName)
+	if err != nil {
+		return graphql.Schema{}, err
+	}
+
+	views, err := sg.dbClient.Views(keyspaceName) // Used to exclude views from mutations
 	if err != nil {
 		return graphql.Schema{}, err
 	}
@@ -192,7 +199,7 @@ func (sg *SchemaGenerator) BuildSchema(keyspaceName string) (graphql.Schema, err
 	return graphql.NewSchema(
 		graphql.SchemaConfig{
 			Query:    sg.buildQuery(keyspaceSchema, keyspace),
-			Mutation: sg.buildMutation(keyspaceSchema, keyspace),
+			Mutation: sg.buildMutation(keyspaceSchema, keyspace, views),
 		},
 	)
 }

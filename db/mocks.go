@@ -102,6 +102,7 @@ func (o *SessionMock) Default() *SessionMock {
 		"store", map[string][]*gocql.ColumnMetadata{
 			"books": BooksColumnsMock,
 		}))
+	o.AddViews(nil)
 	return o
 }
 
@@ -114,6 +115,21 @@ func (o *SessionMock) SetSchemaVersion(version string) *mock.Call {
 
 	return o.On("ExecuteIter", "SELECT schema_version FROM system.local", mock.Anything, mock.Anything).
 		Return(schemaVersionResultMock, nil)
+}
+
+func (o *SessionMock) AddViews(views []string) *mock.Call {
+	values := make([]map[string]interface{}, 0, len(views))
+	for _, value := range views {
+		values = append(values, map[string]interface{}{"view_name": &value})
+	}
+	viewsResultMock := &ResultMock{}
+	viewsResultMock.
+		On("Values").Return(values, nil)
+
+	return o.On("ExecuteIter",
+		"SELECT view_name FROM system_schema.views WHERE keyspace_name = ?",
+		mock.Anything, mock.Anything).
+		Return(viewsResultMock, nil)
 }
 
 func (o *SessionMock) AddKeyspace(keyspace *gocql.KeyspaceMetadata) *mock.Call {

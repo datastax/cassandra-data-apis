@@ -25,6 +25,8 @@ func TestSchemaUpdater_Update(t *testing.T) {
 			"books": db.BooksColumnsMock,
 		})).Once()
 
+	sessionMock.AddViews(nil)
+
 	updater, err := NewUpdater(schemaGen, "store", 10*time.Second, log.NewZapLogger(zap.NewExample()))
 	assert.NoError(t, err, "unable to create updater")
 

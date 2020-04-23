@@ -92,3 +92,18 @@ func (db *Db) Keyspaces() ([]string, error) {
 
 	return keyspaces, nil
 }
+
+// Views Retrieves all the views for the given keyspace
+func (db *Db) Views(ksName string) (map[string]bool, error) {
+	iter, err := db.session.ExecuteIter("SELECT view_name FROM system_schema.views WHERE keyspace_name = ?", nil, ksName)
+	if err != nil {
+		return nil, err
+	}
+
+	views := make(map[string]bool, len(iter.Values()))
+	for _, row := range iter.Values() {
+		views[*row["view_name"].(*string)] = true
+	}
+
+	return views, nil
+}
