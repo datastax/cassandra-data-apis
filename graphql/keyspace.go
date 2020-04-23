@@ -155,13 +155,16 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 
 	if ops.IsSupported(config.KeyspaceCreate) {
 		fields["createKeyspace"] = &graphql.Field{
-			Type: graphql.Boolean,
+			Type: keyspaceType,
 			Args: graphql.FieldConfigArgument{
 				"name": &graphql.ArgumentConfig{
 					Type: graphql.NewNonNull(graphql.String),
 				},
 				"dcs": &graphql.ArgumentConfig{
 					Type: graphql.NewNonNull(graphql.NewList(dataCenterInput)),
+				},
+				"ifNotExists": &graphql.ArgumentConfig{
+					Type: graphql.Boolean,
 				},
 			},
 			Resolve: func(params graphql.ResolveParams) (interface{}, error) {
@@ -178,7 +181,22 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 				if err != nil {
 					return nil, err
 				}
-				return sg.dbClient.CreateKeyspace(ksName, dcReplicas, db.NewQueryOptions().WithUserOrRole(userOrRole))
+
+				err =  sg.dbClient.CreateKeyspace(&db.CreateKeyspaceInfo{
+					Name:        ksName,
+					DCReplicas:  dcReplicas,
+					IfNotExists: params.Args["ifNotExists"].(bool),
+				}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+				if err != nil {
+					return nil, err
+				}
+
+				keyspace, err := sg.dbClient.Keyspace(ksName)
+				if err != nil {
+					return err, nil
+				}
+
+				return sg.buildKeyspaceValue(keyspace), nil
 			},
 		}
 	}
@@ -190,15 +208,23 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 				"name": &graphql.ArgumentConfig{
 					Type: graphql.NewNonNull(graphql.String),
 				},
+				"ifExists": &graphql.ArgumentConfig{
+					Type: graphql.Boolean,
+				},
 			},
 			Resolve: func(params graphql.ResolveParams) (interface{}, error) {
-				ksName := params.Args["name"].(string)
+				args := params.Args
+				ksName := args["name"].(string)
 
 				userOrRole, err := sg.checkUserOrRoleAuth(params)
 				if err != nil {
 					return nil, err
 				}
-				return sg.dbClient.DropKeyspace(ksName, db.NewQueryOptions().WithUserOrRole(userOrRole))
+
+				return true, sg.dbClient.DropKeyspace(&db.DropKeyspaceInfo{
+					Name: ksName,
+					IfExists: args["ifExists"].(bool),
+				}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 			},
 		}
 
@@ -206,7 +232,7 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 
 	if ops.IsSupported(config.TableCreate) {
 		fields["createTable"] = &graphql.Field{
-			Type: graphql.Boolean,
+			Type: tableType,
 			Args: graphql.FieldConfigArgument{
 				"keyspaceName": &graphql.ArgumentConfig{
 					Type: graphql.NewNonNull(graphql.String),
@@ -223,8 +249,11 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 				"values": &graphql.ArgumentConfig{
 					Type: graphql.NewList(columnInput),
 				},
+				"ifNotExists": &graphql.ArgumentConfig{
+					Type: graphql.Boolean,
+				},
 			},
-			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				return sg.createTable(p)
 			},
 		}
@@ -232,7 +261,7 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 
 	if ops.IsSupported(config.TableAlterAdd) {
 		fields["alterTableAdd"] = &graphql.Field{
-			Type: graphql.Boolean,
+			Type: tableType,
 			Args: graphql.FieldConfigArgument{
 				"keyspaceName": &graphql.ArgumentConfig{
 					Type: graphql.NewNonNull(graphql.String),
@@ -252,7 +281,7 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 
 	if ops.IsSupported(config.TableAlterDrop) {
 		fields["alterTableDrop"] = &graphql.Field{
-			Type: graphql.Boolean,
+			Type: tableType,
 			Args: graphql.FieldConfigArgument{
 				"keyspaceName": &graphql.ArgumentConfig{
 					Type: graphql.NewNonNull(graphql.String),
@@ -279,6 +308,9 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 				},
 				"tableName": &graphql.ArgumentConfig{
 					Type: graphql.NewNonNull(graphql.String),
+				},
+				"ifExists": &graphql.ArgumentConfig{
+					Type: graphql.Boolean,
 				},
 			},
 			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {

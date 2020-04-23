@@ -267,7 +267,7 @@ func (sg *SchemaGenerator) createTable(params graphql.ResolveParams) (interface{
 	partitionKeys, err := decodeColumns(args["partitionKeys"].([]interface{}))
 
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	if args["values"] != nil {
@@ -286,12 +286,28 @@ func (sg *SchemaGenerator) createTable(params graphql.ResolveParams) (interface{
 	if err != nil {
 		return nil, err
 	}
-	return sg.dbClient.CreateTable(&db.CreateTableInfo{
+
+	err = sg.dbClient.CreateTable(&db.CreateTableInfo{
 		Keyspace:       ksName,
 		Table:          tableName,
 		PartitionKeys:  partitionKeys,
 		ClusteringKeys: clusteringKeys,
-		Values:         values}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+		Values:         values,
+		IfNotExists:    params.Args["ifNotExists"].(bool),
+	}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+	if err != nil {
+		return nil, err
+	}
+
+	if tableResult, err := sg.buildTableResult(tableName, ksName); err != nil {
+		sg.logger.Error("unable to build table result for create table",
+			"keyspaceName", ksName,
+			"tableName", tableName,
+			"error", err)
+		return tableValue{Name: tableName, Columns: []*columnValue{}}, nil
+	} else {
+		return tableResult, nil
+	}
 }
 
 func (sg *SchemaGenerator) alterTableAdd(params graphql.ResolveParams) (interface{}, error) {
@@ -314,11 +330,24 @@ func (sg *SchemaGenerator) alterTableAdd(params graphql.ResolveParams) (interfac
 	if err != nil {
 		return nil, err
 	}
-	return sg.dbClient.AlterTableAdd(&db.AlterTableAddInfo{
+	err = sg.dbClient.AlterTableAdd(&db.AlterTableAddInfo{
 		Keyspace: ksName,
 		Table:    tableName,
 		ToAdd:    toAdd,
 	}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+	if err != nil {
+		return nil, err
+	}
+
+	if tableResult, err := sg.buildTableResult(tableName, ksName); err != nil {
+		sg.logger.Error("unable to build table result for alter table add",
+			"keyspaceName", ksName,
+			"tableName", tableName,
+			"error", err)
+		return tableValue{Name: tableName, Columns: []*columnValue{}}, nil
+	} else {
+		return tableResult, nil
+	}
 }
 
 func (sg *SchemaGenerator) alterTableDrop(params graphql.ResolveParams) (interface{}, error) {
@@ -341,11 +370,24 @@ func (sg *SchemaGenerator) alterTableDrop(params graphql.ResolveParams) (interfa
 	if err != nil {
 		return nil, err
 	}
-	return sg.dbClient.AlterTableDrop(&db.AlterTableDropInfo{
+	err = sg.dbClient.AlterTableDrop(&db.AlterTableDropInfo{
 		Keyspace: ksName,
 		Table:    tableName,
 		ToDrop:   toDrop,
 	}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+	if err != nil {
+		return nil, err
+	}
+
+	if tableResult, err := sg.buildTableResult(tableName, ksName); err != nil {
+		sg.logger.Error("unable to build table result for alter table drop",
+			"keyspaceName", ksName,
+			"tableName", tableName,
+			"error", err)
+		return tableValue{Name: tableName, Columns: []*columnValue{}}, nil
+	} else {
+		return tableResult, nil
+	}
 }
 
 func (sg *SchemaGenerator) dropTable(params graphql.ResolveParams) (interface{}, error) {
@@ -358,7 +400,27 @@ func (sg *SchemaGenerator) dropTable(params graphql.ResolveParams) (interface{},
 	}
 	return sg.dbClient.DropTable(&db.DropTableInfo{
 		Keyspace: ksName,
-		Table:    tableName}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+		Table:    tableName,
+		IfExists: args["ifExists"].(bool)}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+}
+
+func (sg *SchemaGenerator) buildTableResult(tableName string, ksName string) (*tableValue, error) {
+	keyspace, err := sg.dbClient.Keyspace(ksName)
+	if err != nil {
+		return nil, err
+	}
+	if table, ok := keyspace.Tables[tableName]; !ok {
+		return nil, fmt.Errorf("unable to find table: %s", tableName)
+	} else {
+		columnsValues, err := toColumnValues(table.Columns)
+		if err != nil {
+			return nil, err
+		}
+		return &tableValue{
+			Name:    tableName,
+			Columns: columnsValues,
+		}, nil
+	}
 }
 
 func toColumnType(info gocql.TypeInfo) (*dataTypeValue, error) {
