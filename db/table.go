@@ -41,7 +41,7 @@ func (db *Db) CreateTable(info *CreateTableInfo, options *QueryOptions) (bool, e
 	}
 
 	if info.ClusteringKeys != nil {
-		primaryKeys = fmt.Sprintf("(%s)", primaryKeys)
+		primaryKeys = fmt.Sprintf("(%s)", primaryKeys[2:])
 
 		for _, c := range info.ClusteringKeys {
 			columns += fmt.Sprintf(`"%s" %s, `, c.Name, c.Type)
@@ -52,6 +52,8 @@ func (db *Db) CreateTable(info *CreateTableInfo, options *QueryOptions) (bool, e
 			}
 			clusteringOrder += fmt.Sprintf(`, "%s" %s`, c.Name, order)
 		}
+	} else {
+		primaryKeys = primaryKeys[2:]
 	}
 
 	if info.Values != nil {
@@ -60,7 +62,7 @@ func (db *Db) CreateTable(info *CreateTableInfo, options *QueryOptions) (bool, e
 		}
 	}
 
-	query := fmt.Sprintf(`CREATE TABLE "%s"."%s" (%sPRIMARY KEY (%s))`, info.Keyspace, info.Table, columns, primaryKeys[2:])
+	query := fmt.Sprintf(`CREATE TABLE "%s"."%s" (%sPRIMARY KEY (%s))`, info.Keyspace, info.Table, columns, primaryKeys)
 
 	if clusteringOrder != "" {
 		query += fmt.Sprintf(" WITH CLUSTERING ORDER BY (%s)", clusteringOrder[2:])

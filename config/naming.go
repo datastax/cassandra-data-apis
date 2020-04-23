@@ -104,7 +104,7 @@ func generateAvailableName(baseName string, nameMap map[string]string) string {
 func isReserved(name string) bool {
 	switch name {
 	case "BasicType", "Bigint", "Blob", "Column", "ColumnInput", "ColumnKind", "Consistency", "ClusteringKeyInput",
-		"DataType", "DataTypeInput", "Decimal", "QueryOptions", "Table", "TableQuery", "TableMutation", "Time",
+		"DataType", "DataTypeInput", "Decimal", "QueryOptions", "Table", "Query", "Mutation", "Time",
 		"Timestamp", "TimeUuid", "UpdateOptions", "Uuid", "Varint":
 		return true
 	}

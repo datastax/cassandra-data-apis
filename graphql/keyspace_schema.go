@@ -48,7 +48,7 @@ var inputQueryOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 })
 
 var inputMutationOptions = graphql.NewInputObject(graphql.InputObjectConfig{
-	Name: "UpdateOptions",
+	Name: "MutationOptions",
 	Fields: graphql.InputObjectConfigFieldMap{
 		"ttl":               {Type: graphql.Int, DefaultValue: -1},
 		"consistency":       {Type: mutationConsistencyEnum, DefaultValue: DefaultConsistencyLevel},
