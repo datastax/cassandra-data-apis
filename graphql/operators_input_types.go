@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"fmt"
 	"github.com/gocql/gocql"
 	"github.com/graphql-go/graphql"
 )
@@ -40,7 +41,8 @@ var operatorsInputTypes = map[gocql.Type]*graphql.InputObject{
 
 func operatorType(graphqlType graphql.Type) *graphql.InputObject {
 	return graphql.NewInputObject(graphql.InputObjectConfig{
-		Name: graphqlType.Name() + "FilterInput",
+		Description: fmt.Sprintf("Input type to be used in filter queries for the %s type.", graphqlType.Name()),
+		Name:        graphqlType.Name() + "FilterInput",
 		Fields: graphql.InputObjectConfigFieldMap{
 			"eq":    {Type: graphqlType},
 			"notEq": {Type: graphqlType},

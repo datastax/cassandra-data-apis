@@ -58,9 +58,15 @@ func (sg *SchemaGenerator) buildQueriesFields(
 		}
 
 		fields[ksSchema.naming.ToGraphQLOperation("", table.Name)] = &graphql.Field{
+			Description: fmt.Sprintf("Retrieves data from '%s' table.\n", table.Name) +
+				"Uses the provided value fields to filter, using the equality operator.\n" +
+				"The amount of rows in contained in the result is limited by the page size " +
+				fmt.Sprintf(" (defaults to %d). Use the pageState included in the result to ", DefaultPageSize) +
+				"obtain the following rows.\n" +
+				"When no fields are provided, it returns all rows in the table, limited by the page size.",
 			Type: ksSchema.resultSelectTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"value":    {Type: ksSchema.tableScalarInputTypes[table.Name]},
+				"value":   {Type: ksSchema.tableScalarInputTypes[table.Name]},
 				"orderBy": {Type: graphql.NewList(ksSchema.orderEnums[table.Name])},
 				"options": {Type: inputQueryOptions, DefaultValue: inputQueryOptionsDefault},
 			},
@@ -68,6 +74,11 @@ func (sg *SchemaGenerator) buildQueriesFields(
 		}
 
 		fields[ksSchema.naming.ToGraphQLOperation("", table.Name)+"Filter"] = &graphql.Field{
+			Description: fmt.Sprintf("Retrieves data from '%s' table using equality \n", table.Name) +
+				"and non-equality operators.\n" +
+				"The amount of rows in contained in the result is limited by the page size " +
+				fmt.Sprintf(" (defaults to %d). Use the pageState included in the result to ", DefaultPageSize) +
+				"obtain the following rows.\n",
 			Type: ksSchema.resultSelectTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
 				"filter":  {Type: graphql.NewNonNull(ksSchema.tableOperatorInputTypes[table.Name])},
@@ -81,7 +92,8 @@ func (sg *SchemaGenerator) buildQueriesFields(
 	if len(keyspace.Tables) == 0 {
 		// graphql-go requires at least a single query and a single mutation
 		fields["__keyspaceEmptyQuery"] = &graphql.Field{
-			Type: graphql.Boolean,
+			Description: "Placeholder query that is exposed when a keyspace is empty.",
+			Type:        graphql.Boolean,
 			Resolve: func(params graphql.ResolveParams) (interface{}, error) {
 				return true, nil
 			},
@@ -113,9 +125,12 @@ func (sg *SchemaGenerator) buildMutationFields(
 		}
 
 		fields[ksSchema.naming.ToGraphQLOperation(insertPrefix, name)] = &graphql.Field{
+			Description: fmt.Sprintf("Inserts an entire row or upserts data into an existing row of '%s' table. ", table.Name) +
+				"Requires a value for each component of the primary key, but not for any other columns. " +
+				"Missing values are left unset.",
 			Type: ksSchema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"value":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
+				"value":       {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
 				"ifNotExists": {Type: graphql.Boolean},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
 			},
@@ -123,9 +138,10 @@ func (sg *SchemaGenerator) buildMutationFields(
 		}
 
 		fields[ksSchema.naming.ToGraphQLOperation(deletePrefix, name)] = &graphql.Field{
-			Type: ksSchema.resultUpdateTypes[table.Name],
+			Description: fmt.Sprintf("Removes an entire row in '%s' table.", table.Name),
+			Type:        ksSchema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"value":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
+				"value":       {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
 				"ifExists":    {Type: graphql.Boolean},
 				"ifCondition": {Type: ksSchema.tableOperatorInputTypes[table.Name]},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
@@ -134,9 +150,12 @@ func (sg *SchemaGenerator) buildMutationFields(
 		}
 
 		fields[ksSchema.naming.ToGraphQLOperation(updatePrefix, name)] = &graphql.Field{
+			Description: fmt.Sprintf("Writes one or more column values to a row in '%s' table.", table.Name) +
+				"Like insert operation, update is an upsert operation: if the specified row does not exist," +
+				"the command creates it.",
 			Type: ksSchema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"value":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
+				"value":       {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
 				"ifExists":    {Type: graphql.Boolean},
 				"ifCondition": {Type: ksSchema.tableOperatorInputTypes[table.Name]},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
@@ -148,7 +167,8 @@ func (sg *SchemaGenerator) buildMutationFields(
 	if len(keyspace.Tables) == 0 {
 		// graphql-go requires at least a single query and a single mutation
 		fields["__keyspaceEmptyMutation"] = &graphql.Field{
-			Type: graphql.Boolean,
+			Description: "Placeholder mutation that is exposed when a keyspace is empty.",
+			Type:        graphql.Boolean,
 			Resolve: func(params graphql.ResolveParams) (interface{}, error) {
 				return true, nil
 			},

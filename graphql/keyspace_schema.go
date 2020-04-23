@@ -38,7 +38,8 @@ type KeyspaceGraphQLSchema struct {
 }
 
 var inputQueryOptions = graphql.NewInputObject(graphql.InputObjectConfig{
-	Name: "QueryOptions",
+	Description: "An input type to determine paging, consistency and other query settings.",
+	Name:        "QueryOptions",
 	Fields: graphql.InputObjectConfigFieldMap{
 		"limit":       {Type: graphql.Int},
 		"pageSize":    {Type: graphql.Int, DefaultValue: DefaultPageSize},
@@ -48,7 +49,8 @@ var inputQueryOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 })
 
 var inputMutationOptions = graphql.NewInputObject(graphql.InputObjectConfig{
-	Name: "MutationOptions",
+	Name:        "MutationOptions",
+	Description: "An input type to determine consistency and other mutation settings.",
 	Fields: graphql.InputObjectConfigFieldMap{
 		"ttl":               {Type: graphql.Int, DefaultValue: -1},
 		"consistency":       {Type: mutationConsistencyEnum, DefaultValue: DefaultConsistencyLevel},
@@ -69,7 +71,8 @@ var inputMutationOptionsDefault = types.MutationOptions{
 }
 
 var queryConsistencyEnum = graphql.NewEnum(graphql.EnumConfig{
-	Name: "QueryConsistency",
+	Description: "Consistency level for queries.",
+	Name:        "QueryConsistency",
 	Values: graphql.EnumValueConfigMap{
 		"LOCAL_ONE":    {Value: gocql.LocalOne},
 		"LOCAL_QUORUM": {Value: gocql.LocalQuorum},
@@ -80,7 +83,8 @@ var queryConsistencyEnum = graphql.NewEnum(graphql.EnumConfig{
 })
 
 var mutationConsistencyEnum = graphql.NewEnum(graphql.EnumConfig{
-	Name: "MutationConsistency",
+	Description: "Consistency level for mutations.",
+	Name:        "MutationConsistency",
 	Values: graphql.EnumValueConfigMap{
 		"LOCAL_ONE":    {Value: gocql.LocalOne},
 		"LOCAL_QUORUM": {Value: gocql.LocalQuorum},
@@ -89,7 +93,8 @@ var mutationConsistencyEnum = graphql.NewEnum(graphql.EnumConfig{
 })
 
 var serialConsistencyEnum = graphql.NewEnum(graphql.EnumConfig{
-	Name: "SerialConsistency",
+	Description: "Serial level for mutations.",
+	Name:        "SerialConsistency",
 	Values: graphql.EnumValueConfigMap{
 		"SERIAL":       {Value: gocql.Serial},
 		"LOCAL_SERIAL": {Value: gocql.LocalSerial},
@@ -241,18 +246,19 @@ func (s *KeyspaceGraphQLSchema) buildOrderEnums(keyspace *gocql.KeyspaceMetadata
 		for _, column := range table.Columns {
 			field := s.naming.ToGraphQLField(table.Name, column.Name)
 			values[field+"_ASC"] = &graphql.EnumValueConfig{
-				Value: column.Name + "_ASC",
-				Description: fmt.Sprintf("Order %s by %s in a	scending order", table.Name, column.Name),
+				Value:       column.Name + "_ASC",
+				Description: fmt.Sprintf("Order %s by %s in ascending order.", table.Name, column.Name),
 			}
 			values[field+"_DESC"] = &graphql.EnumValueConfig{
 				Value:       column.Name + "_DESC",
-				Description: fmt.Sprintf("Order %s by %s in descending order", table.Name, column.Name),
+				Description: fmt.Sprintf("Order %s by %s in descending order.", table.Name, column.Name),
 			}
 		}
 
 		s.orderEnums[table.Name] = graphql.NewEnum(graphql.EnumConfig{
-			Name:   s.naming.ToGraphQLTypeUnique(table.Name, "Order"),
-			Values: values,
+			Description: fmt.Sprintf("Order enumeration for the '%s' table.", table.Name),
+			Name:        s.naming.ToGraphQLTypeUnique(table.Name, "Order"),
+			Values:      values,
 		})
 	}
 }
@@ -312,18 +318,21 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 		}
 
 		s.tableValueTypes[table.Name] = graphql.NewObject(graphql.ObjectConfig{
-			Name:   s.naming.ToGraphQLType(table.Name),
-			Fields: fields,
+			Description: fmt.Sprintf("Type to populate '%s' table values.", table.Name),
+			Name:        s.naming.ToGraphQLType(table.Name),
+			Fields:      fields,
 		})
 
 		s.tableScalarInputTypes[table.Name] = graphql.NewInputObject(graphql.InputObjectConfig{
-			Name:   s.naming.ToGraphQLTypeUnique(table.Name, "Input"),
-			Fields: inputFields,
+			Description: fmt.Sprintf("Input type to be used in equality query for the '%s' table.", table.Name),
+			Name:        s.naming.ToGraphQLTypeUnique(table.Name, "Input"),
+			Fields:      inputFields,
 		})
 
 		s.tableOperatorInputTypes[table.Name] = graphql.NewInputObject(graphql.InputObjectConfig{
-			Name:   s.naming.ToGraphQLTypeUnique(table.Name, "FilterInput"),
-			Fields: inputOperatorFields,
+			Description: fmt.Sprintf("Input type to be used in filter query for the '%s' table.", table.Name),
+			Name:        s.naming.ToGraphQLTypeUnique(table.Name, "FilterInput"),
+			Fields:      inputOperatorFields,
 		})
 	}
 }
@@ -344,7 +353,8 @@ func (s *KeyspaceGraphQLSchema) buildResultTypes(keyspace *gocql.KeyspaceMetadat
 		}
 
 		s.resultSelectTypes[table.Name] = graphql.NewObject(graphql.ObjectConfig{
-			Name: s.naming.ToGraphQLTypeUnique(table.Name, "Result"),
+			Description: fmt.Sprintf("Query result type for the '%s' table.", table.Name),
+			Name:        s.naming.ToGraphQLTypeUnique(table.Name, "Result"),
 			Fields: graphql.Fields{
 				"pageState": {Type: graphql.String},
 				"values":    {Type: graphql.NewList(graphql.NewNonNull(itemType))},
@@ -352,7 +362,8 @@ func (s *KeyspaceGraphQLSchema) buildResultTypes(keyspace *gocql.KeyspaceMetadat
 		})
 
 		s.resultUpdateTypes[table.Name] = graphql.NewObject(graphql.ObjectConfig{
-			Name: s.naming.ToGraphQLTypeUnique(table.Name, "MutationResult"),
+			Description: fmt.Sprintf("Mutation result type for the '%s' table.", table.Name),
+			Name:        s.naming.ToGraphQLTypeUnique(table.Name, "MutationResult"),
 			Fields: graphql.Fields{
 				"applied": {Type: graphql.NewNonNull(graphql.Boolean)},
 				"value":   {Type: itemType},
