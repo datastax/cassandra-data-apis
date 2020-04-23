@@ -373,6 +373,12 @@ var _ = Describe("DataEndpoint", func() {
 				}
 			})
 
+			It("Should support case sensitive column names", func() {
+				routes := getRoutes(config, keyspace)
+				quirky.InsertWeirdCase(routes, 1)
+				quirky.SelectWeirdCase(routes, 1)
+			})
+
 			It("Should not allow direct mutations on materialized views", func() {
 				routes := getRoutes(config, keyspace)
 
