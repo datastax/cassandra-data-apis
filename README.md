@@ -134,7 +134,7 @@ docker build -t cassandra-data-apis .
 docker run -p 8080:8080 -e "DATA_API_HOSTS=172.17.0.1" cassandra-data-apis
 
 # With a cluster bound to 0.0.0.0
-run --network host -e "DATA_API_HOSTS=127.0.0.1" cassandra-data-apis
+docker run --network host -e "DATA_API_HOSTS=127.0.0.1" cassandra-data-apis
 
 # On macOS (with a cluster bound to 0.0.0.0)
 docker run -p 8080:8080 -e "DATA_API_HOSTS=host.docker.internal" cassandra-data-apis
