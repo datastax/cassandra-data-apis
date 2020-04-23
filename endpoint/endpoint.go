@@ -20,6 +20,7 @@ type DataEndpointConfig struct {
 	naming            config.NamingConventionFn
 	useUserOrRoleAuth bool
 	logger            log.Logger
+	urlPattern        config.UrlPattern
 }
 
 func (cfg DataEndpointConfig) ExcludedKeyspaces() []string {
@@ -40,6 +41,10 @@ func (cfg DataEndpointConfig) UseUserOrRoleAuth() bool {
 
 func (cfg DataEndpointConfig) Logger() log.Logger {
 	return cfg.logger
+}
+
+func (cfg DataEndpointConfig) UrlPattern() config.UrlPattern {
+	return cfg.urlPattern
 }
 
 func (cfg *DataEndpointConfig) WithExcludedKeyspaces(ksExcluded []string) *DataEndpointConfig {
@@ -69,6 +74,13 @@ func (cfg *DataEndpointConfig) WithDbUsername(dbUsername string) *DataEndpointCo
 
 func (cfg *DataEndpointConfig) WithDbPassword(dbPassword string) *DataEndpointConfig {
 	cfg.dbPassword = dbPassword
+	return cfg
+}
+
+// WithUrlPattern sets the url pattern to be use to separate url parameters
+// For example: "/graphql/:param1" (colon, default) or "/graphql/{param1}" (brackets)
+func (cfg *DataEndpointConfig) WithUrlPattern(pattern config.UrlPattern) *DataEndpointConfig {
+	cfg.urlPattern = pattern
 	return cfg
 }
 
@@ -104,15 +116,16 @@ func NewEndpointConfigWithLogger(logger log.Logger, hosts ...string) *DataEndpoi
 		updateInterval: DefaultSchemaUpdateDuration,
 		naming:         config.NewDefaultNaming,
 		logger:         logger,
+		urlPattern:     config.UrlPatternColon,
 	}
 }
 
 func (e *DataEndpoint) RoutesGraphQL(pattern string) ([]graphql.Route, error) {
-	return e.graphQLRouteGen.Routes(pattern)
+	return e.graphQLRouteGen.Routes(pattern, "")
 }
 
 func (e *DataEndpoint) RoutesKeyspaceGraphQL(pattern string, ksName string) ([]graphql.Route, error) {
-	return e.graphQLRouteGen.RoutesKeyspace(pattern, ksName)
+	return e.graphQLRouteGen.Routes(pattern, ksName)
 }
 
 func (e *DataEndpoint) RoutesSchemaManagementGraphQL(pattern string, ops config.SchemaOperations) ([]graphql.Route, error) {

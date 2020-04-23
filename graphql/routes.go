@@ -3,6 +3,7 @@ package graphql
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/datastax/cassandra-data-apis/config"
 	"github.com/datastax/cassandra-data-apis/db"
@@ -10,16 +11,19 @@ import (
 	"github.com/graphql-go/graphql"
 	"net/http"
 	"path"
+	"regexp"
+	"strings"
 	"time"
 )
 
-type executeQueryFunc func(query string, ctx context.Context) *graphql.Result
+type executeQueryFunc func(query string, urlPath string, ctx context.Context) *graphql.Result
 
 type RouteGenerator struct {
 	dbClient       *db.Db
 	updateInterval time.Duration
 	logger         log.Logger
 	schemaGen      *SchemaGenerator
+	urlPattern     config.UrlPattern
 }
 
 type Route struct {
@@ -42,29 +46,8 @@ func NewRouteGenerator(dbClient *db.Db, cfg config.Config) *RouteGenerator {
 		updateInterval: cfg.SchemaUpdateInterval(),
 		logger:         cfg.Logger(),
 		schemaGen:      NewSchemaGenerator(dbClient, cfg),
+		urlPattern:     cfg.UrlPattern(),
 	}
-}
-
-func (rg *RouteGenerator) Routes(prefixPattern string) ([]Route, error) {
-	ksNames, err := rg.dbClient.Keyspaces()
-	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve keyspace names: %s", err)
-	}
-
-	routes := make([]Route, 0, len(ksNames))
-
-	for _, ksName := range ksNames {
-		if rg.schemaGen.isKeyspaceExcluded(ksName) {
-			continue
-		}
-		ksRoutes, err := rg.RoutesKeyspace(path.Join(prefixPattern, ksName), ksName)
-		if err != nil {
-			return nil, err
-		}
-		routes = append(routes, ksRoutes...)
-	}
-
-	return routes, nil
 }
 
 func (rg *RouteGenerator) RoutesSchemaManagement(pattern string, ops config.SchemaOperations) ([]Route, error) {
@@ -72,20 +55,67 @@ func (rg *RouteGenerator) RoutesSchemaManagement(pattern string, ops config.Sche
 	if err != nil {
 		return nil, fmt.Errorf("unable to build graphql schema for schema management: %s", err)
 	}
-	return routesForSchema(pattern, func(query string, ctx context.Context) *graphql.Result {
+	return routesForSchema(pattern, func(query string, urlPath string, ctx context.Context) *graphql.Result {
 		return rg.executeQuery(query, ctx, schema)
 	}), nil
 }
 
-func (rg *RouteGenerator) RoutesKeyspace(pattern string, ksName string) ([]Route, error) {
-	updater, err := NewUpdater(rg.schemaGen, ksName, rg.updateInterval, rg.logger)
+func (rg *RouteGenerator) Routes(pattern string, singleKeyspace string) ([]Route, error) {
+	updater, err := NewUpdater(rg.schemaGen, singleKeyspace, rg.updateInterval, rg.logger)
 	if err != nil {
-		return nil, fmt.Errorf("unable to build graphql schema for keyspace '%s': %s", ksName, err)
+		return nil, fmt.Errorf("unable to build graphql schema: %s", err)
 	}
+
 	go updater.Start()
-	return routesForSchema(pattern, func(query string, ctx context.Context) *graphql.Result {
-		return rg.executeQuery(query, ctx, *updater.Schema())
+
+	pathParser := getPathParser(pattern)
+	if singleKeyspace == "" {
+		// Use a single route with keyspace as dynamic parameter
+		switch rg.urlPattern {
+		case config.UrlPatternColon:
+			pattern = path.Join(pattern, ":keyspace")
+		case config.UrlPatternBrackets:
+			pattern = path.Join(pattern, "{keyspace}")
+		default:
+			return nil, errors.New("URL pattern not supported")
+		}
+	}
+
+	return routesForSchema(pattern, func(query string, urlPath string, ctx context.Context) *graphql.Result {
+		ksName := singleKeyspace
+		if ksName == "" {
+			// Multiple keyspace support
+			// The keyspace is part of the url path
+			ksName = pathParser(urlPath)
+			if ksName == "" {
+				// Invalid url parameter
+				return nil
+			}
+		}
+		schema := updater.Schema(ksName)
+
+		if schema == nil {
+			// The keyspace was not found or is invalid
+			return nil
+		}
+
+		return rg.executeQuery(query, ctx, *schema)
 	}), nil
+}
+
+func getPathParser(root string) func(string) string {
+	if !strings.HasSuffix(root, "/") {
+		root += "/"
+	}
+	regexString := fmt.Sprintf(`^%s([\w-]+)/?(?:\?.*)?$`, root)
+	r := regexp.MustCompile(regexString)
+	return func(urlPath string) string {
+		subMatches := r.FindStringSubmatch(urlPath)
+		if len(subMatches) != 2 {
+			return ""
+		}
+		return subMatches[1]
+	}
 }
 
 func routesForSchema(pattern string, execute executeQueryFunc) []Route {
@@ -94,8 +124,16 @@ func routesForSchema(pattern string, execute executeQueryFunc) []Route {
 			Method:  http.MethodGet,
 			Pattern: pattern,
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				result := execute(r.URL.Query().Get("query"), r.Context())
-				json.NewEncoder(w).Encode(result)
+				result := execute(r.URL.Query().Get("query"), r.URL.Path, r.Context())
+				if result == nil {
+					// The execution function is signaling that it shouldn't be processing this request
+					http.NotFound(w, r)
+					return
+				}
+				err := json.NewEncoder(w).Encode(result)
+				if err != nil {
+					http.Error(w, "response could not be encoded: "+err.Error(), 500)
+				}
 			}),
 		},
 		{
@@ -114,8 +152,17 @@ func routesForSchema(pattern string, execute executeQueryFunc) []Route {
 					return
 				}
 
-				result := execute(body.Query, r.Context())
-				json.NewEncoder(w).Encode(result)
+				result := execute(body.Query, r.URL.Path, r.Context())
+				if result == nil {
+					// The execution function is signaling that it shouldn't be processing this request
+					http.NotFound(w, r)
+					return
+				}
+
+				err = json.NewEncoder(w).Encode(result)
+				if err != nil {
+					http.Error(w, "response could not be encoded: "+err.Error(), 500)
+				}
 			}),
 		},
 	}

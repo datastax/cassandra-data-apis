@@ -60,7 +60,7 @@ func (sg *SchemaGenerator) buildQueriesFields(
 		fields[ksSchema.naming.ToGraphQLOperation("", table.Name)] = &graphql.Field{
 			Type: ksSchema.resultSelectTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"value":    {Type: ksSchema.tableScalarInputTypes[table.Name]},
+				"value":   {Type: ksSchema.tableScalarInputTypes[table.Name]},
 				"orderBy": {Type: graphql.NewList(ksSchema.orderEnums[table.Name])},
 				"options": {Type: inputQueryOptions, DefaultValue: inputQueryOptionsDefault},
 			},
@@ -116,7 +116,7 @@ func (sg *SchemaGenerator) buildMutationFields(
 		fields[ksSchema.naming.ToGraphQLOperation(insertPrefix, name)] = &graphql.Field{
 			Type: ksSchema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"value":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
+				"value":       {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
 				"ifNotExists": {Type: graphql.Boolean},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
 			},
@@ -126,7 +126,7 @@ func (sg *SchemaGenerator) buildMutationFields(
 		fields[ksSchema.naming.ToGraphQLOperation(deletePrefix, name)] = &graphql.Field{
 			Type: ksSchema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"value":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
+				"value":       {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
 				"ifExists":    {Type: graphql.Boolean},
 				"ifCondition": {Type: ksSchema.tableOperatorInputTypes[table.Name]},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
@@ -137,7 +137,7 @@ func (sg *SchemaGenerator) buildMutationFields(
 		fields[ksSchema.naming.ToGraphQLOperation(updatePrefix, name)] = &graphql.Field{
 			Type: ksSchema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
-				"value":        {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
+				"value":       {Type: graphql.NewNonNull(ksSchema.tableScalarInputTypes[table.Name])},
 				"ifExists":    {Type: graphql.Boolean},
 				"ifCondition": {Type: ksSchema.tableOperatorInputTypes[table.Name]},
 				"options":     {Type: inputMutationOptions, DefaultValue: inputMutationOptionsDefault},
@@ -171,8 +171,47 @@ func (sg *SchemaGenerator) buildMutation(
 		})
 }
 
+func (sg *SchemaGenerator) BuildSchemas(singleKeyspace string) (map[string]*graphql.Schema, error) {
+	if singleKeyspace != "" {
+		sg.logger.Info("building schema", "keyspace", singleKeyspace)
+		// Schema generator is only focused on a single keyspace
+		if schema, err := sg.buildSchema(singleKeyspace); err != nil {
+			return nil, err
+		} else {
+			return map[string]*graphql.Schema{singleKeyspace: &schema}, nil
+		}
+	}
+
+	keyspaces, err := sg.dbClient.Keyspaces()
+	if err != nil {
+		return nil, err
+	}
+
+	sg.logger.Info("building schemas")
+	result := make(map[string]*graphql.Schema, len(keyspaces))
+	builtKeyspaces := make([]string, 0, len(keyspaces))
+	for _, ksName := range keyspaces {
+		if sg.isKeyspaceExcluded(ksName) {
+			continue
+		}
+		schema, err := sg.buildSchema(ksName)
+		if err != nil {
+			return nil, err
+		}
+
+		result[ksName] = &schema
+		builtKeyspaces = append(builtKeyspaces, ksName)
+	}
+
+	if len(builtKeyspaces) > 0 {
+		sg.logger.Info("built keyspace schemas", "keyspaces", builtKeyspaces)
+	}
+
+	return result, nil
+}
+
 // Build GraphQL schema for tables in the provided keyspace metadata
-func (sg *SchemaGenerator) BuildSchema(keyspaceName string) (graphql.Schema, error) {
+func (sg *SchemaGenerator) buildSchema(keyspaceName string) (graphql.Schema, error) {
 	keyspace, err := sg.dbClient.Keyspace(keyspaceName)
 	if err != nil {
 		return graphql.Schema{}, err
@@ -182,8 +221,6 @@ func (sg *SchemaGenerator) BuildSchema(keyspaceName string) (graphql.Schema, err
 	if err != nil {
 		return graphql.Schema{}, err
 	}
-
-	sg.logger.Info("building schema", "keyspace", keyspace.Name)
 
 	ksNaming := sg.dbClient.KeyspaceNamingInfo(keyspace)
 	keyspaceSchema := &KeyspaceGraphQLSchema{
