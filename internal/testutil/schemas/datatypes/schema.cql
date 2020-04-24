@@ -37,4 +37,12 @@ CREATE TABLE collections (
     map_bigint_blob map<bigint, blob>,
 );
 
+CREATE TABLE table_static (
+  id1 uuid,
+  id2 int,
+  value int,
+  value_static int static,
+  PRIMARY KEY (id1, id2)
+);
+
 CREATE TABLE sample_table (id int PRIMARY KEY);

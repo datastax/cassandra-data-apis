@@ -177,3 +177,44 @@ func MutateAndQueryCollection(
 		Expect(value).To(ContainElements(jsonValue))
 	}
 }
+
+func MutateAndQueryStatic(routes []graphql.Route) {
+	insertQueryWithStatic := `mutation {
+	  insertTableStatic(value:{id1: "%s", id2: %d, value: %d, valueStatic: %v}) {
+		applied
+	  }
+	}`
+	insertQuery := `mutation {
+	  insertTableStatic(value:{id1: "%s", id2: %d, value: %d}) {
+		applied
+	  }
+	}`
+	selectQuery := `query {
+	  tableStatic(value:{id1:"%s"}) {
+		values {
+		  id1
+		  id2
+		  value
+		  valueStatic
+		}
+	  }
+	}`
+
+	id := schemas.NewUuid()
+	jsonValue := float64(100)
+
+	// Insert 2 rows in the same partition, one including the static value
+	buffer := schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(insertQueryWithStatic, id, 1, 1, jsonValue))
+	Expect(schemas.DecodeData(buffer, "insertTableStatic")["applied"]).To(Equal(true))
+	buffer = schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(insertQuery, id, 2, 2))
+	Expect(schemas.DecodeData(buffer, "insertTableStatic")["applied"]).To(Equal(true))
+
+	// Select
+	buffer = schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(selectQuery, id))
+	values := schemas.DecodeDataAsSliceOfMaps(buffer, "tableStatic", "values")
+	Expect(values).To(HaveLen(2))
+	// The static value should be present in all rows for the partition
+	for _, value := range values {
+		Expect(value["valueStatic"]).To(Equal(jsonValue))
+	}
+}
