@@ -396,8 +396,8 @@ var _ = Describe("DataEndpoint", func() {
 
 				response := schemas.DecodeResponse(schemas.ExecutePost(routes, "/grqphql", query))
 				expected := schemas.NewResponseBody("tablesView", map[string]interface{}{
-					"values": []interface{} {
-						map[string]interface{} {
+					"values": []interface{}{
+						map[string]interface{}{
 							"id": float64(1),
 						},
 					},
@@ -659,7 +659,7 @@ var _ = Describe("DataEndpoint", func() {
 				}
 			})
 
-			It("should maps", func() {
+			It("should support maps", func() {
 				datatypes.MutateAndQueryCollection(
 					routes,
 					"mapBigintBlob",
@@ -669,6 +669,10 @@ var _ = Describe("DataEndpoint", func() {
 						map[string]interface{}{"key": "4", "value": "asfR"},
 					},
 					true)
+			})
+
+			It("Should support static columns", func() {
+				datatypes.MutateAndQueryStatic(routes)
 			})
 		})
 
