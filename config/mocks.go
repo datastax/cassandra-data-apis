@@ -49,6 +49,11 @@ func (o *ConfigMock) Logger() log.Logger {
 	return args.Get(0).(log.Logger)
 }
 
+func (o *ConfigMock) UrlPattern() UrlPattern {
+	args := o.Called()
+	return args.Get(0).(UrlPattern)
+}
+
 type KeyspaceNamingInfoMock struct {
 	mock.Mock
 }

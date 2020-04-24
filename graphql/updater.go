@@ -14,22 +14,28 @@ type SchemaUpdater struct {
 	cancel         context.CancelFunc
 	mutex          sync.Mutex
 	updateInterval time.Duration
-	schema         *graphql.Schema
+	schemas        *map[string]*graphql.Schema
 	schemaGen      *SchemaGenerator
-	ksName         string
+	singleKeyspace string
 	schemaVersion  string
 	logger         log.Logger
 }
 
-func (su *SchemaUpdater) Schema() *graphql.Schema {
+func (su *SchemaUpdater) Schema(keyspace string) *graphql.Schema {
 	// This should be pretty fast, but an atomic pointer swap wouldn't require a lock here
 	su.mutex.Lock()
-	defer su.mutex.Unlock()
-	return su.schema
+	schemas := *su.schemas
+	su.mutex.Unlock()
+	return schemas[keyspace]
 }
 
-func NewUpdater(schemaGen *SchemaGenerator, ksName string, updateInterval time.Duration, logger log.Logger) (*SchemaUpdater, error) {
-	schema, err := schemaGen.BuildSchema(ksName)
+func NewUpdater(
+	schemaGen *SchemaGenerator,
+	singleKeyspace string,
+	updateInterval time.Duration,
+	logger log.Logger,
+) (*SchemaUpdater, error) {
+	schemas, err := schemaGen.BuildSchemas(singleKeyspace)
 	if err != nil {
 		return nil, err
 	}
@@ -39,9 +45,9 @@ func NewUpdater(schemaGen *SchemaGenerator, ksName string, updateInterval time.D
 		cancel:         nil,
 		mutex:          sync.Mutex{},
 		updateInterval: updateInterval,
-		schema:         &schema,
+		schemas:        &schemas,
 		schemaGen:      schemaGen,
-		ksName:         ksName,
+		singleKeyspace: singleKeyspace,
 		logger:         logger,
 	}
 
@@ -85,13 +91,12 @@ func (su *SchemaUpdater) update() {
 	}
 
 	if shouldUpdate {
-		schema, err := su.schemaGen.BuildSchema(su.ksName)
+		schemas, err := su.schemaGen.BuildSchemas(su.singleKeyspace)
 		if err != nil {
-			su.logger.Error("unable to build graphql schema for keyspace",
-				"keyspace", su.ksName, "error", err)
+			su.logger.Error("unable to build graphql schema for keyspace", "error", err)
 		} else {
 			su.mutex.Lock()
-			su.schema = &schema
+			su.schemas = &schemas
 			su.mutex.Unlock()
 		}
 	}

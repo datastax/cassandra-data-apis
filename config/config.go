@@ -11,4 +11,12 @@ type Config interface {
 	Naming() NamingConventionFn
 	UseUserOrRoleAuth() bool
 	Logger() log.Logger
+	UrlPattern() UrlPattern
 }
+
+type UrlPattern int
+
+const (
+	UrlPatternColon UrlPattern = iota
+	UrlPatternBrackets
+)
