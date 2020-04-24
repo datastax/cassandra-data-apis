@@ -3,6 +3,8 @@
 package endpoint
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/graphql"
@@ -17,6 +19,9 @@ import (
 	"gopkg.in/inf.v0"
 	"math"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
+	"path"
 	"sort"
 	"strconv"
 	"testing"
@@ -396,8 +401,8 @@ var _ = Describe("DataEndpoint", func() {
 
 				response := schemas.DecodeResponse(schemas.ExecutePost(routes, "/grqphql", query))
 				expected := schemas.NewResponseBody("tablesView", map[string]interface{}{
-					"values": []interface{} {
-						map[string]interface{} {
+					"values": []interface{}{
+						map[string]interface{}{
 							"id": float64(1),
 						},
 					},
@@ -689,6 +694,45 @@ var _ = Describe("DataEndpoint", func() {
 				// getRoutes() validates that there wasn't an error
 				getRoutes(config, keyspace)
 			})
+		})
+	})
+
+	Describe("RoutesGraphQL()", func() {
+		var routes []graphql.Route
+		config := NewEndpointConfigWithLogger(TestLogger(), host)
+
+		BeforeEach(func() {
+			var err error
+			endpoint := config.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
+			routes, err = endpoint.RoutesGraphQL("/graphql_root")
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("Should provide a url path per keyspace", func() {
+			buffer := schemas.ExecutePost(routes, "/graphql_root/killrvideo", `{ videos { values { name }} }`)
+			schemas.DecodeData(buffer, "videos")
+
+			buffer = schemas.ExecutePost(routes, "/graphql_root/quirky?z=1&", `{ validSample { values { id }} }`)
+			schemas.DecodeData(buffer, "validSample")
+
+			buffer = schemas.ExecutePost(routes, "/graphql_root/datatypes/?", `{ sampleTable { values { id }} }`)
+			schemas.DecodeData(buffer, "sampleTable")
+		})
+
+		It("Should return not found when keyspace is not found or invalid", func() {
+			targets := []string{
+				"/graphql_root/zzz", "/graphql_root/killrvideo/malformed", "/graphql_root/killrvideo%20",
+			}
+
+			for _, target := range targets {
+				b, err := json.Marshal(graphql.RequestBody{Query: `{__schema{queryType{name}}}`})
+				Expect(err).ToNot(HaveOccurred())
+				targetUrl := fmt.Sprintf("http://%s", path.Join(host, target))
+				r := httptest.NewRequest(http.MethodPost, targetUrl, bytes.NewReader(b))
+				w := httptest.NewRecorder()
+				routes[postIndex].Handler.ServeHTTP(w, r)
+				Expect(w.Code).To(Equal(http.StatusNotFound))
+			}
 		})
 	})
 })
