@@ -58,9 +58,8 @@ func (sg *SchemaGenerator) buildQueriesFields(
 		}
 
 		fields[ksSchema.naming.ToGraphQLOperation("", table.Name)] = &graphql.Field{
-			Description: fmt.Sprintf("Retrieves data from '%s' table.\n", table.Name) +
-				"Uses the provided value fields to filter, using the equality operator.\n" +
-				"The amount of rows in contained in the result is limited by the page size " +
+			Description: fmt.Sprintf("Retrieves data from '%s' table using the equality operator.\n", table.Name) +
+				"The amount of values contained in the result is limited by the page size " +
 				fmt.Sprintf(" (defaults to %d). Use the pageState included in the result to ", DefaultPageSize) +
 				"obtain the following rows.\n" +
 				"When no fields are provided, it returns all rows in the table, limited by the page size.",
@@ -76,7 +75,7 @@ func (sg *SchemaGenerator) buildQueriesFields(
 		fields[ksSchema.naming.ToGraphQLOperation("", table.Name)+"Filter"] = &graphql.Field{
 			Description: fmt.Sprintf("Retrieves data from '%s' table using equality \n", table.Name) +
 				"and non-equality operators.\n" +
-				"The amount of rows in contained in the result is limited by the page size " +
+				"The amount of values contained in the result is limited by the page size " +
 				fmt.Sprintf(" (defaults to %d). Use the pageState included in the result to ", DefaultPageSize) +
 				"obtain the following rows.\n",
 			Type: ksSchema.resultSelectTypes[table.Name],
@@ -150,8 +149,8 @@ func (sg *SchemaGenerator) buildMutationFields(
 		}
 
 		fields[ksSchema.naming.ToGraphQLOperation(updatePrefix, name)] = &graphql.Field{
-			Description: fmt.Sprintf("Writes one or more column values to a row in '%s' table.", table.Name) +
-				"Like insert operation, update is an upsert operation: if the specified row does not exist," +
+			Description: fmt.Sprintf("Updates one or more column values to a row in '%s' table.", table.Name) +
+				"Like the insert operation, update is an upsert operation: if the specified row does not exist," +
 				"the command creates it.",
 			Type: ksSchema.resultUpdateTypes[table.Name],
 			Args: graphql.FieldConfigArgument{

@@ -38,7 +38,7 @@ var varint = newStringScalar(
 
 var float32Scalar = graphql.NewScalar(graphql.ScalarConfig{
 	Name:        "Float32",
-	Description: "The `Float32` scalar type represents a CQL float (single-precision fractional values).",
+	Description: "The `Float32` scalar type represents a CQL float (single-precision floating point values).",
 	Serialize:   identityFn,
 	ParseValue:  deserializeFloat32,
 	ParseLiteral: func(valueAST ast.Value) interface{} {

@@ -38,7 +38,7 @@ type KeyspaceGraphQLSchema struct {
 }
 
 var inputQueryOptions = graphql.NewInputObject(graphql.InputObjectConfig{
-	Description: "An input type to determine paging, consistency and other query settings.",
+	Description: "An input type for paging, consistency and other query settings.",
 	Name:        "QueryOptions",
 	Fields: graphql.InputObjectConfigFieldMap{
 		"limit":       {Type: graphql.Int},
@@ -93,7 +93,7 @@ var mutationConsistencyEnum = graphql.NewEnum(graphql.EnumConfig{
 })
 
 var serialConsistencyEnum = graphql.NewEnum(graphql.EnumConfig{
-	Description: "Serial level for mutations.",
+	Description: "Serial consistency level for mutations.",
 	Name:        "SerialConsistency",
 	Values: graphql.EnumValueConfigMap{
 		"SERIAL":       {Value: gocql.Serial},
@@ -324,13 +324,13 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 		})
 
 		s.tableScalarInputTypes[table.Name] = graphql.NewInputObject(graphql.InputObjectConfig{
-			Description: fmt.Sprintf("Input type to be used in equality query for the '%s' table.", table.Name),
+			Description: fmt.Sprintf("Input type to be used in equality queries for the '%s' table.", table.Name),
 			Name:        s.naming.ToGraphQLTypeUnique(table.Name, "Input"),
 			Fields:      inputFields,
 		})
 
 		s.tableOperatorInputTypes[table.Name] = graphql.NewInputObject(graphql.InputObjectConfig{
-			Description: fmt.Sprintf("Input type to be used in filter query for the '%s' table.", table.Name),
+			Description: fmt.Sprintf("Input type to be used in filter queries for the '%s' table.", table.Name),
 			Name:        s.naming.ToGraphQLTypeUnique(table.Name, "FilterInput"),
 			Fields:      inputOperatorFields,
 		})
