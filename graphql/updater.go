@@ -24,8 +24,8 @@ type SchemaUpdater struct {
 func (su *SchemaUpdater) Schema(keyspace string) *graphql.Schema {
 	// This should be pretty fast, but an atomic pointer swap wouldn't require a lock here
 	su.mutex.Lock()
-	defer su.mutex.Unlock()
 	schemas := *su.schemas
+	su.mutex.Unlock()
 	return schemas[keyspace]
 }
 
