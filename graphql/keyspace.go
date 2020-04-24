@@ -168,8 +168,9 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 				},
 			},
 			Resolve: func(params graphql.ResolveParams) (interface{}, error) {
-				ksName := params.Args["name"].(string)
-				dcs := params.Args["dcs"].([]interface{})
+				args := params.Args
+				ksName := args["name"].(string)
+				dcs := args["dcs"].([]interface{})
 
 				dcReplicas := make(map[string]int)
 				for _, dc := range dcs {
@@ -185,7 +186,7 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 				err =  sg.dbClient.CreateKeyspace(&db.CreateKeyspaceInfo{
 					Name:        ksName,
 					DCReplicas:  dcReplicas,
-					IfNotExists: params.Args["ifNotExists"].(bool),
+					IfNotExists: getBoolArgs(args, "ifNotExists"),
 				}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 				if err != nil {
 					return nil, err
@@ -222,8 +223,8 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 				}
 
 				return true, sg.dbClient.DropKeyspace(&db.DropKeyspaceInfo{
-					Name: ksName,
-					IfExists: args["ifExists"].(bool),
+					Name:     ksName,
+					IfExists: getBoolArgs(args, "ifExists"),
 				}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 			},
 		}
@@ -323,4 +324,11 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 		Name:   "Mutation",
 		Fields: fields,
 	})
+}
+
+func getBoolArgs(args map[string]interface{}, name string) bool {
+	if value, ok := args[name]; ok {
+		return value.(bool)
+	}
+	return false
 }

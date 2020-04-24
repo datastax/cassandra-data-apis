@@ -4,11 +4,13 @@ package endpoint
 
 import (
 	"fmt"
+	"github.com/datastax/cassandra-data-apis/config"
 	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/graphql"
 	. "github.com/datastax/cassandra-data-apis/internal/testutil"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas/datatypes"
+	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas/ddl"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas/killrvideo"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas/quirky"
 	"github.com/gocql/gocql"
@@ -19,6 +21,7 @@ import (
 	"math/big"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -396,8 +399,8 @@ var _ = Describe("DataEndpoint", func() {
 
 				response := schemas.DecodeResponse(schemas.ExecutePost(routes, "/grqphql", query))
 				expected := schemas.NewResponseBody("tablesView", map[string]interface{}{
-					"values": []interface{} {
-						map[string]interface{} {
+					"values": []interface{}{
+						map[string]interface{}{
 							"id": float64(1),
 						},
 					},
@@ -691,6 +694,82 @@ var _ = Describe("DataEndpoint", func() {
 			})
 		})
 	})
+	Describe("RoutesSchemaManagement()", func() {
+		cfg := NewEndpointConfigWithLogger(TestLogger(), host)
+		columnTypes := []string{
+			"{ basic: TEXT }",
+			"{ basic: ASCII }",
+			"{ basic: VARCHAR }",
+			"{ basic: TEXT }",
+			"{ basic: BOOLEAN }",
+			"{ basic: FLOAT }",
+			"{ basic: DOUBLE }",
+			"{ basic: TINYINT }",
+			"{ basic: SMALLINT }",
+			"{ basic: INT }",
+			"{ basic: BIGINT }",
+			"{ basic: VARINT }",
+			"{ basic: DECIMAL }",
+			"{ basic: UUID }",
+			"{ basic: TIMEUUID }",
+			"{ basic: TIME }",
+			"{ basic: DATE }",
+			"{ basic: DURATION }",
+			"{ basic: TIMESTAMP }",
+			"{ basic: BLOB }",
+			"{ basic: INET }",
+			"{ basic: COUNTER }",
+			"{ basic: LIST, info: { subTypes: [ { basic: TEXT } ] } }",
+			"{ basic: SET, info: { subTypes: [ { basic: TEXT } ] } }",
+			"{ basic: MAP, info: { subTypes: [ { basic: TEXT }, { basic: INT } ] } }",
+		}
+		Context("With keyspace schema mutations", func() {
+			It("Should create keyspace", func() {
+				routes := getSchemaRoutes(cfg)
+				ksName := randomName()
+				response := ddl.CreateKeyspace(routes, ksName)
+				expected := schemas.NewResponseBody("createKeyspace", map[string]interface{}{
+					"name": ksName,
+				})
+				Expect(response).To(Equal(expected))
+			})
+			It("Should drop keyspace", func() {
+			})
+		})
+		Context("With table schema mutations", func() {
+			It("Should create table", func() {
+				routes := getSchemaRoutes(cfg)
+				ksName := randomName()
+				ddl.CreateKeyspace(routes, ksName)
+				for i, columnType := range columnTypes {
+					tableName := fmt.Sprintf("table%d", i + 1)
+					response := ddl.CreateTable(routes, ksName, tableName, columnType)
+					expected := schemas.NewResponseBody("createTable", map[string]interface{}{
+						"name": tableName,
+					})
+					Expect(response).To(Equal(expected))
+				}
+			})
+			It("Should alter table add column", func() {
+				routes := getSchemaRoutes(cfg)
+				ksName := randomName()
+				ddl.CreateKeyspace(routes, ksName)
+				for i, columnType := range columnTypes {
+					tableName := fmt.Sprintf("table%d", i + 1)
+					ddl.CreateTable(routes, ksName, tableName, columnType)
+					response := ddl.AlterTableAdd(routes, ksName, tableName, columnType)
+					expected := schemas.NewResponseBody("alterTableAdd", map[string]interface{}{
+						"name": tableName,
+					})
+					Expect(response).To(Equal(expected))
+				}
+			})
+			It("Should alter table drop column", func() {
+			})
+			It("Should drop table", func() {
+			})
+		})
+	})
 })
 
 var _ = BeforeSuite(func() {
@@ -716,6 +795,13 @@ func getRoutes(config *DataEndpointConfig, keyspace string) []graphql.Route {
 	return routes
 }
 
+func getSchemaRoutes(cfg *DataEndpointConfig) []graphql.Route {
+	var endpoint = cfg.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
+	routes, err := endpoint.RoutesSchemaManagementGraphQL("/graphql-schema", config.AllSchemaOperations)
+	Expect(err).ToNot(HaveOccurred())
+	return routes
+}
+
 func jsonStringTo(f func(string) interface{}) func(interface{}) interface{} {
 	return func(value interface{}) interface{} {
 		switch value := value.(type) {
@@ -734,4 +820,8 @@ func jsonNumberTo(f func(float64) interface{}) func(interface{}) interface{} {
 		}
 		panic("unexpected type")
 	}
+}
+
+func randomName() string {
+	return strings.Replace(gocql.TimeUUID().String(), "-", "", -1)
 }

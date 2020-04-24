@@ -10,13 +10,13 @@ import (
 )
 
 type dataTypeValue struct {
-	Basic    gocql.Type    `json:"basic"`
-	TypeInfo *dataTypeInfo `json:"info"`
+	Basic    gocql.Type    `json:"basic" mapstructure:"basic"`
+	TypeInfo *dataTypeInfo `json:"info" mapstructure:"info"`
 }
 
 type dataTypeInfo struct {
-	Name     string          `json:"name"`
-	SubTypes []dataTypeValue `json:"subTypes"`
+	Name     string           `json:"name"`
+	SubTypes []*dataTypeValue `json:"subTypes"`
 }
 
 type columnValue struct {
@@ -293,7 +293,7 @@ func (sg *SchemaGenerator) createTable(params graphql.ResolveParams) (interface{
 		PartitionKeys:  partitionKeys,
 		ClusteringKeys: clusteringKeys,
 		Values:         values,
-		IfNotExists:    params.Args["ifNotExists"].(bool),
+		IfNotExists:    getBoolArgs(args, "ifNotExists"),
 	}, db.NewQueryOptions().WithUserOrRole(userOrRole))
 	if err != nil {
 		return nil, err
@@ -401,7 +401,8 @@ func (sg *SchemaGenerator) dropTable(params graphql.ResolveParams) (interface{},
 	return sg.dbClient.DropTable(&db.DropTableInfo{
 		Keyspace: ksName,
 		Table:    tableName,
-		IfExists: args["ifExists"].(bool)}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+		IfExists: getBoolArgs(args, "ifExists")},
+		db.NewQueryOptions().WithUserOrRole(userOrRole))
 }
 
 func (sg *SchemaGenerator) buildTableResult(tableName string, ksName string) (*tableValue, error) {
@@ -435,7 +436,7 @@ func toColumnType(info gocql.TypeInfo) (*dataTypeValue, error) {
 		}
 
 		subTypeInfo = &dataTypeInfo{
-			SubTypes: []dataTypeValue{*subType},
+			SubTypes: []*dataTypeValue{subType},
 		}
 	case gocql.TypeMap:
 		collectionInfo := info.(gocql.CollectionType)
@@ -451,7 +452,7 @@ func toColumnType(info gocql.TypeInfo) (*dataTypeValue, error) {
 		}
 
 		subTypeInfo = &dataTypeInfo{
-			SubTypes: []dataTypeValue{*keyType, *valueType},
+			SubTypes: []*dataTypeValue{keyType, valueType},
 		}
 	case gocql.TypeCustom:
 		subTypeInfo = &dataTypeInfo{
@@ -474,7 +475,7 @@ func toDbColumnType(info *dataTypeValue) (gocql.TypeInfo, error) {
 			return nil, errors.New("you must provide one sub type for list and set data types")
 		}
 
-		subType, err := toDbColumnType(&info.TypeInfo.SubTypes[0])
+		subType, err := toDbColumnType(info.TypeInfo.SubTypes[0])
 		if err != nil {
 			return nil, err
 		}
@@ -489,12 +490,12 @@ func toDbColumnType(info *dataTypeValue) (gocql.TypeInfo, error) {
 			return nil, errors.New("you must provide the key and value sub type for map data types")
 		}
 
-		keyType, err := toDbColumnType(&info.TypeInfo.SubTypes[0])
+		keyType, err := toDbColumnType(info.TypeInfo.SubTypes[0])
 		if err != nil {
 			return nil, err
 		}
 
-		valueType, err := toDbColumnType(&info.TypeInfo.SubTypes[0])
+		valueType, err := toDbColumnType(info.TypeInfo.SubTypes[0])
 		if err != nil {
 			return nil, err
 		}

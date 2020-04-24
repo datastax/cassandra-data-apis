@@ -32,13 +32,28 @@ type DropTableInfo struct {
 	IfExists bool
 }
 
+func toTypeString(info gocql.TypeInfo) string {
+	if coll, ok := info.(gocql.CollectionType); ok {
+		switch coll.Type() {
+		case gocql.TypeList: fallthrough
+		case gocql.TypeSet:
+			return fmt.Sprintf("%s<%s>",
+				coll.Type().String(), toTypeString(coll.Elem))
+		case gocql.TypeMap:
+			return fmt.Sprintf("%s<%s, %s>",
+				coll.Type().String(), toTypeString(coll.Key), toTypeString(coll.Elem))
+		}
+	}
+	return info.Type().String()
+}
+
 func (db *Db) CreateTable(info *CreateTableInfo, options *QueryOptions) error {
 	columns := ""
 	primaryKeys := ""
 	clusteringOrder := ""
 
 	for _, c := range info.PartitionKeys {
-		columns += fmt.Sprintf(`"%s" %s, `, c.Name, c.Type)
+		columns += fmt.Sprintf(`"%s" %s, `, c.Name, toTypeString(c.Type))
 		primaryKeys += fmt.Sprintf(`, "%s"`, c.Name)
 	}
 
@@ -46,7 +61,7 @@ func (db *Db) CreateTable(info *CreateTableInfo, options *QueryOptions) error {
 		primaryKeys = fmt.Sprintf("(%s)", primaryKeys[2:])
 
 		for _, c := range info.ClusteringKeys {
-			columns += fmt.Sprintf(`"%s" %s, `, c.Name, c.Type)
+			columns += fmt.Sprintf(`"%s" %s, `, c.Name, toTypeString(c.Type))
 			primaryKeys += fmt.Sprintf(`, "%s"`, c.Name)
 			order := c.ClusteringOrder
 			if order == "" {
@@ -60,7 +75,7 @@ func (db *Db) CreateTable(info *CreateTableInfo, options *QueryOptions) error {
 
 	if info.Values != nil {
 		for _, c := range info.Values {
-			columns += fmt.Sprintf(`"%s" %s, `, c.Name, c.Type)
+			columns += fmt.Sprintf(`"%s" %s, `, c.Name, toTypeString(c.Type))
 		}
 	}
 
