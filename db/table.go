@@ -92,7 +92,7 @@ func (db *Db) CreateTable(info *CreateTableInfo, options *QueryOptions) error {
 func (db *Db) AlterTableAdd(info *AlterTableAddInfo, options *QueryOptions) error {
 	columns := ""
 	for _, c := range info.ToAdd {
-		columns += fmt.Sprintf(`, "%s" %s`, c.Name, c.Type)
+		columns += fmt.Sprintf(`, "%s" %s`, c.Name, toTypeString(c.Type))
 	}
 	query := fmt.Sprintf(`ALTER TABLE "%s"."%s" ADD(%s)`, info.Keyspace, info.Table, columns[2:])
 	return db.session.Execute(query, options)

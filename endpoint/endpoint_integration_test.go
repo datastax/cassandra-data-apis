@@ -718,7 +718,7 @@ var _ = Describe("DataEndpoint", func() {
 			"{ basic: TIMESTAMP }",
 			"{ basic: BLOB }",
 			"{ basic: INET }",
-			"{ basic: COUNTER }",
+			// "{ basic: COUNTER }",
 			"{ basic: LIST, info: { subTypes: [ { basic: TEXT } ] } }",
 			"{ basic: SET, info: { subTypes: [ { basic: TEXT } ] } }",
 			"{ basic: MAP, info: { subTypes: [ { basic: TEXT }, { basic: INT } ] } }",
@@ -740,29 +740,25 @@ var _ = Describe("DataEndpoint", func() {
 			It("Should create table", func() {
 				routes := getSchemaRoutes(cfg)
 				ksName := randomName()
+				tableName := "table1"
 				ddl.CreateKeyspace(routes, ksName)
-				for i, columnType := range columnTypes {
-					tableName := fmt.Sprintf("table%d", i + 1)
-					response := ddl.CreateTable(routes, ksName, tableName, columnType)
-					expected := schemas.NewResponseBody("createTable", map[string]interface{}{
-						"name": tableName,
-					})
-					Expect(response).To(Equal(expected))
-				}
+				response := ddl.CreateTable(routes, ksName, tableName, columnTypes)
+				expected := schemas.NewResponseBody("createTable", map[string]interface{}{
+					"name": tableName,
+				})
+				Expect(response).To(Equal(expected))
 			})
 			It("Should alter table add column", func() {
 				routes := getSchemaRoutes(cfg)
 				ksName := randomName()
+				tableName := "table1"
 				ddl.CreateKeyspace(routes, ksName)
-				for i, columnType := range columnTypes {
-					tableName := fmt.Sprintf("table%d", i + 1)
-					ddl.CreateTable(routes, ksName, tableName, columnType)
-					response := ddl.AlterTableAdd(routes, ksName, tableName, columnType)
-					expected := schemas.NewResponseBody("alterTableAdd", map[string]interface{}{
-						"name": tableName,
-					})
-					Expect(response).To(Equal(expected))
-				}
+				ddl.CreateTable(routes, ksName, tableName, []string{ "{ basic: TEXT }"})
+				response := ddl.AlterTableAdd(routes, ksName, tableName, columnTypes)
+				expected := schemas.NewResponseBody("alterTableAdd", map[string]interface{}{
+					"name": tableName,
+				})
+				Expect(response).To(Equal(expected))
 			})
 			It("Should alter table drop column", func() {
 			})
