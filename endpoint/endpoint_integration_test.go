@@ -749,7 +749,7 @@ var _ = Describe("DataEndpoint", func() {
 				routes := getSchemaRoutes(cfg)
 				ksName := randomName()
 				ddl.CreateKeyspace(routes, ksName)
-				response := ddl.WaitUntilExist(func() schemas.ResponseBody {
+				response := ddl.WaitUntilExists(func() schemas.ResponseBody {
 					return ddl.Keyspace(routes, ksName)
 				})
 				Expect(response).To(Equal(schemas.NewResponseBody("keyspace", map[string]interface{}{
@@ -761,7 +761,7 @@ var _ = Describe("DataEndpoint", func() {
 				routes := getSchemaRoutes(cfg)
 				ksName := randomName()
 				ddl.CreateKeyspace(routes, ksName)
-				ddl.WaitUntilExist(func() schemas.ResponseBody {
+				ddl.WaitUntilExists(func() schemas.ResponseBody {
 					return ddl.Keyspace(routes, ksName)
 				})
 				ddl.DropKeyspace(routes, ksName)
@@ -776,7 +776,7 @@ var _ = Describe("DataEndpoint", func() {
 				routes := getSchemaRoutes(cfg)
 				ksName := randomName()
 				ddl.CreateKeyspace(routes, ksName)
-				ddl.WaitUntilExist(func() schemas.ResponseBody {
+				ddl.WaitUntilExists(func() schemas.ResponseBody {
 					return ddl.Keyspace(routes, ksName)
 				})
 				response := ddl.CreateKeyspaceIfNotExists(routes, ksName, false)
@@ -793,7 +793,7 @@ var _ = Describe("DataEndpoint", func() {
 				tableName := "table1"
 				ddl.CreateKeyspace(routes, ksName)
 				ddl.CreateTable(routes, ksName, tableName, ddl.ColumnTypes)
-				response := ddl.WaitUntilExist(func() schemas.ResponseBody {
+				response := ddl.WaitUntilExists(func() schemas.ResponseBody {
 					return ddl.Table(routes, ksName, tableName)
 				})
 				ddl.SortColumns(response)
@@ -811,7 +811,7 @@ var _ = Describe("DataEndpoint", func() {
 				tableName := "table1"
 				ddl.CreateKeyspace(routes, ksName)
 				ddl.CreateTable(routes, ksName, tableName, ddl.ColumnTypes)
-				ddl.WaitUntilExist(func() schemas.ResponseBody {
+				ddl.WaitUntilExists(func() schemas.ResponseBody {
 					return ddl.Table(routes, ksName, tableName)
 				})
 				response := ddl.CreateTableIfNotExists(routes, ksName, tableName, ddl.ColumnTypes, false)
@@ -826,7 +826,7 @@ var _ = Describe("DataEndpoint", func() {
 				tableName := "table1"
 				ddl.CreateKeyspace(routes, ksName)
 				ddl.CreateTable(routes, ksName, tableName, []string{"{ basic: COUNTER }"})
-				response := ddl.WaitUntilExist(func() schemas.ResponseBody {
+				response := ddl.WaitUntilExists(func() schemas.ResponseBody {
 					return ddl.Table(routes, ksName, tableName)
 				})
 				ddl.SortColumns(response)
@@ -866,7 +866,7 @@ var _ = Describe("DataEndpoint", func() {
 				tableName := "table1"
 				ddl.CreateKeyspace(routes, ksName)
 				ddl.CreateTable(routes, ksName, tableName, []string{"{ basic: TEXT }"})
-				ddl.WaitUntilExist(func() schemas.ResponseBody {
+				ddl.WaitUntilExists(func() schemas.ResponseBody {
 					return ddl.Table(routes, ksName, tableName)
 				})
 				ddl.AlterTableDrop(routes, ksName, tableName, []string{"value01"})
@@ -889,7 +889,7 @@ var _ = Describe("DataEndpoint", func() {
 				ddl.CreateKeyspace(routes, ksName)
 				ddl.CreateTable(routes, ksName, tableName, []string{"{ basic: TEXT }"})
 				ddl.AlterTableAdd(routes, ksName, tableName, ddl.ColumnTypes)
-				ddl.WaitUntilExist(func() schemas.ResponseBody {
+				ddl.WaitUntilExists(func() schemas.ResponseBody {
 					return ddl.Table(routes, ksName, tableName)
 				})
 				ddl.DropTable(routes, ksName, tableName)

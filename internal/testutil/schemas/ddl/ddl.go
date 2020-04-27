@@ -253,7 +253,7 @@ func WaitUntilColumnIsGone(columnName string, queryFunc func() schemas.ResponseB
 	}, queryFunc)
 }
 
-func WaitUntilExist(queryFunc func() schemas.ResponseBody) schemas.ResponseBody {
+func WaitUntilExists(queryFunc func() schemas.ResponseBody) schemas.ResponseBody {
 	return waitUntil(func(response schemas.ResponseBody) bool {
 		return len(response.Errors) == 0 ||
 			!strings.Contains(response.Errors[0].Message, "does not exist")
