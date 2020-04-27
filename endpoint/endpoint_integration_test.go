@@ -768,6 +768,9 @@ var _ = Describe("DataEndpoint", func() {
 				ddl.WaitUntilGone(func() schemas.ResponseBody {
 					return ddl.Keyspace(routes, ksName)
 				})
+				response := ddl.Keyspace(routes, ksName)
+				Expect(response.Errors).To(HaveLen(1))
+				Expect(response.Errors[0].Message).To(ContainSubstring("keyspace does not exist"))
 			})
 			It("Should create keyspace if not exists", func() {
 				routes := getSchemaRoutes(cfg)
@@ -893,6 +896,9 @@ var _ = Describe("DataEndpoint", func() {
 				ddl.WaitUntilGone(func() schemas.ResponseBody {
 					return ddl.Table(routes, ksName, tableName)
 				})
+				response := ddl.Table(routes, ksName, tableName)
+				Expect(response.Errors).To(HaveLen(1))
+				Expect(response.Errors[0].Message).To(ContainSubstring("table does not exist"))
 			})
 		})
 	})
