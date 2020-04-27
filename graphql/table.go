@@ -10,8 +10,8 @@ import (
 )
 
 type dataTypeValue struct {
-	Basic    gocql.Type    `json:"basic"`
-	TypeInfo *dataTypeInfo `json:"info"`
+	Basic    gocql.Type    `json:"basic" mapstructure:"basic"`
+	TypeInfo *dataTypeInfo `json:"info" mapstructure:"info"`
 }
 
 type dataTypeInfo struct {
@@ -172,7 +172,7 @@ func getTables(keyspace *gocql.KeyspaceMetadata, args map[string]interface{}) (i
 		name := args["name"].(string)
 		table := keyspace.Tables[name]
 		if table == nil {
-			return nil, fmt.Errorf("unable to find table '%s'", name)
+			return nil, fmt.Errorf("table does not exist '%s'", name)
 		}
 
 		columns, err := toColumnValues(table.Columns)
@@ -180,11 +180,9 @@ func getTables(keyspace *gocql.KeyspaceMetadata, args map[string]interface{}) (i
 			return nil, err
 		}
 
-		return []*tableValue{
-			{
-				Name:    table.Name,
-				Columns: columns,
-			},
+		return tableValue{
+			Name:    table.Name,
+			Columns: columns,
 		}, nil
 	}
 
@@ -267,7 +265,7 @@ func (sg *SchemaGenerator) createTable(params graphql.ResolveParams) (interface{
 	partitionKeys, err := decodeColumns(args["partitionKeys"].([]interface{}))
 
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	if args["values"] != nil {
@@ -286,12 +284,18 @@ func (sg *SchemaGenerator) createTable(params graphql.ResolveParams) (interface{
 	if err != nil {
 		return nil, err
 	}
-	return sg.dbClient.CreateTable(&db.CreateTableInfo{
+
+	ifNotExists := getBoolArg(args, "ifNotExists")
+
+	err = sg.dbClient.CreateTable(&db.CreateTableInfo{
 		Keyspace:       ksName,
 		Table:          tableName,
 		PartitionKeys:  partitionKeys,
 		ClusteringKeys: clusteringKeys,
-		Values:         values}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+		Values:         values,
+		IfNotExists:    ifNotExists,
+	}, db.NewQueryOptions().WithUserOrRole(userOrRole).WithContext(params.Context))
+	return err != nil, err
 }
 
 func (sg *SchemaGenerator) alterTableAdd(params graphql.ResolveParams) (interface{}, error) {
@@ -314,11 +318,12 @@ func (sg *SchemaGenerator) alterTableAdd(params graphql.ResolveParams) (interfac
 	if err != nil {
 		return nil, err
 	}
-	return sg.dbClient.AlterTableAdd(&db.AlterTableAddInfo{
+	err = sg.dbClient.AlterTableAdd(&db.AlterTableAddInfo{
 		Keyspace: ksName,
 		Table:    tableName,
 		ToAdd:    toAdd,
-	}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+	}, db.NewQueryOptions().WithUserOrRole(userOrRole).WithContext(params.Context))
+	return err != nil, err
 }
 
 func (sg *SchemaGenerator) alterTableDrop(params graphql.ResolveParams) (interface{}, error) {
@@ -341,11 +346,12 @@ func (sg *SchemaGenerator) alterTableDrop(params graphql.ResolveParams) (interfa
 	if err != nil {
 		return nil, err
 	}
-	return sg.dbClient.AlterTableDrop(&db.AlterTableDropInfo{
+	err = sg.dbClient.AlterTableDrop(&db.AlterTableDropInfo{
 		Keyspace: ksName,
 		Table:    tableName,
 		ToDrop:   toDrop,
-	}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+	}, db.NewQueryOptions().WithUserOrRole(userOrRole).WithContext(params.Context))
+	return err != nil, err
 }
 
 func (sg *SchemaGenerator) dropTable(params graphql.ResolveParams) (interface{}, error) {
@@ -356,9 +362,12 @@ func (sg *SchemaGenerator) dropTable(params graphql.ResolveParams) (interface{},
 	if err != nil {
 		return nil, err
 	}
-	return sg.dbClient.DropTable(&db.DropTableInfo{
+	err = sg.dbClient.DropTable(&db.DropTableInfo{
 		Keyspace: ksName,
-		Table:    tableName}, db.NewQueryOptions().WithUserOrRole(userOrRole))
+		Table:    tableName,
+		IfExists: getBoolArg(args, "ifExists")},
+		db.NewQueryOptions().WithUserOrRole(userOrRole).WithContext(params.Context))
+	return err != nil, err
 }
 
 func toColumnType(info gocql.TypeInfo) (*dataTypeValue, error) {
@@ -432,7 +441,7 @@ func toDbColumnType(info *dataTypeValue) (gocql.TypeInfo, error) {
 			return nil, err
 		}
 
-		valueType, err := toDbColumnType(&info.TypeInfo.SubTypes[0])
+		valueType, err := toDbColumnType(&info.TypeInfo.SubTypes[1])
 		if err != nil {
 			return nil, err
 		}

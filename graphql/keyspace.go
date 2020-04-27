@@ -1,7 +1,7 @@
 package graphql
 
 import (
-	"errors"
+	"fmt"
 	"github.com/datastax/cassandra-data-apis/config"
 	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/gocql/gocql"
@@ -54,11 +54,18 @@ var keyspaceType = graphql.NewObject(graphql.ObjectConfig{
 		"dcs": &graphql.Field{
 			Type: graphql.NewList(dataCenterType),
 		},
-		"tables": &graphql.Field{
-			Type: graphql.NewList(tableType),
+		"table": &graphql.Field{
+			Type: tableType,
 			Args: graphql.FieldConfigArgument{
 				"name": {Type: graphql.String},
 			},
+			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
+				parent := p.Source.(ksValue)
+				return getTables(parent.keyspace, p.Args)
+			},
+		},
+		"tables": &graphql.Field{
+			Type: graphql.NewList(tableType),
 			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
 				parent := p.Source.(ksValue)
 				return getTables(parent.keyspace, p.Args)
@@ -113,7 +120,7 @@ func (sg *SchemaGenerator) buildKeyspaceQuery() *graphql.Object {
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) {
 					ksName := params.Args["name"].(string)
 					if sg.isKeyspaceExcluded(ksName) {
-						return nil, errors.New("keyspace does not exist")
+						return nil, fmt.Errorf("keyspace does not exist '%s'", ksName)
 					}
 					keyspace, err := sg.dbClient.Keyspace(ksName)
 					if err != nil {
@@ -163,10 +170,14 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 				"dcs": &graphql.ArgumentConfig{
 					Type: graphql.NewNonNull(graphql.NewList(dataCenterInput)),
 				},
+				"ifNotExists": &graphql.ArgumentConfig{
+					Type: graphql.Boolean,
+				},
 			},
 			Resolve: func(params graphql.ResolveParams) (interface{}, error) {
-				ksName := params.Args["name"].(string)
-				dcs := params.Args["dcs"].([]interface{})
+				args := params.Args
+				ksName := args["name"].(string)
+				dcs := args["dcs"].([]interface{})
 
 				dcReplicas := make(map[string]int)
 				for _, dc := range dcs {
@@ -178,7 +189,13 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 				if err != nil {
 					return nil, err
 				}
-				return sg.dbClient.CreateKeyspace(ksName, dcReplicas, db.NewQueryOptions().WithUserOrRole(userOrRole))
+
+				err = sg.dbClient.CreateKeyspace(&db.CreateKeyspaceInfo{
+					Name:        ksName,
+					DCReplicas:  dcReplicas,
+					IfNotExists: getBoolArg(args, "ifNotExists"),
+				}, db.NewQueryOptions().WithUserOrRole(userOrRole).WithContext(params.Context))
+				return err != nil, err
 			},
 		}
 	}
@@ -190,15 +207,24 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 				"name": &graphql.ArgumentConfig{
 					Type: graphql.NewNonNull(graphql.String),
 				},
+				"ifExists": &graphql.ArgumentConfig{
+					Type: graphql.Boolean,
+				},
 			},
 			Resolve: func(params graphql.ResolveParams) (interface{}, error) {
-				ksName := params.Args["name"].(string)
+				args := params.Args
+				ksName := args["name"].(string)
 
 				userOrRole, err := sg.checkUserOrRoleAuth(params)
 				if err != nil {
 					return nil, err
 				}
-				return sg.dbClient.DropKeyspace(ksName, db.NewQueryOptions().WithUserOrRole(userOrRole))
+
+				err = sg.dbClient.DropKeyspace(&db.DropKeyspaceInfo{
+					Name:     ksName,
+					IfExists: getBoolArg(args, "ifExists"),
+				}, db.NewQueryOptions().WithUserOrRole(userOrRole).WithContext(params.Context))
+				return err != nil, err
 			},
 		}
 
@@ -223,8 +249,11 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 				"values": &graphql.ArgumentConfig{
 					Type: graphql.NewList(columnInput),
 				},
+				"ifNotExists": &graphql.ArgumentConfig{
+					Type: graphql.Boolean,
+				},
 			},
-			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				return sg.createTable(p)
 			},
 		}
@@ -280,6 +309,9 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 				"tableName": &graphql.ArgumentConfig{
 					Type: graphql.NewNonNull(graphql.String),
 				},
+				"ifExists": &graphql.ArgumentConfig{
+					Type: graphql.Boolean,
+				},
 			},
 			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
 				return sg.dropTable(p)
@@ -291,4 +323,11 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(ops config.SchemaOperations) *g
 		Name:   "Mutation",
 		Fields: fields,
 	})
+}
+
+func getBoolArg(args map[string]interface{}, name string) bool {
+	if value, ok := args[name]; ok {
+		return value.(bool)
+	}
+	return false
 }

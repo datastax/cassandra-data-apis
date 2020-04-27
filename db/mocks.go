@@ -20,6 +20,11 @@ func (o *SessionMock) ExecuteIter(query string, options *QueryOptions, values ..
 	return args.Get(0).(ResultSet), args.Error(1)
 }
 
+func (o *SessionMock) ChangeSchema(query string, options *QueryOptions) error {
+	args := o.Called(query, options)
+	return args.Error(0)
+}
+
 func (o *SessionMock) KeyspaceMetadata(keyspaceName string) (*gocql.KeyspaceMetadata, error) {
 	args := o.Called(keyspaceName)
 	return args.Get(0).(*gocql.KeyspaceMetadata), args.Error(1)
