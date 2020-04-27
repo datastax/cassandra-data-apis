@@ -14,6 +14,9 @@ type Db struct {
 // NewDb Gets a pointer to a db
 func NewDb(username string, password string, hosts ...string) (*Db, error) {
 	cluster := gocql.NewCluster(hosts...)
+	cluster.PoolConfig = gocql.PoolConfig{
+		HostSelectionPolicy: NewDcInferringPolicy(),
+	}
 
 	// Match DataStax drivers settings
 	cluster.ConnectTimeout = 5 * time.Second

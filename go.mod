@@ -8,9 +8,9 @@ require (
 	github.com/graphql-go/graphql v0.7.9
 	github.com/iancoleman/strcase v0.0.0-20191112232945-16388991a334
 	github.com/julienschmidt/httprouter v1.3.0
+	github.com/mitchellh/mapstructure v1.2.2
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0
-	github.com/mitchellh/mapstructure v1.2.2
 	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
@@ -20,6 +20,7 @@ require (
 	github.com/spf13/viper v1.6.2
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.5.1
+	go.uber.org/atomic v1.6.0
 	go.uber.org/zap v1.14.1
 	golang.org/x/sys v0.0.0-20200331124033-c3d80250170d // indirect
 	golang.org/x/text v0.3.2 // indirect
