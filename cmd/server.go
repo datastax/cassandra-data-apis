@@ -15,6 +15,7 @@ import (
 	log2 "log"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 )
 
@@ -215,16 +216,20 @@ func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint
 
 	if viper.GetBool("graphql-playground") {
 		playgroundPath := viper.GetString("graphql-playground-path")
-		path := rootPath
-		// Get the first POST GraphQL route
-		for _, route := range routes {
-			if route.Method == http.MethodPost && strings.HasPrefix(route.Pattern, rootPath) {
-				path = route.Pattern
-				break
+		hostAndPort := fmt.Sprintf("http://localhost:%d", viper.GetInt("graphql-port"))
+		defaultPath := rootPath
+		if singleKeyspace == "" {
+			// For multi-keyspace mode, use /graphql/<any_keyspace> as default playground endpoint url
+			keyspaces, err := endpoint.Keyspaces()
+			if err != nil {
+				logger.Fatal("could not retrieve keyspaces", "error", err)
+			}
+
+			if len(keyspaces) > 0 {
+				defaultPath = path.Join(rootPath, keyspaces[0])
 			}
 		}
-		hostAndPort := fmt.Sprintf("http://localhost:%d", viper.GetInt("graphql-port"))
-		defaultEndpointUrl := fmt.Sprintf("%s%s", hostAndPort, path)
+		defaultEndpointUrl := fmt.Sprintf("%s%s", hostAndPort, defaultPath)
 		logger.Info("get started by visiting the GraphQL playground",
 			"url", fmt.Sprintf("%s%s", hostAndPort, playgroundPath))
 		router.GET(playgroundPath, graphql.GetPlaygroundHandle(defaultEndpointUrl))
