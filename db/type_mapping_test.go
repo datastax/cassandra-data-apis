@@ -175,7 +175,7 @@ var _ = Describe("Session", func() {
 })
 
 var _ = BeforeSuite(func() {
-	session := SetupIntegrationTestFixture("CREATE KEYSPACE ks1 WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 1}")
+	session, _ := SetupIntegrationTestFixture("CREATE KEYSPACE ks1 WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 1}")
 
 	db = NewDbWithConnectedInstance(session)
 })

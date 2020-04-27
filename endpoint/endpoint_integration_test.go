@@ -6,11 +6,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/datastax/cassandra-data-apis/config"
 	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/graphql"
 	. "github.com/datastax/cassandra-data-apis/internal/testutil"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas/datatypes"
+	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas/ddl"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas/killrvideo"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas/quirky"
 	"github.com/gocql/gocql"
@@ -24,6 +26,7 @@ import (
 	"path"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -739,13 +742,170 @@ var _ = Describe("DataEndpoint", func() {
 			}
 		})
 	})
+	Describe("RoutesSchemaManagement()", func() {
+		cfg := NewEndpointConfigWithLogger(TestLogger(), host)
+		Context("With keyspace schema mutations", func() {
+			It("Should create keyspace", func() {
+				routes := getSchemaRoutes(cfg)
+				ksName := randomName()
+				ddl.CreateKeyspace(routes, ksName)
+				response := ddl.WaitUntilExist(func() schemas.ResponseBody {
+					return ddl.Keyspace(routes, ksName)
+				})
+				Expect(response).To(Equal(schemas.NewResponseBody("keyspace", map[string]interface{}{
+					"name": ksName,
+					"dcs":  ddl.DCsResult,
+				})))
+			})
+			It("Should drop keyspace", func() {
+				routes := getSchemaRoutes(cfg)
+				ksName := randomName()
+				ddl.CreateKeyspace(routes, ksName)
+				ddl.WaitUntilExist(func() schemas.ResponseBody {
+					return ddl.Keyspace(routes, ksName)
+				})
+				ddl.DropKeyspace(routes, ksName)
+				ddl.WaitUntilGone(func() schemas.ResponseBody {
+					return ddl.Keyspace(routes, ksName)
+				})
+			})
+			It("Should create keyspace if not exists", func() {
+				routes := getSchemaRoutes(cfg)
+				ksName := randomName()
+				ddl.CreateKeyspace(routes, ksName)
+				ddl.WaitUntilExist(func() schemas.ResponseBody {
+					return ddl.Keyspace(routes, ksName)
+				})
+				response := ddl.CreateKeyspaceIfNotExists(routes, ksName, false)
+				Expect(response.Errors).To(HaveLen(1))
+				Expect(response.Errors[0].Message).To(ContainSubstring("Cannot add existing keyspace"))
+				response = ddl.CreateKeyspaceIfNotExists(routes, ksName, true)
+				Expect(response.Errors).To(HaveLen(0))
+			})
+		})
+		Context("With table schema mutations", func() {
+			It("Should create table", func() {
+				routes := getSchemaRoutes(cfg)
+				ksName := randomName()
+				tableName := "table1"
+				ddl.CreateKeyspace(routes, ksName)
+				ddl.CreateTable(routes, ksName, tableName, ddl.ColumnTypes)
+				response := ddl.WaitUntilExist(func() schemas.ResponseBody {
+					return ddl.Table(routes, ksName, tableName)
+				})
+				ddl.SortColumns(response)
+				expected := schemas.NewResponseBody("keyspace", map[string]interface{}{
+					"table": map[string]interface{}{
+						"name":    tableName,
+						"columns": ddl.BuildColumnResult("value", ddl.ColumnTypesResult),
+					},
+				})
+				Expect(response).To(Equal(expected))
+			})
+			It("Should create table if not exists", func() {
+				routes := getSchemaRoutes(cfg)
+				ksName := randomName()
+				tableName := "table1"
+				ddl.CreateKeyspace(routes, ksName)
+				ddl.CreateTable(routes, ksName, tableName, ddl.ColumnTypes)
+				ddl.WaitUntilExist(func() schemas.ResponseBody {
+					return ddl.Table(routes, ksName, tableName)
+				})
+				response := ddl.CreateTableIfNotExists(routes, ksName, tableName, ddl.ColumnTypes, false)
+				Expect(response.Errors).To(HaveLen(1))
+				Expect(response.Errors[0].Message).To(ContainSubstring("Cannot add already existing table"))
+				response = ddl.CreateTableIfNotExists(routes, ksName, tableName, ddl.ColumnTypes, true)
+				Expect(response.Errors).To(HaveLen(0))
+			})
+			It("Should create counter table", func() {
+				routes := getSchemaRoutes(cfg)
+				ksName := randomName()
+				tableName := "table1"
+				ddl.CreateKeyspace(routes, ksName)
+				ddl.CreateTable(routes, ksName, tableName, []string{"{ basic: COUNTER }"})
+				response := ddl.WaitUntilExist(func() schemas.ResponseBody {
+					return ddl.Table(routes, ksName, tableName)
+				})
+				ddl.SortColumns(response)
+				expected := schemas.NewResponseBody("keyspace", map[string]interface{}{
+					"table": map[string]interface{}{
+						"name": tableName,
+						"columns": ddl.BuildColumnResult("value", []map[string]interface{}{
+							{"basic": "COUNTER"},
+						}),
+					},
+				})
+				Expect(response).To(Equal(expected))
+			})
+			It("Should alter table add column", func() {
+				routes := getSchemaRoutes(cfg)
+				ksName := randomName()
+				tableName := "table1"
+				ddl.CreateKeyspace(routes, ksName)
+				ddl.CreateTable(routes, ksName, tableName, []string{"{ basic: TEXT }"})
+				ddl.AlterTableAdd(routes, ksName, tableName, ddl.ColumnTypes)
+				response := ddl.WaitUntilColumnExists("addedValue01", func() schemas.ResponseBody {
+					return ddl.Table(routes, ksName, tableName)
+				})
+				ddl.SortColumns(response)
+				expected := schemas.NewResponseBody("keyspace", map[string]interface{}{
+					"table": map[string]interface{}{
+						"name": tableName,
+						"columns": ddl.BuildColumnResult("addedValue", ddl.ColumnTypesResult,
+							ddl.TextColumn("value01")),
+					},
+				})
+				Expect(response).To(Equal(expected))
+			})
+			It("Should alter table drop column", func() {
+				routes := getSchemaRoutes(cfg)
+				ksName := randomName()
+				tableName := "table1"
+				ddl.CreateKeyspace(routes, ksName)
+				ddl.CreateTable(routes, ksName, tableName, []string{"{ basic: TEXT }"})
+				ddl.WaitUntilExist(func() schemas.ResponseBody {
+					return ddl.Table(routes, ksName, tableName)
+				})
+				ddl.AlterTableDrop(routes, ksName, tableName, []string{"value01"})
+				response := ddl.WaitUntilColumnIsGone("value01", func() schemas.ResponseBody {
+					return ddl.Table(routes, ksName, tableName)
+				})
+				ddl.SortColumns(response)
+				expected := schemas.NewResponseBody("keyspace", map[string]interface{}{
+					"table": map[string]interface{}{
+						"name":    tableName,
+						"columns": ddl.BuildColumnResult("", nil),
+					},
+				})
+				Expect(response).To(Equal(expected))
+			})
+			It("Should drop table", func() {
+				routes := getSchemaRoutes(cfg)
+				ksName := randomName()
+				tableName := "table1"
+				ddl.CreateKeyspace(routes, ksName)
+				ddl.CreateTable(routes, ksName, tableName, []string{"{ basic: TEXT }"})
+				ddl.AlterTableAdd(routes, ksName, tableName, ddl.ColumnTypes)
+				ddl.WaitUntilExist(func() schemas.ResponseBody {
+					return ddl.Table(routes, ksName, tableName)
+				})
+				ddl.DropTable(routes, ksName, tableName)
+				ddl.WaitUntilGone(func() schemas.ResponseBody {
+					return ddl.Table(routes, ksName, tableName)
+				})
+			})
+		})
+	})
 })
 
 var _ = BeforeSuite(func() {
-	session = SetupIntegrationTestFixture()
-	CreateSchema("killrvideo")
-	CreateSchema("quirky")
-	CreateSchema("datatypes")
+	var isNew bool
+	session, isNew = SetupIntegrationTestFixture()
+	if isNew {
+		CreateSchema("killrvideo")
+		CreateSchema("quirky")
+		CreateSchema("datatypes")
+	}
 })
 
 var _ = AfterSuite(func() {
@@ -760,6 +920,13 @@ func TestEndpoint(t *testing.T) {
 func getRoutes(config *DataEndpointConfig, keyspace string) []graphql.Route {
 	var endpoint = config.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
 	routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", keyspace)
+	Expect(err).ToNot(HaveOccurred())
+	return routes
+}
+
+func getSchemaRoutes(cfg *DataEndpointConfig) []graphql.Route {
+	var endpoint = cfg.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
+	routes, err := endpoint.RoutesSchemaManagementGraphQL("/graphql-schema", config.AllSchemaOperations)
 	Expect(err).ToNot(HaveOccurred())
 	return routes
 }
@@ -782,4 +949,8 @@ func jsonNumberTo(f func(float64) interface{}) func(interface{}) interface{} {
 		}
 		panic("unexpected type")
 	}
+}
+
+func randomName() string {
+	return strings.Replace(gocql.TimeUUID().String(), "-", "", -1)
 }
