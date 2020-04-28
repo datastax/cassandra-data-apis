@@ -6,52 +6,68 @@ import (
 )
 
 type dcInferringPolicy struct {
-	childPolicy gocql.HostSelectionPolicy
+	childPolicy atomic.Value
 	localDc     atomic.String
 }
 
-func NewDcInferringPolicy() gocql.HostSelectionPolicy {
-	return gocql.TokenAwareHostPolicy(&dcInferringPolicy{
-		childPolicy: gocql.DCAwareRoundRobinPolicy("__invalid_dc_not_considered"),
-	})
+type childPolicyWrapper struct {
+	policy gocql.HostSelectionPolicy
+}
+
+func NewDefaultHostSelectionPolicy() gocql.HostSelectionPolicy {
+	return gocql.TokenAwareHostPolicy(NewDcInferringPolicy(), gocql.ShuffleReplicas())
+}
+
+func NewDcInferringPolicy() *dcInferringPolicy {
+	policy := dcInferringPolicy{}
+	policy.childPolicy.Store(childPolicyWrapper{gocql.RoundRobinHostPolicy()})
+	return &policy
 }
 
 func (p *dcInferringPolicy) AddHost(host *gocql.HostInfo) {
 	if p.localDc.Load() == "" {
 		p.localDc.Store(host.DataCenter())
+		childPolicy := gocql.DCAwareRoundRobinPolicy(host.DataCenter())
+		p.childPolicy.Store(childPolicyWrapper{childPolicy})
+		childPolicy.AddHost(host)
+	} else {
+		p.getChildPolicy().AddHost(host)
 	}
-	p.childPolicy.AddHost(host)
+}
+
+func (p *dcInferringPolicy) getChildPolicy() gocql.HostSelectionPolicy {
+	wrapper := p.childPolicy.Load().(childPolicyWrapper)
+	return wrapper.policy
 }
 
 func (p *dcInferringPolicy) RemoveHost(host *gocql.HostInfo) {
-	p.childPolicy.RemoveHost(host)
+	p.getChildPolicy().RemoveHost(host)
 }
 
 func (p *dcInferringPolicy) HostUp(host *gocql.HostInfo) {
-	p.childPolicy.HostUp(host)
+	p.getChildPolicy().HostUp(host)
 }
 
 func (p *dcInferringPolicy) HostDown(host *gocql.HostInfo) {
-	p.childPolicy.HostDown(host)
+	p.getChildPolicy().HostDown(host)
 }
 
 func (p *dcInferringPolicy) SetPartitioner(partitioner string) {
-	p.childPolicy.SetPartitioner(partitioner)
+	p.getChildPolicy().SetPartitioner(partitioner)
 }
 
-func (p *dcInferringPolicy) KeyspaceChanged(gocql.KeyspaceUpdateEvent) {}
+func (p *dcInferringPolicy) KeyspaceChanged(e gocql.KeyspaceUpdateEvent) {
+	p.getChildPolicy().KeyspaceChanged(e)
+}
 
-func (p *dcInferringPolicy) Init(*gocql.Session) {}
+func (p *dcInferringPolicy) Init(*gocql.Session) {
+	// TAP parent policy does not call init on "fallback policy"
+}
 
 func (p *dcInferringPolicy) IsLocal(host *gocql.HostInfo) bool {
-	localDc := p.localDc.Load()
-	if localDc == "" {
-		return true
-	}
-
-	return host.DataCenter() == localDc
+	return p.getChildPolicy().IsLocal(host)
 }
 
 func (p *dcInferringPolicy) Pick(query gocql.ExecutableQuery) gocql.NextHost {
-	return p.childPolicy.Pick(query)
+	return p.getChildPolicy().Pick(query)
 }

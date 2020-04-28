@@ -15,7 +15,7 @@ type Db struct {
 func NewDb(username string, password string, hosts ...string) (*Db, error) {
 	cluster := gocql.NewCluster(hosts...)
 	cluster.PoolConfig = gocql.PoolConfig{
-		HostSelectionPolicy: NewDcInferringPolicy(),
+		HostSelectionPolicy: NewDefaultHostSelectionPolicy(),
 	}
 
 	// Match DataStax drivers settings
