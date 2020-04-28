@@ -243,7 +243,7 @@ func executePost(routes []graphql.Route, target string, body graphql.RequestBody
 		return nil, err
 	}
 
-	r := httptest.NewRequest(http.MethodPost, path.Join(fmt.Sprintf("http://%s", host), target), bytes.NewReader(b))
+	r := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://%s", path.Join(host, target)), bytes.NewReader(b))
 	if header != nil {
 		r.Header = header
 	}

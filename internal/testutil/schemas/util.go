@@ -52,7 +52,11 @@ func DecodeResponse(buffer *bytes.Buffer) ResponseBody {
 func DecodeData(buffer *bytes.Buffer, key string) map[string]interface{} {
 	response := DecodeResponse(buffer)
 	Expect(response.Errors).To(HaveLen(0))
-	return response.Data[key].(map[string]interface{})
+	value, found := response.Data[key]
+	if !found {
+		panic(fmt.Sprintf("%s key not in response: %v", key, response))
+	}
+	return value.(map[string]interface{})
 }
 
 func DecodeDataAsSliceOfMaps(buffer *bytes.Buffer, key string, property string) []map[string]interface{} {
@@ -93,16 +97,19 @@ func NewUuid() string {
 func ExecutePost(routes []graphql.Route, target string, body string) *bytes.Buffer {
 	b, err := json.Marshal(graphql.RequestBody{Query: body})
 	Expect(err).ToNot(HaveOccurred())
-	r := httptest.NewRequest(http.MethodPost, path.Join(fmt.Sprintf("http://%s", host), target), bytes.NewReader(b))
+	targetUrl := fmt.Sprintf("http://%s", path.Join(host, target))
+	r := httptest.NewRequest(http.MethodPost, targetUrl, bytes.NewReader(b))
 	w := httptest.NewRecorder()
 	routes[postIndex].Handler.ServeHTTP(w, r)
+	Expect(w.Code).To(Equal(http.StatusOK))
 	return w.Body
 }
 
 func ExpectQueryToReturnError(routes []graphql.Route, query string, expectedMessage string) {
 	b, err := json.Marshal(graphql.RequestBody{Query: query})
 	Expect(err).ToNot(HaveOccurred())
-	r := httptest.NewRequest(http.MethodPost, path.Join(fmt.Sprintf("http://%s", host), "/graphql"), bytes.NewReader(b))
+	targetUrl := fmt.Sprintf("http://%s", path.Join(host, "/graphql"))
+	r := httptest.NewRequest(http.MethodPost, targetUrl, bytes.NewReader(b))
 	w := httptest.NewRecorder()
 	routes[postIndex].Handler.ServeHTTP(w, r)
 	// GraphQL spec defines the error as a field and HTTP status code should still be 200
