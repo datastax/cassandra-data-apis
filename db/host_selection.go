@@ -7,7 +7,7 @@ import (
 
 type dcInferringPolicy struct {
 	childPolicy  atomic.Value
-	isLocalDcSet *int32
+	isLocalDcSet int32
 }
 
 type childPolicyWrapper struct {
@@ -19,15 +19,13 @@ func NewDefaultHostSelectionPolicy() gocql.HostSelectionPolicy {
 }
 
 func NewDcInferringPolicy() *dcInferringPolicy {
-	policy := dcInferringPolicy{
-		isLocalDcSet: new(int32),
-	}
+	policy := dcInferringPolicy{}
 	policy.childPolicy.Store(childPolicyWrapper{gocql.RoundRobinHostPolicy()})
 	return &policy
 }
 
 func (p *dcInferringPolicy) AddHost(host *gocql.HostInfo) {
-	if atomic.CompareAndSwapInt32(p.isLocalDcSet, 0, 1) {
+	if atomic.CompareAndSwapInt32(&p.isLocalDcSet, 0, 1) {
 		childPolicy := gocql.DCAwareRoundRobinPolicy(host.DataCenter())
 		p.childPolicy.Store(childPolicyWrapper{childPolicy})
 		childPolicy.AddHost(host)
