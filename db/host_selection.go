@@ -2,12 +2,12 @@ package db
 
 import (
 	"github.com/gocql/gocql"
-	"go.uber.org/atomic"
+	"sync/atomic"
 )
 
 type dcInferringPolicy struct {
-	childPolicy atomic.Value
-	localDc     atomic.String
+	childPolicy  atomic.Value
+	isLocalDcSet *int32
 }
 
 type childPolicyWrapper struct {
@@ -19,14 +19,15 @@ func NewDefaultHostSelectionPolicy() gocql.HostSelectionPolicy {
 }
 
 func NewDcInferringPolicy() *dcInferringPolicy {
-	policy := dcInferringPolicy{}
+	policy := dcInferringPolicy{
+		isLocalDcSet: new(int32),
+	}
 	policy.childPolicy.Store(childPolicyWrapper{gocql.RoundRobinHostPolicy()})
 	return &policy
 }
 
 func (p *dcInferringPolicy) AddHost(host *gocql.HostInfo) {
-	if p.localDc.Load() == "" {
-		p.localDc.Store(host.DataCenter())
+	if atomic.CompareAndSwapInt32(p.isLocalDcSet, 0, 1) {
 		childPolicy := gocql.DCAwareRoundRobinPolicy(host.DataCenter())
 		p.childPolicy.Store(childPolicyWrapper{childPolicy})
 		childPolicy.AddHost(host)
