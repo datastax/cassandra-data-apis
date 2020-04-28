@@ -15,6 +15,8 @@ const (
 	KeyspaceDrop
 )
 
+const AllSchemaOperations = TableCreate | TableDrop | TableAlterAdd | TableAlterDrop | KeyspaceCreate | KeyspaceDrop
+
 func Ops(ops ...string) (SchemaOperations, error) {
 	var o SchemaOperations
 	err := o.Add(ops...)

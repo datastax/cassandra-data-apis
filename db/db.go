@@ -6,6 +6,20 @@ import (
 	"time"
 )
 
+func ifNotExistsStr(ifNotExists bool) string {
+	if ifNotExists {
+		return "IF NOT EXISTS "
+	}
+	return ""
+}
+
+func ifExistsStr(ifExists bool) string {
+	if ifExists {
+		return "IF EXISTS "
+	}
+	return ""
+}
+
 // Db represents a connection to a db
 type Db struct {
 	session Session
