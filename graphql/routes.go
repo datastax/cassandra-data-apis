@@ -103,6 +103,24 @@ func (rg *RouteGenerator) Routes(pattern string, singleKeyspace string) ([]Route
 	}), nil
 }
 
+// Keyspaces gets a slice of keyspace names that are considered by the route generator.
+func (rg *RouteGenerator) Keyspaces() ([]string, error) {
+	keyspaces, err := rg.dbClient.Keyspaces()
+
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]string, 0, len(keyspaces))
+	for _, ksName := range keyspaces {
+		if !rg.schemaGen.isKeyspaceExcluded(ksName) {
+			result = append(result, ksName)
+		}
+	}
+
+	return result, nil
+}
+
 func getPathParser(root string) func(string) string {
 	if !strings.HasSuffix(root, "/") {
 		root += "/"
