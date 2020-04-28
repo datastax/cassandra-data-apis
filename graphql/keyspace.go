@@ -57,7 +57,9 @@ var keyspaceType = graphql.NewObject(graphql.ObjectConfig{
 		"table": &graphql.Field{
 			Type: tableType,
 			Args: graphql.FieldConfigArgument{
-				"name": {Type: graphql.String},
+				"name": {
+					Type: graphql.NewNonNull(graphql.String),
+				},
 			},
 			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
 				parent := p.Source.(ksValue)
