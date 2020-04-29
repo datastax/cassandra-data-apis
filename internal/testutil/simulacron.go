@@ -54,6 +54,7 @@ func simulacronPath() string {
 }
 
 func StopSimulacron() {
+	fmt.Println("Stopping simulacron")
 	if err := cmd.Process.Kill(); err != nil {
 		fmt.Println("Failed to kill simulacron ", err)
 	}

@@ -5,7 +5,7 @@ build: off
 cache:
   - $HOME/.ccm/repository -> appveyor.yml, ci/ubuntu_tools.sh
   - $GOPATH/pkg/mod -> appveyor.yml, go.mod, go.sum
-  - $HOME/simulacron -> appveyor.yml, ci/ubuntu_tools.sh
+  - simulacron -> appveyor.yml, ci/ubuntu_tools.sh
 
 environment:
   matrix:
