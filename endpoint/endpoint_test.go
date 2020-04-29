@@ -8,8 +8,11 @@ import (
 	"github.com/datastax/cassandra-data-apis/auth"
 	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/graphql"
+	"github.com/datastax/cassandra-data-apis/internal/testutil"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas"
 	"github.com/gocql/gocql"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"net/http"
@@ -296,4 +299,13 @@ func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write(bytes)
 		return
 	}
+}
+
+var _ = BeforeSuite(testutil.BeforeTestSuite)
+
+var _ = AfterSuite(testutil.AfterTestSuite)
+
+func TestEndpoint(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Endpoint test suite")
 }

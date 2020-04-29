@@ -1,6 +1,7 @@
 package db
 
 import (
+	"github.com/datastax/cassandra-data-apis/internal/testutil"
 	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/gocql/gocql"
 	. "github.com/onsi/ginkgo"
@@ -105,7 +106,7 @@ var _ = Describe("db", func() {
 
 			It("Should generate UPDATE statement with "+item.description, func() {
 				table := &gocql.TableMetadata{
-					Name:              "tbl1",
+					Name: "tbl1",
 					Columns: map[string]*gocql.ColumnMetadata{
 						"pk1": {Name: "pk1", Kind: gocql.ColumnPartitionKey},
 						"pk2": {Name: "pk2", Kind: gocql.ColumnPartitionKey},
@@ -264,3 +265,7 @@ func TestTypeMapping(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Db test suite")
 }
+
+var _ = BeforeSuite(testutil.BeforeTestSuite)
+
+var _ = AfterSuite(testutil.AfterTestSuite)

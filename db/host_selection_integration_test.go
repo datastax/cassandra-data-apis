@@ -9,7 +9,9 @@ import (
 )
 
 var _ = Describe("NewDb()", func() {
-	It("Should target only local DC", func() {
+	testutil.EnsureSimulacronCluster()
+
+	It("Should only target local DC", func() {
 		db, err := NewDb("", "", testutil.SimulacronStartIp)
 		Expect(err).NotTo(HaveOccurred())
 		query := "SELECT * FROM ks1.tbl1"
@@ -33,15 +35,6 @@ var _ = Describe("NewDb()", func() {
 		dc2Queries := testutil.CountLogMatches(dc2Logs.DataCenters[0].Nodes, query)
 
 		// No executions on DC2
-		Expect(dc2Queries).To(Equal(testutil.QueryMatches{Prepare: 0, Execute: 0}))
+		Expect(dc2Queries.Execute).To(BeZero())
 	})
-})
-
-var _ = BeforeSuite(func() {
-	testutil.StartSimulacron()
-	testutil.CreateSimulacronCluster(3, 3)
-})
-
-var _ = AfterSuite(func() {
-	testutil.StopSimulacron()
 })

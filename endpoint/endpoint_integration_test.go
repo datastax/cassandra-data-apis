@@ -27,14 +27,23 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"testing"
 	"time"
 )
 
-var session *gocql.Session
-
 var _ = Describe("DataEndpoint", func() {
+	EnsureCcmCluster(func() {
+		CreateSchema("killrvideo")
+		CreateSchema("quirky")
+		CreateSchema("datatypes")
+	})
+
 	Describe("RoutesKeyspaceGraphQL()", func() {
+		var session *gocql.Session
+
+		BeforeEach(func() {
+			session = GetSession()
+		})
+
 		Context("With killrvideo schema", func() {
 			config := NewEndpointConfigWithLogger(TestLogger(), host)
 			keyspace := "killrvideo"
@@ -710,7 +719,7 @@ var _ = Describe("DataEndpoint", func() {
 
 		BeforeEach(func() {
 			var err error
-			endpoint := config.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
+			endpoint := config.newEndpointWithDb(db.NewDbWithConnectedInstance(GetSession()))
 			routes, err = endpoint.RoutesGraphQL("/graphql_root")
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -904,34 +913,15 @@ var _ = Describe("DataEndpoint", func() {
 	})
 })
 
-var _ = BeforeSuite(func() {
-	var isNew bool
-	session, isNew = SetupIntegrationTestFixture()
-	if isNew {
-		CreateSchema("killrvideo")
-		CreateSchema("quirky")
-		CreateSchema("datatypes")
-	}
-})
-
-var _ = AfterSuite(func() {
-	TearDownIntegrationTestFixture()
-})
-
-func TestEndpoint(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Endpoint integration test suite")
-}
-
 func getRoutes(config *DataEndpointConfig, keyspace string) []graphql.Route {
-	var endpoint = config.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
+	var endpoint = config.newEndpointWithDb(db.NewDbWithConnectedInstance(GetSession()))
 	routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", keyspace)
 	Expect(err).ToNot(HaveOccurred())
 	return routes
 }
 
 func getSchemaRoutes(cfg *DataEndpointConfig) []graphql.Route {
-	var endpoint = cfg.newEndpointWithDb(db.NewDbWithConnectedInstance(session))
+	var endpoint = cfg.newEndpointWithDb(db.NewDbWithConnectedInstance(GetSession()))
 	routes, err := endpoint.RoutesSchemaManagementGraphQL("/graphql-schema", config.AllSchemaOperations)
 	Expect(err).ToNot(HaveOccurred())
 	return routes
