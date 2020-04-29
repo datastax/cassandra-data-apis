@@ -41,7 +41,7 @@ Envoy can be used to control access to the data APIs using an [external authenti
 service](#external-authentication), [JSON Web Tokens (JWT)](#json-web-tokens-jwt), or [TLS client
 certificates](#client-certificates). 
 
-Start with a basic proxy forwarding:
+Start with basic proxy forwarding:
 
 ``` yaml
 static_resources:
@@ -237,7 +237,7 @@ static_resources:
 NGNIX can also be used control access using either an [external authentication
 service](#external-authentication-1) or [TLS client certificates](#client-certificates-1). 
 
-Start with a basic proxy forwarding:
+Start with basic proxy forwarding:
 
 ```
 server {
