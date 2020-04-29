@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"github.com/datastax/cassandra-data-apis/config"
@@ -35,7 +36,7 @@ var serverCmd = &cobra.Command{
 	Use:   os.Args[0] + " --hosts [HOSTS] [--start-graph|--start-rest] [OPTIONS]",
 	Short: "GraphQL and REST endpoints for Apache Cassandra",
 	Args: func(cmd *cobra.Command, args []string) error {
-		hosts := viper.GetStringSlice("hosts")
+		hosts := getStringSlice("hosts")
 		if len(hosts) == 0 {
 			return errors.New("hosts are required")
 		}
@@ -157,7 +158,7 @@ func Execute() {
 }
 
 func createEndpoint() *endpoint.DataEndpoint {
-	cfg = endpoint.NewEndpointConfigWithLogger(logger, viper.GetStringSlice("hosts")...)
+	cfg = endpoint.NewEndpointConfigWithLogger(logger, getStringSlice("hosts")...)
 
 	updateInterval := viper.GetDuration("schema-update-interval")
 	if updateInterval <= 0 {
@@ -167,7 +168,7 @@ func createEndpoint() *endpoint.DataEndpoint {
 	cfg.
 		WithDbUsername(viper.GetString("username")).
 		WithDbPassword(viper.GetString("password")).
-		WithExcludedKeyspaces(viper.GetStringSlice("excluded-keyspaces")).
+		WithExcludedKeyspaces(getStringSlice("excluded-keyspaces")).
 		WithSchemaUpdateInterval(updateInterval)
 
 	endpoint, err := cfg.NewEndpoint()
@@ -201,7 +202,7 @@ func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint
 		router.Handler(route.Method, route.Pattern, route.Handler)
 	}
 
-	supportedOps := viper.GetStringSlice("operations")
+	supportedOps := getStringSlice("operations")
 	ops, err := config.Ops(supportedOps...)
 	if err != nil {
 		logger.Fatal("invalid supported operation", "operations", supportedOps, "error", err)
@@ -298,4 +299,34 @@ func listenAndServe(handler http.Handler, port int, endpointNames string) {
 			"port", port,
 			"error", err)
 	}
+}
+
+func getStringSlice(key string) []string {
+	value := viper.GetStringSlice(key)
+	slice, err := toStringSlice(value)
+	if err != nil {
+		logger.Fatal("invalid string slice value for setting",
+			"error", err,
+			"key", key,
+			"value", value)
+	}
+	return slice
+}
+
+func toStringSlice(slice []string) ([]string, error) {
+	result := make([]string, 0)
+	for _, entry := range slice {
+		stringReader := strings.NewReader(entry)
+		csvReader := csv.NewReader(stringReader)
+		split, err := csvReader.Read()
+		if err != nil {
+			return nil, err
+		}
+		for _, part := range split {
+			if part != "" { // Don't add empty values
+				result = append(result, part)
+			}
+		}
+	}
+	return result, nil
 }
