@@ -20,7 +20,7 @@ API from selected VPCs and from selected accounts.
 ### Example: Creating a private API in Amazon API Gateway
 
 Deploy the GraphQL endpoint on a Virtual Private Cloud (VPC) subnet, within the same VPC as the
-Apache Cassandra nodes or within [peered VPC][aws-vpc-peering]. Make sure you only allow ingress from desired
+Apache Cassandra nodes or within a [peered VPC][aws-vpc-peering]. Make sure you only allow ingress from desired
 CIDR blocks to the [security group][aws-security-groups]. Also, don't associate public IP addresses to the endpoint.
 
 [Create a private Amazon API Gateway][aws-private-api] that can only be accessed from your virtual private
