@@ -318,6 +318,11 @@ docker run --rm -d -p 8080:8080 -e DATA_API_HOSTS=<cassandra_hosts_here> \
   -e DATA_API_ACCESS_CONTROL_ALLOW_ORIGIN="*" datastaxlabs/cassandra-data-apis
 ```
 
+## Controlling and managing access to your GraphQL API
+
+Consider one of the strategies we recommend to protect your GraphQL API in the [following documentation
+page](../protecting).
+
 ## API Features
 
 ### Query Options
