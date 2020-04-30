@@ -1,21 +1,26 @@
-# Controlling and managing access to your GraphQL API
+# Controlling and managing access to your API endpoints
 
-There are several ways you can use to protect your GraphQL API. While supporting built-in authentication
+There are several ways you can use to protect your API endpoints. While supporting built-in authentication
 mechanisms and other access restriction methods are in the project roadmap, these features are not yet implemented.
 We recommend that you consider one of the following strategies depending on your deployment model
 and requirements: you can use an existing cloud service, deploy a reverse proxy server like
 [Envoy][envoy] / [NGINX][nginx] or use a service mesh ingress controller like [Istio Gateway][istio-gateway].
 
+- [Using a cloud service](#using-a-cloud-service)
+  - [Example: Creating a private API in Amazon API Gateway](#example-creating-a-private-api-in-amazon-api-gateway)
+- [Using a reverse proxy server](#using-a-reverse-proxy-server)
+  - [Example: Setup Envoy](#example-setup-envoy)
+  - [Example: Setup NGNIX](#example-setup-ngnix)
+- [Using a service mesh ingress controller](#using-a-service-mesh-ingress-controller)
+
 ## Using a cloud service
 
 Cloud providers offer API gateway services that can help you manage access to your GraphQL API. For example:
+[Amazon API Gateway][api-gateway-aws], [Google Cloud Endpoints][api-gateway-gce] and 
+[Azure API Management][api-gateway-azure]
 
-- [Amazon API Gateway][api-gateway-aws]
-- [Google Cloud Endpoints][api-gateway-gce]
-- [Azure API Management][api-gateway-azure]
-
-Using API gateway services you can control how your GraphQL endpoint is accessed, allowing access to your
-API from selected VPCs and from selected accounts.
+API gateway services allow you to control access to your API endpoints by restricting access to selected VPCs
+and accounts.
 
 ### Example: Creating a private API in Amazon API Gateway
 
@@ -35,7 +40,7 @@ You can use a L7 proxy server like [Envoy][envoy] or [NGINX][nginx] to delegate 
 management, allowing you to place your GraphQL API instance under a private subnet. You can then protect your proxy
 instance with http filters, integrating it with your own authorization mechanisms.
 
-### Envoy
+### Example: Setup Envoy
 
 Envoy can be used to control access to the data APIs using an [external authentication
 service](#external-authentication), [JSON Web Tokens (JWT)](#json-web-tokens-jwt), or [TLS client
@@ -232,7 +237,7 @@ static_resources:
   # ...
 ```
 
-### NGNIX
+### Example: Setup NGNIX
 
 NGNIX can also be used control access using either an [external authentication
 service](#external-authentication-1) or [TLS client certificates](#client-certificates-1). 
@@ -298,7 +303,7 @@ server {
 ## Using a service mesh ingress controller
 
 If you are using a service mesh such as Istio or linkerd, consider the features that are provided by the
-ingress controller for that service mesh. For example, Istio Gateway let's you restrict access to a set of
+ingress controller for that service mesh. For example, Istio Gateway lets you restrict access to a set of
 virtual services that can bind to a server like explained in [this documentation][istio-gateway].
 
 [envoy]: https://www.envoyproxy.io/
