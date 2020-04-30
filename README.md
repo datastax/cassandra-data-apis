@@ -15,12 +15,28 @@ the future.
 
 ```sh
 docker pull datastaxlabs/cassandra-data-apis
-docker run --rm -d -p 8080:8080 -e DATA_API_HOSTS=<cassandra_hosts_here> datastaxlabs/cassandra-data-apis
+docker run -p 8080:8080 -e DATA_API_HOSTS=<cassandra_hosts_here> datastaxlabs/cassandra-data-apis
 ```
 
 You can also manually build the docker image and/or the server using the
 [instructions](#building) below.
 
+#### Running in the background
+
+You can start the container in detached mode by using `-d` and `--rm` flags.
+
+```sh
+docker run --rm -d -p 8080:8080 -e DATA_API_HOSTS=<cassandra_hosts_here> datastaxlabs/cassandra-data-apis
+```
+
+#### Running on macOS or Windows for development purposes
+
+When using Docker for Desktop, if your Cassandra instance is listening on the loopback address `127.0.0.1`,
+you can use `host.docker.internal` name which resolves to the internal IP address used by the host.
+
+```sh
+docker run -p 8080:8080 -e DATA_API_HOSTS=host.docker.internal datastaxlabs/cassandra-data-apis
+```
 
 ### Using GraphQL
 
