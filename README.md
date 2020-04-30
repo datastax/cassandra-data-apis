@@ -40,8 +40,10 @@ docker run -p 8080:8080 -e DATA_API_HOSTS=host.docker.internal datastaxlabs/cass
 
 ### Using GraphQL
 
-By default, a GraphQL endpoint is started. Use the [GraphQL
-documentation](/docs/graphql/README.md) for getting started.
+By default, a GraphQL endpoint is started and will generate a GraphQL schema per keyspace. You need at least one
+user-defined keyspace in your database to get started.  
+
+Use the [GraphQL documentation](/docs/graphql/README.md) for getting started.
 
 ## Configuration
 
