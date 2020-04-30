@@ -4,7 +4,7 @@ package db
 
 import (
 	"fmt"
-	. "github.com/datastax/cassandra-data-apis/internal/testutil"
+	"github.com/datastax/cassandra-data-apis/internal/testutil"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
@@ -15,9 +15,15 @@ import (
 	"time"
 )
 
-var db *Db
-
 var _ = Describe("Session", func() {
+	testutil.EnsureCcmCluster(
+		nil, "CREATE KEYSPACE ks1 WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 1}")
+
+	var db *Db
+	BeforeEach(func() {
+		db = NewDbWithConnectedInstance(testutil.GetSession())
+	})
+
 	Describe("ExecuteIter()", func() {
 		Context("With numerical values", func() {
 			It("Should provide the expected representation", func() {
@@ -172,16 +178,6 @@ var _ = Describe("Session", func() {
 			})
 		})
 	})
-})
-
-var _ = BeforeSuite(func() {
-	session, _ := SetupIntegrationTestFixture("CREATE KEYSPACE ks1 WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 1}")
-
-	db = NewDbWithConnectedInstance(session)
-})
-
-var _ = AfterSuite(func() {
-	TearDownIntegrationTestFixture()
 })
 
 func assertPointer(expectedType interface{}, expected interface{}, actual interface{}) {

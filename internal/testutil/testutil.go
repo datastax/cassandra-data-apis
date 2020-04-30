@@ -15,6 +15,10 @@ import (
 )
 
 var started = false
+var shouldStartCassandra = false
+var shouldStartSimulacron = false
+var setupQueries = make([]string, 0)
+var setupHandlers = make([]func(), 0)
 var session *gocql.Session
 
 type commandOptions int
@@ -107,36 +111,6 @@ func CreateSchema(name string) {
 	executeCcm(fmt.Sprintf("node1 cqlsh -f %s", filePath), cmdFatal)
 }
 
-func SetupIntegrationTestFixture(queries ...string) (*gocql.Session, bool) {
-	isNew := startCassandra()
-
-	cluster := gocql.NewCluster("127.0.0.1")
-	cluster.Timeout = 5 * time.Second
-	cluster.ConnectTimeout = cluster.Timeout
-
-	var err error
-
-	if session, err = cluster.CreateSession(); err != nil {
-		panic(err)
-	}
-
-	for _, query := range queries {
-		err := session.Query(query).Exec()
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	return session, isNew
-}
-
-func TearDownIntegrationTestFixture() {
-	if session != nil {
-		session.Close()
-	}
-	shutdownCassandra()
-}
-
 func PanicIfError(err error) {
 	if err != nil {
 		panic(err)
@@ -153,4 +127,70 @@ func TestLogger() log.Logger {
 	}
 
 	return log.NewZapLogger(zap.NewNop())
+}
+
+// Gets the shared session for this suite
+func GetSession() *gocql.Session {
+	return session
+}
+
+func EnsureCcmCluster(setupHandler func(), queries ...string) {
+	shouldStartCassandra = true
+
+	if setupHandler != nil {
+		setupHandlers = append(setupHandlers, setupHandler)
+	}
+
+	for _, query := range queries {
+		setupQueries = append(setupQueries, query)
+	}
+}
+
+func EnsureSimulacronCluster() {
+	shouldStartSimulacron = true
+}
+
+func BeforeTestSuite() {
+	// Start the required process for the suite to run
+	if shouldStartCassandra {
+		isNew := startCassandra()
+
+		cluster := gocql.NewCluster("127.0.0.1")
+		cluster.Timeout = 5 * time.Second
+		cluster.ConnectTimeout = cluster.Timeout
+
+		var err error
+
+		if session, err = cluster.CreateSession(); err != nil {
+			panic(err)
+		}
+
+		if isNew {
+			for _, query := range setupQueries {
+				err := session.Query(query).Exec()
+				PanicIfError(err)
+			}
+
+			for _, handler := range setupHandlers {
+				handler()
+			}
+		}
+	}
+
+	if shouldStartSimulacron {
+		StartSimulacron()
+		CreateSimulacronCluster(3, 3)
+	}
+}
+
+func AfterTestSuite() {
+	// Shutdown previously started processes
+	if shouldStartCassandra {
+		session.Close()
+		shutdownCassandra()
+	}
+
+	if shouldStartSimulacron {
+		StopSimulacron()
+	}
 }
