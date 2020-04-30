@@ -21,7 +21,8 @@ create a keyspace by executing:
 mutation {
   createKeyspace(
     name:"library", # The name of your keyspace
-    dcs: { name:"dc1", replicas: 3 } # Controls how your data is replicated
+    # Controls how your data is replicated,
+    dcs: { name:"dc1", replicas: 1 }  # Use at least 3 replicas in production
   )
 }
 ```
@@ -391,7 +392,7 @@ The `pageState` value is returned in the result:
     "books": {
       "pageState": "CENhdGNoLTIyAPB////+AA==",
       "values": [
-        # ...
+        ...
       ]
     }
   }
