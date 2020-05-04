@@ -12,9 +12,8 @@ import (
 const DefaultSchemaUpdateDuration = 10 * time.Second
 
 type DataEndpointConfig struct {
+	dbConfig          db.Config
 	dbHosts           []string
-	dbUsername        string
-	dbPassword        string
 	ksExcluded        []string
 	updateInterval    time.Duration
 	naming            config.NamingConventionFn
@@ -37,6 +36,10 @@ func (cfg DataEndpointConfig) Naming() config.NamingConventionFn {
 
 func (cfg DataEndpointConfig) UseUserOrRoleAuth() bool {
 	return cfg.useUserOrRoleAuth
+}
+
+func (cfg DataEndpointConfig) DbConfig() db.Config {
+	return cfg.dbConfig
 }
 
 func (cfg DataEndpointConfig) Logger() log.Logger {
@@ -67,13 +70,8 @@ func (cfg *DataEndpointConfig) WithUseUserOrRoleAuth(useUserOrRowAuth bool) *Dat
 	return cfg
 }
 
-func (cfg *DataEndpointConfig) WithDbUsername(dbUsername string) *DataEndpointConfig {
-	cfg.dbUsername = dbUsername
-	return cfg
-}
-
-func (cfg *DataEndpointConfig) WithDbPassword(dbPassword string) *DataEndpointConfig {
-	cfg.dbPassword = dbPassword
+func (cfg *DataEndpointConfig) WithDbConfig(dbConfig db.Config) *DataEndpointConfig {
+	cfg.dbConfig = dbConfig
 	return cfg
 }
 
@@ -85,7 +83,7 @@ func (cfg *DataEndpointConfig) WithUrlPattern(pattern config.UrlPattern) *DataEn
 }
 
 func (cfg DataEndpointConfig) NewEndpoint() (*DataEndpoint, error) {
-	dbClient, err := db.NewDb(cfg.dbUsername, cfg.dbPassword, cfg.dbHosts...)
+	dbClient, err := db.NewDb(cfg.dbConfig, cfg.dbHosts...)
 	if err != nil {
 		return nil, err
 	}
