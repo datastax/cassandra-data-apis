@@ -12,7 +12,7 @@ var _ = Describe("NewDb()", func() {
 	testutil.EnsureSimulacronCluster()
 
 	It("Should only target local DC", func() {
-		db, err := NewDb("", "", testutil.SimulacronStartIp)
+		db, err := NewDb(Config{}, "", testutil.SimulacronStartIp)
 		Expect(err).NotTo(HaveOccurred())
 		query := "SELECT * FROM ks1.tbl1"
 		length := 100
