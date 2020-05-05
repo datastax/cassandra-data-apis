@@ -91,6 +91,11 @@ docker run -p 8080:8080 -v "${PWD}/<your_config_file>.yaml:/root/config.yaml" da
 | operations             | strings  | DATA_API_OPERATIONS             | A list of supported schema management operations. See below. (default `"TableCreate, KeyspaceCreate"`) |
 | request-logging        | bool     | DATA_API_REQUEST_LOGGING        | Enable request logging |
 | schema-update-interval | duration | DATA_API_SCHEMA_UPDATE_INTERVAL | Interval in seconds used to update the graphql schema (default `10s`) |
+| ssl-enabled            | bool     | DATA_API_SSL_ENABLED            | Enable SSL (client-to-node encryption)? |
+| ssl-ca-cert-path       | string   | DATA_API_SSL_CA_CERT_PATH       | SSL CA certificate path |
+| ssl-client-cert-path   | string   | DATA_API_SSL_CLIENT_CERT_PATH   | SSL client certificate path |
+| ssl-client-key-path    | string   | DATA_API_SSL_CLIENT_KEY_PATH    | SSL client private key path |
+| ssl-host-verification  | string   | DATA_API_SSL_HOST_VERIFICATION  | Verify the peer certificate? It is highly insecure to disable host verification (default `true`) |
 | start-graphql          | bool     | DATA_API_START_GRAPHQL          | Start the GraphQL endpoint (default `true`) |
 | graphql-path           | string   | DATA_API_GRAPHQL_PATH           | GraphQL endpoint path (default `"/graphql"`) |
 | graphql-port           | int      | DATA_API_GRAPHQL_PORT           | GraphQL endpoint port (default `8080`) |
@@ -116,7 +121,7 @@ host:
 JSON:
 ```json
 {
-	"hosts": ["127.0.0.1", "127.0.0.2", "127.0.0.3"]
+  "hosts": ["127.0.0.1", "127.0.0.2", "127.0.0.3"]
 }
 ```
 
@@ -130,6 +135,27 @@ JSON:
 | `TableAlterDrop` | Remove table columns  |
 | `KeyspaceCreate` | Creation of keyspaces |
 | `KeyspaceDrop`   | Removal of keyspaces  |
+
+#### TLS/SSL
+
+##### HTTPS
+
+The API endpoint does not currently support HTTPS natively, but it can be handled by a gateway or
+reverse proxy. More information about protecting the API endpoint can be found in this
+[documentation][protecting].
+
+##### Client-to-node Encryption
+
+By default, traffic between the API endpoints and the database servers is not encrypted. To secure
+this traffic you will need to generate SSL certificates and enable SSL on the database servers. More
+information about enabling SSL (client-to-node encryption) on the database servers can be found in
+this [documentation][client-to-node]. After SSL is enabled on the database servers use the
+`ssl-enabled` option, along with `ssl-ca-cert-path` to enable secure connections. `ssl-ca-cert-path`
+is a path to the chain of certificates used to generate the database server's certificates. The
+certificate chain is used by API endpoints to verify the database server's certificates.  The
+`ssl-client-cert-path` and `ssl-client-key-path` options are not required, but can be use to provide
+client-side certificates that are used by the database servers to authenticate and verify the API
+servers, this is know as mutual authentication. 
 
 ## Building 
 
@@ -233,3 +259,6 @@ http://www.apache.org/licenses/LICENSE-2.0
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
+
+[protecting]: /docs/protecting/README.md
+[client-to-node]: https://docs.datastax.com/en/cassandra-oss/3.x/cassandra/configuration/secureSSLClientToNode.html

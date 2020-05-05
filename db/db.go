@@ -26,15 +26,15 @@ type Db struct {
 }
 
 type SslOptions struct {
-	CaPath string
-	CertPath string
-	KeyPath string
+	CaPath           string
+	CertPath         string
+	KeyPath          string
 	HostVerification bool
 }
 
 type Config struct {
-	Username string
-	Password string
+	Username   string
+	Password   string
 	SslOptions *SslOptions
 }
 

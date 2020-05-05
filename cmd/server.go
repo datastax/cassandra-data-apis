@@ -53,7 +53,7 @@ var serverCmd = &cobra.Command{
 		}
 
 		isSetSslCertPath := viper.GetString("ssl-client-cert-path") != ""
-		isSetSslKeyPath := viper.GetString("ssl-client-key-path")  != ""
+		isSetSslKeyPath := viper.GetString("ssl-client-key-path") != ""
 		if isSetSslCertPath != isSetSslKeyPath {
 			return errors.New("both the client certificate and private must be set")
 		}
@@ -133,10 +133,11 @@ func Execute() {
 	flags.String("access-control-allow-origin", "", "Access-Control-Allow-Origin header value")
 
 	// SSL
+	flags.Bool("ssl-enabled", false, "enable SSL (client-to-node encryption)?")
 	flags.String("ssl-ca-cert-path", "", "SSL CA certificate path")
 	flags.String("ssl-client-cert-path", "", "SSL client certificate path")
 	flags.String("ssl-client-key-path", "", "SSL client private key path")
-	flags.Bool("ssl-host-verification", false, "Verify the peer certificate?")
+	flags.Bool("ssl-host-verification", true, "verify the peer certificate? It is highly insecure to disable host verification")
 
 	// GraphQL specific flags
 	flags.Bool("start-graphql", true, "start the GraphQL endpoint")
@@ -179,15 +180,11 @@ func createEndpoint() *endpoint.DataEndpoint {
 	}
 
 	var sslOptions *db.SslOptions
-
-	sslCaCertPath := viper.GetString("ssl-ca-cert-path")
-	sslCertPath := viper.GetString("ssl-client-cert-path")
-	sslKeyPath := viper.GetString("ssl-client-key-path")
-	if sslCaCertPath != "" || (sslCertPath != "" && sslKeyPath != "") {
+	if viper.GetBool("ssl-enabled") {
 		sslOptions = &db.SslOptions{
-			CaPath:           sslCaCertPath,
-			CertPath:         sslCertPath,
-			KeyPath:          sslKeyPath,
+			CaPath:           viper.GetString("ssl-ca-cert-path"),
+			CertPath:         viper.GetString("ssl-client-cert-path"),
+			KeyPath:          viper.GetString("ssl-client-key-path"),
 			HostVerification: viper.GetBool("ssl-host-verification"),
 		}
 	}
