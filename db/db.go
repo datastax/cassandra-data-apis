@@ -25,8 +25,21 @@ type Db struct {
 	session Session
 }
 
+type SslOptions struct {
+	CaPath           string
+	CertPath         string
+	KeyPath          string
+	HostVerification bool
+}
+
+type Config struct {
+	Username   string
+	Password   string
+	SslOptions *SslOptions
+}
+
 // NewDb Gets a pointer to a db
-func NewDb(username string, password string, hosts ...string) (*Db, error) {
+func NewDb(config Config, hosts ...string) (*Db, error) {
 	cluster := gocql.NewCluster(hosts...)
 	cluster.PoolConfig = gocql.PoolConfig{
 		HostSelectionPolicy: NewDefaultHostSelectionPolicy(),
@@ -36,10 +49,19 @@ func NewDb(username string, password string, hosts ...string) (*Db, error) {
 	cluster.ConnectTimeout = 5 * time.Second
 	cluster.Timeout = 12 * time.Second
 
-	if username != "" && password != "" {
+	if config.Username != "" && config.Password != "" {
 		cluster.Authenticator = gocql.PasswordAuthenticator{
-			Username: username,
-			Password: password,
+			Username: config.Username,
+			Password: config.Password,
+		}
+	}
+
+	if config.SslOptions != nil {
+		cluster.SslOpts = &gocql.SslOptions{
+			CertPath:               config.SslOptions.CertPath,
+			KeyPath:                config.SslOptions.KeyPath,
+			CaPath:                 config.SslOptions.CaPath,
+			EnableHostVerification: config.SslOptions.HostVerification,
 		}
 	}
 

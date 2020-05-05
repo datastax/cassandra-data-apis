@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/datastax/cassandra-data-apis/config"
+	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/endpoint"
 	"github.com/datastax/cassandra-data-apis/graphql"
 	"github.com/datastax/cassandra-data-apis/log"
@@ -49,6 +50,12 @@ var serverCmd = &cobra.Command{
 		}
 		if !startGraphQL && !startREST {
 			return errors.New("at least one endpoint type should be started")
+		}
+
+		isSetSslCertPath := viper.GetString("ssl-client-cert-path") != ""
+		isSetSslKeyPath := viper.GetString("ssl-client-key-path") != ""
+		if isSetSslCertPath != isSetSslKeyPath {
+			return errors.New("both the client certificate and private must be set")
 		}
 
 		return nil
@@ -125,6 +132,13 @@ func Execute() {
 	}, "list of supported table and keyspace management operations. options: TableCreate,TableDrop,TableAlterAdd,TableAlterDrop,KeyspaceCreate,KeyspaceDrop")
 	flags.String("access-control-allow-origin", "", "Access-Control-Allow-Origin header value")
 
+	// SSL
+	flags.Bool("ssl-enabled", false, "enable SSL (client-to-node encryption)?")
+	flags.String("ssl-ca-cert-path", "", "SSL CA certificate path")
+	flags.String("ssl-client-cert-path", "", "SSL client certificate path")
+	flags.String("ssl-client-key-path", "", "SSL client private key path")
+	flags.Bool("ssl-host-verification", true, "verify the peer certificate? It is highly insecure to disable host verification")
+
 	// GraphQL specific flags
 	flags.Bool("start-graphql", true, "start the GraphQL endpoint")
 	flags.String("graphql-path", defaultGraphQLPath, "GraphQL endpoint path")
@@ -165,9 +179,22 @@ func createEndpoint() *endpoint.DataEndpoint {
 		updateInterval = endpoint.DefaultSchemaUpdateDuration
 	}
 
+	var sslOptions *db.SslOptions
+	if viper.GetBool("ssl-enabled") {
+		sslOptions = &db.SslOptions{
+			CaPath:           viper.GetString("ssl-ca-cert-path"),
+			CertPath:         viper.GetString("ssl-client-cert-path"),
+			KeyPath:          viper.GetString("ssl-client-key-path"),
+			HostVerification: viper.GetBool("ssl-host-verification"),
+		}
+	}
+
 	cfg.
-		WithDbUsername(viper.GetString("username")).
-		WithDbPassword(viper.GetString("password")).
+		WithDbConfig(db.Config{
+			Username:   viper.GetString("username"),
+			Password:   viper.GetString("password"),
+			SslOptions: sslOptions,
+		}).
 		WithExcludedKeyspaces(getStringSlice("excluded-keyspaces")).
 		WithSchemaUpdateInterval(updateInterval)
 
