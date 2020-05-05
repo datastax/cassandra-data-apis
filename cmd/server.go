@@ -80,18 +80,18 @@ var serverCmd = &cobra.Command{
 				}
 				endpointNames += "REST"
 			}
-			listenAndServe(maybeAddCORS(maybeAddRequestLogging(router)), graphqlPort, endpointNames)
+			listenAndServe(router, graphqlPort, endpointNames)
 		} else {
 			finish := make(chan bool)
 			if startGraphQL {
 				router := createRouter()
 				addGraphQLRoutes(router, endpoint)
-				go listenAndServe(maybeAddRequestLogging(router), graphqlPort, "GraphQL")
+				go listenAndServe(router, graphqlPort, "GraphQL")
 			}
 			if startREST {
 				router := httprouter.New()
 				addRESTRoutes(router, endpoint)
-				go listenAndServe(maybeAddRequestLogging(router), restPort, "REST")
+				go listenAndServe(router, restPort, "REST")
 			}
 			<-finish
 		}
@@ -293,6 +293,7 @@ func listenAndServe(handler http.Handler, port int, endpointNames string) {
 	logger.Info("server listening",
 		"port", port,
 		"type", endpointNames)
+	handler = maybeAddCORS(maybeAddRequestLogging(handler))
 	err := http.ListenAndServe(fmt.Sprintf(":%d", port), handler)
 	if err != nil {
 		logger.Fatal("unable to start server",
