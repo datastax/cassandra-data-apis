@@ -1,25 +1,23 @@
 package endpoint
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"strconv"
-	"strings"
-
+	"github.com/datastax/cassandra-data-apis/auth"
+	"github.com/datastax/cassandra-data-apis/config"
+	"github.com/datastax/cassandra-data-apis/db"
+	e "github.com/datastax/cassandra-data-apis/errors"
+	m "github.com/datastax/cassandra-data-apis/rest/models"
+	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/go-playground/locales/en"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 	enTranslations "github.com/go-playground/validator/v10/translations/en"
 	"github.com/gocql/gocql"
-	inf "gopkg.in/inf.v0"
-
-	"github.com/datastax/cassandra-data-apis/rest/contextutils"
-	"github.com/datastax/cassandra-data-apis/rest/db"
-	e "github.com/datastax/cassandra-data-apis/rest/errors"
-	m "github.com/datastax/cassandra-data-apis/rest/models"
-	t "github.com/datastax/cassandra-data-apis/rest/translator"
+	"net/http"
+	"strings"
 )
 
 var (
@@ -52,26 +50,22 @@ func init() {
 
 func (s *routeList) GetColumns(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
 
-	keyspaceName := s.params(r, "keyspaceName")
-	tableName := s.params(r, "tableName")
-	user := contextutils.GetContextUser(ctx)
+	keyspaceName := s.params(r, keyspaceParam)
+	tableName := s.params(r, tableParam)
+	user := auth.ContextUserOrRole(r.Context())
 
-	table, err := s.dbConn.Database.DescribeTable(keyspaceName, tableName, user)
+	table, err := s.dbClient.DescribeTable(keyspaceName, tableName, user)
 	if err != nil {
 		msg := "unable to describe table"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
+		s.logger.Debug(msg, "table", tableName, "error", err)
 
 		switch err.(type) {
 		case *e.NotFoundError:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusNotFound)
+			RespondWithError(w, msg, http.StatusNotFound)
 			return
 		default:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusInternalServerError)
+			RespondWithError(w, msg, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -81,28 +75,23 @@ func (s *routeList) GetColumns(w http.ResponseWriter, r *http.Request) {
 
 func (s *routeList) GetColumn(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
 
-	keyspaceName := s.params(r, "keyspaceName")
-	tableName := s.params(r, "tableName")
+	keyspaceName := s.params(r, keyspaceParam)
+	tableName := s.params(r, tableParam)
 	columnName := s.params(r, "columnName")
-	user := contextutils.GetContextUser(ctx)
+	user := auth.ContextUserOrRole(r.Context())
 
-	table, err := s.dbConn.Database.DescribeTable(keyspaceName, tableName, user)
+	table, err := s.dbClient.DescribeTable(keyspaceName, tableName, user)
 	if err != nil {
 		msg := "unable to describe table"
-		//TODO: log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("column", columnName).
-		//	With("error", err).
-		//	Error(msg)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "column", columnName, "error", err)
 
 		switch err.(type) {
 		case *e.NotFoundError:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusNotFound)
+			RespondWithError(w, msg, http.StatusNotFound)
 			return
 		default:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusInternalServerError)
+			RespondWithError(w, msg, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -119,7 +108,7 @@ func (s *routeList) GetColumn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		RespondWithError(w, fmt.Errorf("column '%s' not found in table", columnName), http.StatusNotFound)
+		RespondWithError(w, fmt.Sprintf("column '%s' not found in table", columnName), http.StatusNotFound)
 		return
 	}
 
@@ -128,51 +117,42 @@ func (s *routeList) GetColumn(w http.ResponseWriter, r *http.Request) {
 
 func (s *routeList) AddColumn(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
 
-	keyspaceName := s.params(r, "keyspaceName")
-	tableName := s.params(r, "tableName")
-	user := contextutils.GetContextUser(ctx)
+	keyspaceName := s.params(r, keyspaceParam)
+	tableName := s.params(r, tableParam)
+	user := auth.ContextUserOrRole(r.Context())
 
 	var columnDefinition m.ColumnDefinition
 	if err := parseAndValidatePayload(&columnDefinition, r); err != nil {
 		msg := "unable to parse payload"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName)
+		RespondWithError(w, msg, http.StatusBadRequest)
 		return
 	}
 
-	translator := t.APITranslator{
-		KeyspaceName: keyspaceName,
-		TableName:    tableName,
-	}
+	column, err := m.ToDbColumn(columnDefinition)
 
-	query, err := translator.ToAlterTableAddColumn(columnDefinition)
 	if err != nil {
-		msg := "unable to translate to alter table query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
-		return
+		RespondWithError(w, err.Error(), http.StatusBadRequest)
 	}
 
-	err = s.dbConn.Database.Alter(query, user)
+	tableInfo := db.AlterTableAddInfo{
+		Keyspace: keyspaceName,
+		Table:    tableName,
+		ToAdd:    []*gocql.ColumnMetadata{column},
+	}
+
+	err = s.dbClient.AlterTableAdd(&tableInfo, newDbOptions(user))
 	if err != nil {
 		msg := "unable to execute alter table query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
 
 		switch err.(type) {
 		case *e.ConflictError:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusConflict)
+			RespondWithError(w, msg, http.StatusConflict)
 			return
 		default:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusInternalServerError)
+			RespondWithError(w, msg, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -180,98 +160,30 @@ func (s *routeList) AddColumn(w http.ResponseWriter, r *http.Request) {
 	RespondJSONObjectWithCode(w, http.StatusCreated, m.TablesResponse{Success: true})
 }
 
-func (s *routeList) UpdateColumn(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
-
-	keyspaceName := s.params(r, "keyspaceName")
-	tableName := s.params(r, "tableName")
-	columnName := s.params(r, "columnName")
-	user := contextutils.GetContextUser(ctx)
-
-	var columnUpdate m.ColumnUpdate
-	if err := parseAndValidatePayload(&columnUpdate, r); err != nil {
-		msg := "unable to parse payload"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("column", columnName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
-		return
-	}
-
-	translator := t.APITranslator{
-		KeyspaceName: keyspaceName,
-		TableName:    tableName,
-	}
-
-	query, err := translator.ToAlterTableUpdateColumn(columnName, columnUpdate.NewName)
-	if err != nil {
-		msg := "unable to translate to alter table query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("column", columnName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
-		return
-	}
-
-	err = s.dbConn.Database.Alter(query, user)
-	if err != nil {
-		msg := "unable to execute alter table query"
-		//TODO: log.With("keyspace", keyspaceName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusInternalServerError)
-		return
-	}
-
-	RespondJSONObjectWithCode(w, http.StatusOK, m.TablesResponse{Success: true})
-}
-
 func (s *routeList) DeleteColumn(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
 
-	keyspaceName := s.params(r, "keyspaceName")
-	tableName := s.params(r, "tableName")
+	keyspaceName := s.params(r, keyspaceParam)
+	tableName := s.params(r, tableParam)
 	columnName := s.params(r, "columnName")
-	user := contextutils.GetContextUser(ctx)
+	user := auth.ContextUserOrRole(r.Context())
 
-	translator := t.APITranslator{
-		KeyspaceName: keyspaceName,
-		TableName:    tableName,
-	}
+	err := s.dbClient.AlterTableDrop(&db.AlterTableDropInfo{
+		Keyspace: keyspaceName,
+		Table:    tableName,
+		ToDrop:   []string{columnName},
+	}, newDbOptions(user))
 
-	query, err := translator.ToAlterTableDeleteColumn(columnName)
-	if err != nil {
-		msg := "unable to translate to alter table query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("column", columnName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
-		return
-	}
-
-	err = s.dbConn.Database.Alter(query, user)
 	if err != nil {
 		msg := "unable to execute alter table query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("column", columnName).
-		//	With("error", err).
-		//	Error(msg)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "column", columnName, "error", err)
 
 		switch err.(type) {
 		case *e.NotFoundError:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusNotFound)
+			RespondWithError(w, msg, http.StatusNotFound)
 			return
 		default:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusInternalServerError)
+			RespondWithError(w, msg, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -281,163 +193,139 @@ func (s *routeList) DeleteColumn(w http.ResponseWriter, r *http.Request) {
 
 func (s *routeList) GetRow(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
 
-	keyspaceName := s.params(r, "keyspaceName")
-	tableName := s.params(r, "tableName")
+	keyspaceName := s.params(r, keyspaceParam)
+	tableName := s.params(r, tableParam)
 	rowIdentifier := s.params(r, "rowIdentifier")
-	user := contextutils.GetContextUser(ctx)
+	user := auth.ContextUserOrRole(r.Context())
+
+	tblMetadata, err := s.dbClient.Table(keyspaceName, tableName)
+	if err != nil {
+		if _, ok := err.(*db.DbObjectNotFound); ok {
+			RespondWithError(w, fmt.Sprintf(`Table "%s"."%s" not found`, keyspaceName, tableName), http.StatusNotFound)
+			return
+		}
+
+		msg := "Unable to get table metadata"
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusInternalServerError)
+		return
+	}
 
 	// grab table and extract primary key col names
-	primaryKey, err := rowIdentifierToMap(rowIdentifier, keyspaceName, tableName, s.dbConn.Database)
+	columns, values, err := primaryKeyValues(rowIdentifier, tblMetadata)
 	if err != nil {
-		msg := "unable to get primary key"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
+		msg := "Unable to get primary key"
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusBadRequest)
+		return
+	}
 
-		switch err.(type) {
-		case *e.InternalError:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusInternalServerError)
-			return
-		default:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusBadRequest)
-			return
+	where := make([]types.ConditionItem, len(columns))
+	for i, columnName := range columns {
+		where[i] = types.ConditionItem{
+			Column:   columnName,
+			Operator: "=",
+			Value:    values[i],
 		}
 	}
 
-	translator := t.APITranslator{
-		KeyspaceName: keyspaceName,
-		TableName:    tableName,
-	}
+	rs, err := s.dbClient.Select(&db.SelectInfo{
+		Keyspace: keyspaceName,
+		Table:    tableName,
+		Where:    where,
+	}, newDbOptions(user))
 
-	query, vals, err := translator.ToSelect(primaryKey)
-	if err != nil {
-		msg := "unable to translate to select query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
-		return
-	}
-
-	rows, err := s.dbConn.Database.Select(query, user, vals...)
 	if err != nil {
 		msg := "unable to execute select query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusInternalServerError)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusInternalServerError)
 		return
 	}
 
-	if len(rows) == 0 {
-		RespondWithError(w, fmt.Errorf("no row found for primary key %s", primaryKeyToString(primaryKey)), http.StatusNotFound)
+	length := len(rs.Values())
+	if length == 0 {
+		RespondWithError(w, fmt.Sprintf("no row found for primary key %s", s.primaryKeyToString(where)),
+			http.StatusNotFound)
 		return
 	}
 
 	rowsModel := m.Rows{
-		Rows:  rows,
-		Count: len(rows),
+		Rows:  types.ToJsonValues(rs.Values(), tblMetadata),
+		Count: length,
 	}
+
 	RespondJSONObjectWithCode(w, http.StatusOK, rowsModel)
 }
 
 func (s *routeList) AddRow(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
 
-	keyspaceName := s.params(r, "keyspaceName")
-	tableName := s.params(r, "tableName")
-	user := contextutils.GetContextUser(ctx)
+	keyspaceName := s.params(r, keyspaceParam)
+	tableName := s.params(r, tableParam)
+	user := auth.ContextUserOrRole(r.Context())
 
 	var rowAdd m.RowAdd
 	if err := parseAndValidatePayload(&rowAdd, r); err != nil {
 		msg := "unable to parse payload"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusBadRequest)
 		return
 	}
 
-	tblMetadata, err := s.dbConn.Database.DescribeTable(keyspaceName, tableName, "")
+	tblMetadata, err := s.dbClient.Table(keyspaceName, tableName)
 	if err != nil {
-		msg := "unable to get table metadata"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
+		if _, ok := err.(*db.DbObjectNotFound); ok {
+			RespondWithError(w, fmt.Sprintf(`Table "%s"."%s" not found`, keyspaceName, tableName), http.StatusNotFound)
+			return
+		}
 
-		RespondWithError(w, fmt.Errorf(msg), http.StatusInternalServerError)
+		msg := "unable to get table metadata"
+		s.logger.Debug("keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusInternalServerError)
 		return
 	}
+
+	if len(rowAdd.Columns) == 0 {
+		RespondWithError(w, "Columns can not be empty", http.StatusBadRequest)
+		return
+	}
+
+	columns := make([]string, len(rowAdd.Columns))
+	values := make([]interface{}, len(rowAdd.Columns))
 
 	for i, val := range rowAdd.Columns {
 		if _, ok := tblMetadata.Columns[*val.Name]; !ok {
-			msg := "missing column for insert"
-			//TODO log.With("keyspace", keyspaceName).
-			//	With("table", tableName).
-			//	With("error", err).
-			//	Error(msg)
-
-			RespondWithError(w, fmt.Errorf(msg), http.StatusBadRequest)
+			msg := "Missing column for insert"
+			s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+			RespondWithError(w, msg, http.StatusBadRequest)
 			return
 		}
 
-		if val.Value == nil {
-			msg := "missing value for insert"
-			//TODO log.With("keyspace", keyspaceName).
-			//	With("table", tableName).
-			//	With("error", err).
-			//	Error(msg)
-
-			RespondWithError(w, fmt.Errorf(msg), http.StatusBadRequest)
-			return
-		}
-
-		convertedType, typeErr := getCQLType(tblMetadata.Columns[*val.Name].Type, val.Value)
+		convertedType, typeErr := types.FromJsonValue(val.Value, tblMetadata.Columns[*val.Name].Type)
 		if typeErr != nil {
-			msg := "wrong type provided for column " + *val.Name
-			//TODO log.With("keyspace", keyspaceName).
-			//	With("table", tableName).
-			//	With("error", err).
-			//	Error(msg)
-
-			RespondWithError(w, fmt.Errorf(msg), http.StatusBadRequest)
+			msg := "Wrong type provided for column " + *val.Name
+			s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+			RespondWithError(w, msg, http.StatusBadRequest)
 			return
 		}
-		rowAdd.Columns[i].Value = convertedType
+
+		columns[i] = *val.Name
+		values[i] = convertedType
 	}
 
-	translator := t.APITranslator{
-		KeyspaceName: keyspaceName,
-		TableName:    tableName,
-	}
+	_, err = s.dbClient.Insert(&db.InsertInfo{
+		Keyspace:    keyspaceName,
+		Table:       tableName,
+		Columns:     columns,
+		QueryParams: values,
+		TTL:         0,
+	}, newDbOptions(user))
 
-	query, vals, err := translator.ToInsert(rowAdd.Columns)
-	if err != nil {
-		msg := "unable to translate to insert query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
-		return
-	}
-
-	err = s.dbConn.Database.Insert(query, user, vals...)
 	if err != nil {
 		msg := "unable to execute insert query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusInternalServerError)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusInternalServerError)
 		return
 	}
 
@@ -449,170 +337,167 @@ func (s *routeList) AddRow(w http.ResponseWriter, r *http.Request) {
 
 func (s *routeList) Query(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
 
-	keyspaceName := s.params(r, "keyspaceName")
-	tableName := s.params(r, "tableName")
-	user := contextutils.GetContextUser(ctx)
+	keyspaceName := s.params(r, keyspaceParam)
+	tableName := s.params(r, tableParam)
+	user := auth.ContextUserOrRole(r.Context())
+
+	tblMetadata, err := s.dbClient.Table(keyspaceName, tableName)
+	if err != nil {
+		if _, ok := err.(*db.DbObjectNotFound); ok {
+			RespondWithError(w, fmt.Sprintf(`Table "%s"."%s" not found`, keyspaceName, tableName), http.StatusNotFound)
+			return
+		}
+
+		msg := "Unable to get table metadata"
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusInternalServerError)
+		return
+	}
 
 	var queryModel m.Query
 	if err := parseAndValidatePayload(&queryModel, r); err != nil {
 		msg := "unable to parse payload"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusBadRequest)
 		return
 	}
 
-	translator := t.APITranslator{
-		KeyspaceName: keyspaceName,
-		TableName:    tableName,
+	where := make([]types.ConditionItem, len(queryModel.Filters))
+
+	for i, filter := range queryModel.Filters {
+		operator, found := types.CqlOperators[filter.Operator]
+
+		if !found {
+			RespondWithError(w, fmt.Sprintf("operator '%s' not found", filter.Operator), http.StatusBadRequest)
+			return
+		}
+
+		where[i] = types.ConditionItem{
+			Column:   filter.ColumnName,
+			Operator: operator,
+			Value:    filter.Value,
+		}
 	}
 
-	query, vals, err := translator.ToSelectFromQuery(queryModel)
+	pageState, err := base64.StdEncoding.DecodeString(queryModel.PageState)
 	if err != nil {
-		msg := "unable to translate to select query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
+		RespondWithError(w, "Invalid page state", http.StatusBadRequest)
 		return
 	}
 
-	rows, pageState, err := s.dbConn.Database.SelectWithPaging(query, user, queryModel.PageState, queryModel.PageSize, vals...)
+	var orderBy []db.ColumnOrder
+	if queryModel.OrderBy != nil && queryModel.OrderBy.Column != nil {
+		order := "ASC"
+		// Allow only ASC/DESC values
+		if queryModel.OrderBy.Order != nil && strings.ToUpper(*queryModel.OrderBy.Order) == "DESC" {
+			order = "DESC"
+		}
+		orderBy = []db.ColumnOrder{{
+			Column: *queryModel.OrderBy.Column,
+			Order:  order,
+		}}
+	}
+
+	rs, err := s.dbClient.Select(&db.SelectInfo{
+		Keyspace: keyspaceName,
+		Table:    tableName,
+		Columns:  queryModel.ColumnNames,
+		Where:    where,
+		OrderBy:  orderBy,
+	}, newDbOptions(user).WithPageSize(queryModel.PageSize).WithPageState(pageState))
+
 	if err != nil {
 		msg := "unable to execute select query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusInternalServerError)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusInternalServerError)
 		return
 	}
 
 	rowsModel := m.Rows{
-		Rows:      rows,
-		PageState: pageState,
-		Count:     len(rows),
+		Rows:      types.ToJsonValues(rs.Values(), tblMetadata),
+		PageState: base64.StdEncoding.EncodeToString(rs.PageState()),
+		Count:     len(rs.Values()),
 	}
 	RespondJSONObjectWithCode(w, http.StatusOK, rowsModel)
 }
 
 func (s *routeList) UpdateRow(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
 
-	keyspaceName := s.params(r, "keyspaceName")
-	tableName := s.params(r, "tableName")
+	keyspaceName := s.params(r, keyspaceParam)
+	tableName := s.params(r, tableParam)
 	rowIdentifier := s.params(r, "rowIdentifier")
-	user := contextutils.GetContextUser(ctx)
+	user := auth.ContextUserOrRole(r.Context())
+
+	tblMetadata, err := s.dbClient.Table(keyspaceName, tableName)
+	if err != nil {
+		if _, ok := err.(*db.DbObjectNotFound); ok {
+			RespondWithError(w, fmt.Sprintf(`Table "%s"."%s" not found`, keyspaceName, tableName), http.StatusNotFound)
+			return
+		}
+
+		msg := "Unable to get table metadata"
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusInternalServerError)
+		return
+	}
+
+	primaryKeysColumns, primaryKeyValues, err := primaryKeyValues(rowIdentifier, tblMetadata)
+	if err != nil {
+		RespondWithError(w, "Invalid primary keys", http.StatusBadRequest)
+	}
 
 	var rowUpdate m.RowsUpdate
 	if err := parseAndValidatePayload(&rowUpdate, r); err != nil {
 		msg := "unable to parse payload"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusBadRequest)
 		return
 	}
 
-	// grab table and extract primary key col names
-	primaryKey, err := rowIdentifierToMapForUpdate(rowIdentifier, keyspaceName, tableName, s.dbConn.Database)
-	if err != nil {
-		msg := "unable to get primary key"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-
-		switch err.(type) {
-		case *e.InternalError:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusInternalServerError)
-			return
-		default:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusBadRequest)
-			return
-		}
-	}
-
-	tblMetadata, err := s.dbConn.Database.DescribeTable(keyspaceName, tableName, "")
-	if err != nil {
-		msg := "unable to get table metadata"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-
-		RespondWithError(w, fmt.Errorf(msg), http.StatusInternalServerError)
-		return
-	}
+	columns := make([]string, len(rowUpdate.Changeset)+len(primaryKeysColumns))
+	values := make([]interface{}, len(columns))
 
 	for i, val := range rowUpdate.Changeset {
 		if _, ok := tblMetadata.Columns[val.Column]; !ok {
 			msg := "missing column for changeset"
-			//TODO log.With("keyspace", keyspaceName).
-			//	With("table", tableName).
-			//	With("error", err).
-			//	Error(msg)
-
-			RespondWithError(w, fmt.Errorf(msg), http.StatusBadRequest)
+			s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+			RespondWithError(w, msg, http.StatusBadRequest)
 			return
 		}
 
-		if val.Value == nil {
-			msg := "missing value for changeset"
-			//TODO log.With("keyspace", keyspaceName).
-			//	With("table", tableName).
-			//	With("error", err).
-			//	Error(msg)
-
-			RespondWithError(w, fmt.Errorf(msg), http.StatusBadRequest)
-			return
-		}
-
-		convertedType, typeErr := getCQLType(tblMetadata.Columns[val.Column].Type, val.Value)
+		convertedType, typeErr := types.FromJsonValue(val.Value, tblMetadata.Columns[val.Column].Type)
 		if typeErr != nil {
 			msg := "wrong type provided for column " + val.Column
-			//TODO log.With("keyspace", keyspaceName).
-			//	With("table", tableName).
-			//	With("error", err).
-			//	Error(msg)
-
-			RespondWithError(w, fmt.Errorf(msg), http.StatusBadRequest)
+			s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+			RespondWithError(w, msg, http.StatusBadRequest)
 			return
 		}
-		rowUpdate.Changeset[i].Value = convertedType
+
+		columns[i] = val.Column
+		values[i] = convertedType
 	}
 
-	translator := t.APITranslator{
-		KeyspaceName: keyspaceName,
-		TableName:    tableName,
+	index := len(rowUpdate.Changeset)
+	for i, key := range primaryKeysColumns {
+		columns[index] = key
+		values[index] = primaryKeyValues[i]
+		index++
 	}
 
-	query, vals, err := translator.ToUpdate(rowUpdate, primaryKey)
+	_, err = s.dbClient.Update(&db.UpdateInfo{
+		Keyspace:    keyspaceName,
+		Table:       tblMetadata,
+		Columns:     columns,
+		QueryParams: values,
+		TTL:         -1,
+	}, newDbOptions(user))
+
 	if err != nil {
-		msg := "unable to translate to update query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
-		return
-	}
-
-	err = s.dbConn.Database.Update(query, user, vals...)
-	if err != nil {
-		msg := "unable to execute update query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusInternalServerError)
+		msg := "Unable to execute update query"
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusInternalServerError)
 		return
 	}
 
@@ -624,56 +509,45 @@ func (s *routeList) UpdateRow(w http.ResponseWriter, r *http.Request) {
 
 func (s *routeList) DeleteRow(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
 
-	keyspaceName := s.params(r, "keyspaceName")
-	tableName := s.params(r, "tableName")
+	keyspaceName := s.params(r, keyspaceParam)
+	tableName := s.params(r, tableParam)
 	rowIdentifier := s.params(r, "rowIdentifier")
-	user := contextutils.GetContextUser(ctx)
+	user := auth.ContextUserOrRole(r.Context())
 
-	// grab table and extract primary key col names
-	primaryKey, err := rowIdentifierToMap(rowIdentifier, keyspaceName, tableName, s.dbConn.Database)
+	tblMetadata, err := s.dbClient.Table(keyspaceName, tableName)
 	if err != nil {
-		msg := "unable to get primary key"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-
-		switch err.(type) {
-		case *e.InternalError:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusInternalServerError)
-			return
-		default:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusBadRequest)
+		if _, ok := err.(*db.DbObjectNotFound); ok {
+			RespondWithError(w, fmt.Sprintf(`Table "%s"."%s" not found`, keyspaceName, tableName), http.StatusNotFound)
 			return
 		}
-	}
 
-	translator := t.APITranslator{
-		KeyspaceName: keyspaceName,
-		TableName:    tableName,
-	}
-
-	query, vals, err := translator.ToDelete(primaryKey)
-	if err != nil {
-		msg := "unable to translate to delete query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
+		msg := "Unable to get table metadata"
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusInternalServerError)
 		return
 	}
 
-	err = s.dbConn.Database.Delete(query, user, vals...)
+	// grab table and extract primary key col names
+	columns, values, err := primaryKeyValues(rowIdentifier, tblMetadata)
+	if err != nil {
+		msg := "Unable to get primary key"
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusBadRequest)
+		return
+	}
+
+	_, err = s.dbClient.Delete(&db.DeleteInfo{
+		Keyspace:    keyspaceName,
+		Table:       tableName,
+		Columns:     columns,
+		QueryParams: values,
+	}, newDbOptions(user))
+
 	if err != nil {
 		msg := "unable to execute delete query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusInternalServerError)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
+		RespondWithError(w, msg, http.StatusInternalServerError)
 		return
 	}
 
@@ -682,24 +556,32 @@ func (s *routeList) DeleteRow(w http.ResponseWriter, r *http.Request) {
 
 func (s *routeList) GetTables(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
 
-	keyspaceName := s.params(r, "keyspaceName")
-	user := contextutils.GetContextUser(ctx)
+	keyspaceName := s.params(r, keyspaceParam)
+	user := auth.ContextUserOrRole(r.Context())
 
-	tables, err := s.dbConn.Database.DescribeTables(keyspaceName, user)
+	if _, err := s.dbClient.Keyspace(keyspaceName); err != nil {
+		if _, ok := err.(*db.DbObjectNotFound); ok {
+			RespondWithError(w, fmt.Sprintf("Keyspace '%s' not found", keyspaceName), http.StatusNotFound)
+			return
+		}
+		msg := "error retrieving the keyspace"
+		s.logger.Error(msg, "keyspace", keyspaceName, "error", err)
+		RespondWithError(w, msg, http.StatusInternalServerError)
+		return
+	}
+
+	tables, err := s.dbClient.DescribeTables(keyspaceName, user)
 	if err != nil {
 		msg := "unable to describe tables"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("error", err).
-		//	Error(msg)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "error", err)
 
 		switch err.(type) {
 		case *e.NotFoundError:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusNotFound)
+			RespondWithError(w, msg, http.StatusNotFound)
 			return
 		default:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusInternalServerError)
+			RespondWithError(w, msg, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -709,26 +591,22 @@ func (s *routeList) GetTables(w http.ResponseWriter, r *http.Request) {
 
 func (s *routeList) GetTable(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
 
-	keyspaceName := s.params(r, "keyspaceName")
-	tableName := s.params(r, "tableName")
-	user := contextutils.GetContextUser(ctx)
+	keyspaceName := s.params(r, keyspaceParam)
+	tableName := s.params(r, tableParam)
+	user := auth.ContextUserOrRole(r.Context())
 
-	table, err := s.dbConn.Database.DescribeTable(keyspaceName, tableName, user)
+	table, err := s.dbClient.DescribeTable(keyspaceName, tableName, user)
 	if err != nil {
 		msg := "unable to describe table"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
 
 		switch err.(type) {
 		case *e.NotFoundError:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusNotFound)
+			RespondWithError(w, msg, http.StatusNotFound)
 			return
 		default:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusInternalServerError)
+			RespondWithError(w, msg, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -738,42 +616,54 @@ func (s *routeList) GetTable(w http.ResponseWriter, r *http.Request) {
 
 func (s *routeList) AddTable(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
 
-	keyspaceName := s.params(r, "keyspaceName")
-	user := contextutils.GetContextUser(ctx)
+	keyspaceName := s.params(r, keyspaceParam)
+	user := auth.ContextUserOrRole(r.Context())
 
 	var tableAdd m.TableAdd
 	if err := parseAndValidatePayload(&tableAdd, r); err != nil {
 		msg := "unable to parse payload"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "error", err)
+		RespondWithError(w, msg, http.StatusBadRequest)
 		return
 	}
 
-	translator := t.APITranslator{
-		KeyspaceName: keyspaceName,
+	tableInfo := db.CreateTableInfo{
+		Keyspace:    keyspaceName,
+		Table:       tableAdd.Name,
+		IfNotExists: tableAdd.IfNotExists,
 	}
 
-	query, err := translator.ToCreateTable(tableAdd)
-	if err != nil {
-		msg := "unable to translate to create table query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
-		return
+	for _, definition := range tableAdd.ColumnDefinitions {
+		column, err := m.ToDbColumn(definition)
+		if err != nil {
+			RespondWithError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if lookup(tableAdd.PrimaryKey.PartitionKey, definition.Name) {
+			tableInfo.PartitionKeys = append(tableInfo.PartitionKeys, column)
+		} else if lookup(tableAdd.PrimaryKey.ClusteringKey, definition.Name) {
+			tableInfo.ClusteringKeys = append(tableInfo.ClusteringKeys, column)
+			column.ClusteringOrder = "asc"
+			if tableAdd.TableOptions != nil {
+				for _, ck := range tableAdd.TableOptions.ClusteringExpression {
+					if ck.Column != nil && ck.Order != nil && *ck.Column == definition.Name {
+						column.ClusteringOrder = *ck.Order
+						break
+					}
+				}
+			}
+		} else {
+			tableInfo.Values = append(tableInfo.Values, column)
+		}
 	}
 
-	err = s.dbConn.Database.Create(query, user)
+	err := s.dbClient.CreateTable(&tableInfo, newDbOptions(user))
 	if err != nil {
 		msg := "unable to execute create table query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusInternalServerError)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "error", err)
+		RespondWithError(w, msg, http.StatusInternalServerError)
 		return
 	}
 
@@ -782,42 +672,26 @@ func (s *routeList) AddTable(w http.ResponseWriter, r *http.Request) {
 
 func (s *routeList) DeleteTable(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
 
-	keyspaceName := s.params(r, "keyspaceName")
-	tableName := s.params(r, "tableName")
-	user := contextutils.GetContextUser(ctx)
+	keyspaceName := s.params(r, keyspaceParam)
+	tableName := s.params(r, tableParam)
+	user := auth.ContextUserOrRole(r.Context())
 
-	translator := t.APITranslator{
-		KeyspaceName: keyspaceName,
-		TableName:    tableName,
-	}
+	err := s.dbClient.DropTable(&db.DropTableInfo{
+		Keyspace: keyspaceName,
+		Table:    tableName,
+	}, newDbOptions(user))
 
-	query, err := translator.ToDropTable()
-	if err != nil {
-		msg := "unable to translate to drop table query"
-		//TODO: log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
-		RespondWithError(w, errors.New(msg), http.StatusBadRequest)
-		return
-	}
-
-	err = s.dbConn.Database.Drop(query, user)
 	if err != nil {
 		msg := "unable to execute drop table query"
-		//TODO log.With("keyspace", keyspaceName).
-		//	With("table", tableName).
-		//	With("error", err).
-		//	Error(msg)
+		s.logger.Debug(msg, "keyspace", keyspaceName, "table", tableName, "error", err)
 
 		switch err.(type) {
 		case *e.NotFoundError:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusNotFound)
+			RespondWithError(w, msg, http.StatusNotFound)
 			return
 		default:
-			RespondWithError(w, fmt.Errorf(msg), http.StatusInternalServerError)
+			RespondWithError(w, msg, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -827,20 +701,40 @@ func (s *routeList) DeleteTable(w http.ResponseWriter, r *http.Request) {
 
 func (s *routeList) GetKeyspaces(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	ctx := r.Context()
 
-	user := contextutils.GetContextUser(ctx)
+	user := auth.ContextUserOrRole(r.Context())
 
-	keyspaces, err := s.dbConn.Database.DescribeKeyspaces(user)
+	keyspaces, err := s.dbClient.Keyspaces(user)
 	if err != nil {
 		msg := "unable to describe keyspaces"
-		//TODO log.With("error", err).Error(msg)
+		s.logger.Error(msg, "error", err)
 
-		RespondWithError(w, fmt.Errorf(msg), http.StatusInternalServerError)
+		RespondWithError(w, msg, http.StatusInternalServerError)
 		return
 	}
 
-	RespondJSONObjectWithCode(w, http.StatusOK, keyspaces)
+	var result []string
+	if s.singleKeyspace != "" {
+		if !lookup(keyspaces, s.singleKeyspace) {
+			// The single keyspace was not found, maybe it's added later
+			RespondWithError(w, "Keyspace not found", http.StatusNotFound)
+			return
+		}
+
+		// Only list the configured keyspace
+		result = []string{s.singleKeyspace}
+	} else {
+		// Filter out excluded keyspaces
+		result = make([]string, 0, len(keyspaces))
+		for _, ks := range keyspaces {
+			if s.excludedKeyspaces[ks] {
+				continue
+			}
+			result = append(result, ks)
+		}
+	}
+
+	RespondJSONObjectWithCode(w, http.StatusOK, result)
 }
 
 func tableMetadataToTable(tableMetadata *gocql.TableMetadata) interface{} {
@@ -910,84 +804,57 @@ func parseAndValidatePayload(obj interface{}, r *http.Request) error {
 	return nil
 }
 
-func primaryKeyToString(m map[string]interface{}) string {
+func (s *routeList) primaryKeyToString(m []types.ConditionItem) string {
 	jsonString, err := json.Marshal(m)
 	if err != nil {
-		//TODO log.With("error", err).Error("unable to convert primary key map to string")
+		s.logger.Debug("unable to convert primary key map to string", "error", err)
 	}
 
 	return string(jsonString)
 }
 
-// rowIdentifierToMap will return the partition columns of a table
-func rowIdentifierToMap(identifier, keyspace, table string, db db.DB) (map[string]interface{}, error) {
-	tblMetadata, err := db.DescribeTable(keyspace, table, "")
-	if err != nil {
-		return nil, e.NewInternalError(fmt.Sprintf("Unable to describe table: %s", err))
-	}
-
-	vals := strings.Split(identifier, ";")
-	primaryKey := make(map[string]interface{}, len(vals))
+// primaryKeyValues will return the partition columns of a table
+func primaryKeyValues(identifier string, tblMetadata *gocql.TableMetadata) ([]string, []interface{}, error) {
+	// Use array to maintain field order all the way
+	parts := strings.Split(identifier, ";")
+	columns := make([]string, 0, len(parts))
+	values := make([]interface{}, len(parts))
 	for i, key := range tblMetadata.PartitionKey {
-		if i >= len(vals) {
+		if i >= len(parts) {
 			// In this case the table has a composite key but we were not passed in a value for each column
-			return nil, errors.New("not enough values provided for primary keys")
+			return nil, nil, errors.New("not enough parts provided for primary keys")
 		}
-
-		primaryKey[key.Name] = vals[i]
+		index := len(columns)
+		values[index] = parts[index]
+		columns = append(columns, key.Name)
 	}
 
-	return primaryKey, nil
+	// Add clustering keys when provided
+	for i := 0; i < len(tblMetadata.ClusteringColumns) && len(columns) < len(parts); i++ {
+		key := tblMetadata.ClusteringColumns[i]
+		index := len(columns)
+		values[index] = parts[index]
+		columns = append(columns, key.Name)
+	}
+
+	return columns, values, nil
 }
 
-// rowIdentifierToMapForUpdate will return the partition columns of a table and the clustering keys if they exists
-func rowIdentifierToMapForUpdate(identifier, keyspace, table string, db db.DB) (map[string]interface{}, error) {
-	tblMetadata, err := db.DescribeTable(keyspace, table, "")
-	if err != nil {
-		return nil, e.NewInternalError(fmt.Sprintf("Unable to describe table: %s", err))
-	}
-
-	vals := strings.Split(identifier, ";")
-	primaryKey := make(map[string]interface{}, len(vals))
-	for i, key := range append(tblMetadata.PartitionKey, tblMetadata.ClusteringColumns...) {
-		if i >= len(vals) {
-			// In this case the table has a composite key but we were not passed in a value for each column
-			return nil, errors.New("not enough values provided for primary keys")
-		}
-
-		primaryKey[key.Name] = vals[i]
-	}
-
-	return primaryKey, nil
+func newDbOptions(user string) *db.QueryOptions {
+	return db.NewQueryOptions().
+		WithUserOrRole(user).
+		WithConsistency(config.DefaultConsistencyLevel).
+		WithSerialConsistency(config.DefaultSerialConsistencyLevel).
+		WithPageSize(config.DefaultPageSize)
 }
 
-func getCQLType(typeInfo gocql.TypeInfo, val interface{}) (interface{}, error) {
-	switch typeInfo.Type() {
-	case gocql.TypeDecimal:
-		d := new(inf.Dec)
-		if f, ok := val.(float64); ok {
-			d.SetString(fmt.Sprintf("%f", f))
-		} else if s, ok := val.(string); ok {
-			floatVal, err := strconv.ParseFloat(s, 64)
-			if err != nil {
-				return nil, errors.New("wrong type provided for decimal type")
-			}
-			d.SetString(fmt.Sprintf("%f", floatVal))
+// lookup linear search for an item into slice, useful for small slices
+func lookup(s []string, value string) bool {
+	for _, item := range s {
+		if item == value {
+			return true
 		}
-		return d, nil
-	case gocql.TypeInt:
-		if f, ok := val.(float64); ok {
-			return int(f), nil
-		} else if s, ok := val.(string); ok {
-			n, _ := strconv.Atoi(s)
-			return n, nil
-		} else if i, ok := val.(int); ok {
-			// unlikely case since the incoming request should marshal the field as a float64
-			return i, nil
-		}
-
-		return nil, errors.New("wrong type provided for int type")
 	}
 
-	return val, nil
+	return false
 }

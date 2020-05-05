@@ -204,22 +204,31 @@ var _ = Describe("db", func() {
 			where       []types.ConditionItem
 			options     *types.QueryOptions
 			orderBy     []ColumnOrder
+			columns     []string
 			query       string
 		}{
-			{"a single condition", []types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, nil,
+			{"a single condition", []types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, nil, nil,
 				`SELECT * FROM "ks1"."tbl1" WHERE "a" = ?`},
-			{"no where clause", []types.ConditionItem{}, &types.QueryOptions{}, nil,
+			{"condition and one select column", []types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, nil,
+				[]string{"col1"},
+				`SELECT "col1" FROM "ks1"."tbl1" WHERE "a" = ?`},
+			{"condition and select columns", []types.ConditionItem{{"col1", "=", 1}}, &types.QueryOptions{}, nil,
+				[]string{"COL2", "col1"},
+				`SELECT "COL2", "col1" FROM "ks1"."tbl1" WHERE "col1" = ?`},
+			{"no where clause", []types.ConditionItem{}, &types.QueryOptions{}, nil, nil,
 				`SELECT * FROM "ks1"."tbl1"`},
-			{"no where clause and limit", []types.ConditionItem{}, &types.QueryOptions{Limit: 1}, nil,
+			{"no where clause and limit", []types.ConditionItem{}, &types.QueryOptions{Limit: 1}, nil, nil,
 				`SELECT * FROM "ks1"."tbl1" LIMIT ?`},
-			{"multiple conditions", []types.ConditionItem{{"a", "=", 1}, {"B", ">", 2}}, &types.QueryOptions{}, nil,
+			{"multiple conditions", []types.ConditionItem{{"a", "=", 1}, {"B", ">", 2}}, &types.QueryOptions{}, nil, nil,
 				`SELECT * FROM "ks1"."tbl1" WHERE "a" = ? AND "B" > ?`},
 			{"relational operators", []types.ConditionItem{{"a", "=", 1}, {"b", ">", 2}, {"b", "<=", 5}},
-				&types.QueryOptions{}, nil, `SELECT * FROM "ks1"."tbl1" WHERE "a" = ? AND "b" > ? AND "b" <= ?`},
-			{"order clause", []types.ConditionItem{{"a", "=", 1}}, &types.QueryOptions{}, []ColumnOrder{{"c", "DESC"}},
+				&types.QueryOptions{}, nil, nil, `SELECT * FROM "ks1"."tbl1" WHERE "a" = ? AND "b" > ? AND "b" <= ?`},
+			{"order clause", []types.ConditionItem{{"a", "=", 1}},
+				&types.QueryOptions{}, []ColumnOrder{{"c", "DESC"}}, nil,
 				`SELECT * FROM "ks1"."tbl1" WHERE "a" = ? ORDER BY "c" DESC`},
 			{"order and limit", []types.ConditionItem{{"ABC", "=", "z"}}, &types.QueryOptions{Limit: 1},
-				[]ColumnOrder{{"DEF", "ASC"}}, `SELECT * FROM "ks1"."tbl1" WHERE "ABC" = ? ORDER BY "DEF" ASC LIMIT ?`},
+				[]ColumnOrder{{"DEF", "ASC"}}, nil,
+				`SELECT * FROM "ks1"."tbl1" WHERE "ABC" = ? ORDER BY "DEF" ASC LIMIT ?`},
 		}
 
 		for i := 0; i < len(items); i++ {
@@ -249,6 +258,7 @@ var _ = Describe("db", func() {
 				_, err := db.Select(&SelectInfo{
 					Keyspace: "ks1",
 					Table:    "tbl1",
+					Columns:  item.columns,
 					Where:    item.where,
 					Options:  item.options,
 					OrderBy:  item.orderBy,

@@ -2,8 +2,8 @@ package ddl
 
 import (
 	"fmt"
-	"github.com/datastax/cassandra-data-apis/graphql"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas"
+	"github.com/datastax/cassandra-data-apis/types"
 	. "github.com/onsi/gomega"
 	"sort"
 	"strings"
@@ -71,30 +71,30 @@ var DCsResult = []interface{}{
 	},
 }
 
-func CreateKeyspace(routes []graphql.Route, name string) {
+func CreateKeyspace(routes []types.Route, name string) {
 	response := CreateKeyspaceIfNotExists(routes, name, false)
 	Expect(response.Errors).To(HaveLen(0))
 }
 
-func CreateKeyspaceIfNotExists(routes []graphql.Route, name string, ifNotExists bool) schemas.ResponseBody {
+func CreateKeyspaceIfNotExists(routes []types.Route, name string, ifNotExists bool) schemas.ResponseBody {
 	mutation := `mutation { createKeyspace(name:"%s", dcs: [{name:"dc1", replicas:3}], ifNotExists: %t) }`
 	buffer := schemas.ExecutePost(routes, "/graphql-schema", fmt.Sprintf(mutation, name, ifNotExists))
 	return schemas.DecodeResponse(buffer)
 }
 
-func DropKeyspace(routes []graphql.Route, name string) {
+func DropKeyspace(routes []types.Route, name string) {
 	mutation := `mutation { dropKeyspace(name:"%s") }`
 	buffer := schemas.ExecutePost(routes, "/graphql-schema", fmt.Sprintf(mutation, name))
 	response := schemas.DecodeResponse(buffer)
 	Expect(response.Errors).To(HaveLen(0))
 }
 
-func CreateTable(routes []graphql.Route, ksName string, tableName string, columnTypes []string) {
+func CreateTable(routes []types.Route, ksName string, tableName string, columnTypes []string) {
 	response := CreateTableIfNotExists(routes, ksName, tableName, columnTypes, false)
 	Expect(response.Errors).To(HaveLen(0))
 }
 
-func CreateTableIfNotExists(routes []graphql.Route, ksName string, tableName string,
+func CreateTableIfNotExists(routes []types.Route, ksName string, tableName string,
 	columnTypes []string, ifNotExists bool) schemas.ResponseBody {
 	mutation := `mutation { 
   createTable(
@@ -110,12 +110,12 @@ func CreateTableIfNotExists(routes []graphql.Route, ksName string, tableName str
 	return schemas.DecodeResponse(buffer)
 }
 
-func AlterTableAdd(routes []graphql.Route, ksName string, tableName string, columnTypes []string) {
+func AlterTableAdd(routes []types.Route, ksName string, tableName string, columnTypes []string) {
 	response := AlterTableAddResponse(routes, ksName, tableName, columnTypes)
 	Expect(response.Errors).To(HaveLen(0))
 }
 
-func AlterTableAddResponse(routes []graphql.Route, ksName string,
+func AlterTableAddResponse(routes []types.Route, ksName string,
 	tableName string, columnTypes []string) schemas.ResponseBody {
 	mutation := `mutation {
   alterTableAdd(keyspaceName:"%s", tableName:"%s", toAdd: [ %s ])
@@ -125,12 +125,12 @@ func AlterTableAddResponse(routes []graphql.Route, ksName string,
 	return schemas.DecodeResponse(buffer)
 }
 
-func AlterTableDrop(routes []graphql.Route, ksName string, tableName string, columns []string) {
+func AlterTableDrop(routes []types.Route, ksName string, tableName string, columns []string) {
 	response := AlterTableDropResponse(routes, ksName, tableName, columns)
 	Expect(response.Errors).To(HaveLen(0))
 }
 
-func AlterTableDropResponse(routes []graphql.Route, ksName string, tableName string, columns []string) schemas.ResponseBody {
+func AlterTableDropResponse(routes []types.Route, ksName string, tableName string, columns []string) schemas.ResponseBody {
 	mutation := `mutation {
   alterTableDrop(keyspaceName:"%s", tableName:"%s", toDrop: [ %s ])
 }`
@@ -143,18 +143,18 @@ func AlterTableDropResponse(routes []graphql.Route, ksName string, tableName str
 	return schemas.DecodeResponse(buffer)
 }
 
-func DropTable(routes []graphql.Route, ksName string, tableName string) {
+func DropTable(routes []types.Route, ksName string, tableName string) {
 	response := DropTableResponse(routes, ksName, tableName)
 	Expect(response.Errors).To(HaveLen(0))
 }
 
-func DropTableResponse(routes []graphql.Route, ksName string, tableName string) schemas.ResponseBody {
+func DropTableResponse(routes []types.Route, ksName string, tableName string) schemas.ResponseBody {
 	mutation := `mutation { dropTable(keyspaceName:"%s", tableName:"%s") }`
 	buffer := schemas.ExecutePost(routes, "/graphql-schema", fmt.Sprintf(mutation, ksName, tableName))
 	return schemas.DecodeResponse(buffer)
 }
 
-func Keyspaces(routes []graphql.Route) schemas.ResponseBody {
+func Keyspaces(routes []types.Route) schemas.ResponseBody {
 	query := `query {
   keyspaces {
     name
@@ -171,7 +171,7 @@ func Keyspaces(routes []graphql.Route) schemas.ResponseBody {
 	return response
 }
 
-func Keyspace(routes []graphql.Route, ksName string) schemas.ResponseBody {
+func Keyspace(routes []types.Route, ksName string) schemas.ResponseBody {
 	query := `query {
   keyspace(name:"%s") {
     name
@@ -186,7 +186,7 @@ func Keyspace(routes []graphql.Route, ksName string) schemas.ResponseBody {
 	return schemas.DecodeResponse(buffer)
 }
 
-func Tables(routes []graphql.Route, ksName string) schemas.ResponseBody {
+func Tables(routes []types.Route, ksName string) schemas.ResponseBody {
 	query := `query {
   keyspace(name: "%s") {
     tables {
@@ -212,7 +212,7 @@ func Tables(routes []graphql.Route, ksName string) schemas.ResponseBody {
 	return response
 }
 
-func Table(routes []graphql.Route, ksName string, tableName string) schemas.ResponseBody {
+func Table(routes []types.Route, ksName string, tableName string) schemas.ResponseBody {
 	query := `query {
   keyspace(name: "%s") {
     table(name:"%s") {
@@ -237,7 +237,7 @@ func Table(routes []graphql.Route, ksName string, tableName string) schemas.Resp
 	return response
 }
 
-func ExpectInvalidKeyspace(routes []graphql.Route, ksName string, tableName string) {
+func ExpectInvalidKeyspace(routes []types.Route, ksName string, tableName string) {
 	expectedMessage := fmt.Sprintf("keyspace does not exist '%s'", ksName)
 	response := CreateTableIfNotExists(routes, ksName, tableName, []string{"{ basic: TEXT }"}, false)
 	schemas.ExpectError(response, expectedMessage)
@@ -338,7 +338,7 @@ func waitUntil(checkFunc func(response schemas.ResponseBody) bool,
 	queryFunc func() schemas.ResponseBody) schemas.ResponseBody {
 	var response schemas.ResponseBody
 	i := 0
-	const max = 100
+	const max = 20
 	for ; i < max; i++ {
 		response = queryFunc()
 		if checkFunc(response) {

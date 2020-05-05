@@ -54,7 +54,7 @@ func (sg *SchemaGenerator) buildQueriesFields(
 		fields[ksSchema.naming.ToGraphQLOperation("", table.Name)] = &graphql.Field{
 			Description: fmt.Sprintf("Retrieves data from '%s' table using the equality operator.\n", table.Name) +
 				"The amount of values contained in the result is limited by the page size " +
-				fmt.Sprintf(" (defaults to %d). Use the pageState included in the result to ", DefaultPageSize) +
+				fmt.Sprintf(" (defaults to %d). Use the pageState included in the result to ", config.DefaultPageSize) +
 				"obtain the following rows.\n" +
 				"When no fields are provided, it returns all rows in the table, limited by the page size.",
 			Type: ksSchema.resultSelectTypes[table.Name],
@@ -70,7 +70,7 @@ func (sg *SchemaGenerator) buildQueriesFields(
 			Description: fmt.Sprintf("Retrieves data from '%s' table using equality \n", table.Name) +
 				"and non-equality operators.\n" +
 				"The amount of values contained in the result is limited by the page size " +
-				fmt.Sprintf(" (defaults to %d). Use the pageState included in the result to ", DefaultPageSize) +
+				fmt.Sprintf(" (defaults to %d). Use the pageState included in the result to ", config.DefaultPageSize) +
 				"obtain the following rows.\n",
 			Type: ksSchema.resultSelectTypes[table.Name],
 			Args: graphql.FieldConfigArgument{
@@ -195,7 +195,7 @@ func (sg *SchemaGenerator) BuildSchemas(singleKeyspace string) (map[string]*grap
 		}
 	}
 
-	keyspaces, err := sg.dbClient.Keyspaces()
+	keyspaces, err := sg.dbClient.Keyspaces("")
 	if err != nil {
 		return nil, err
 	}

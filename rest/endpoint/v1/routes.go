@@ -1,100 +1,174 @@
 package endpoint
 
 import (
-	"github.com/datastax/cassandra-data-apis/graphql"
+	"github.com/datastax/cassandra-data-apis/config"
+	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/log"
+	"github.com/datastax/cassandra-data-apis/types"
 	"net/http"
-
-	"github.com/datastax/cassandra-data-apis/rest/db"
+	"path"
 )
 
-// Route describes how to route an endpoint
+const (
+	keyspaceParam = "keyspaceName"
+	tableParam    = "tableName"
+)
+
+const (
+	KeyspacesPathFormat    = "v1/keyspaces"
+	TablesPathFormat       = "v1/keyspaces/%s/tables"
+	TableSinglePathFormat  = "v1/keyspaces/%s/tables/%s"
+	ColumnsPathFormat      = "v1/keyspaces/%s/tables/%s/columns"
+	ColumnSinglePathFormat = "v1/keyspaces/%s/tables/%s/columns/%s"
+	RowsPathFormat         = "v1/keyspaces/%s/tables/%s/rows"
+	RowSinglePathFormat    = "v1/keyspaces/%s/tables/%s/rows/%s"
+	QueryPathFormat        = "v1/keyspaces/%s/tables/%s/rows/query"
+)
+
+// routeList describes how to route an endpoint
 type routeList struct {
-	dbConn *db.DatabaseConnection
-	logger log.Logger
-	params func(*http.Request, string) string
+	logger            log.Logger
+	params            config.UrlParamGetter
+	dbClient          *db.Db
+	operations        config.SchemaOperations
+	excludedKeyspaces map[string]bool
+	singleKeyspace    string
 }
 
-// Routes returns a slice of all the endpoint routes
-func Routes(dbConn *db.DatabaseConnection) []graphql.Route {
-	rl := routeList{dbConn: dbConn}
+// Routes returns a slice of all the REST endpoint routes
+func Routes(prefix string, operations config.SchemaOperations, singleKeyspace string, cfg config.Config, dbClient *db.Db) []types.Route {
+	excludedKeyspaces := make(map[string]bool)
+	for _, ks := range cfg.ExcludedKeyspaces() {
+		excludedKeyspaces[ks] = true
+	}
 
-	routes := []graphql.Route{
+	rl := routeList{
+		logger:            cfg.Logger(),
+		params:            cfg.RouterInfo().UrlParams(),
+		dbClient:          dbClient,
+		operations:        operations,
+		excludedKeyspaces: excludedKeyspaces,
+		singleKeyspace:    singleKeyspace,
+	}
+
+	urlPattern := cfg.RouterInfo().UrlPattern()
+
+	urlKeyspaces := url(prefix, urlPattern, KeyspacesPathFormat)
+	urlTables := url(prefix, urlPattern, TablesPathFormat, keyspaceParam)
+	urlSingleTable := url(prefix, urlPattern, TableSinglePathFormat, keyspaceParam, tableParam)
+	urlColumns := url(prefix, urlPattern, ColumnsPathFormat, keyspaceParam, tableParam)
+	urlSingleColumn := url(prefix, urlPattern, ColumnSinglePathFormat, keyspaceParam, tableParam, "columnName")
+	urlRows := url(prefix, urlPattern, RowsPathFormat, keyspaceParam, tableParam)
+	urlSingleRow := url(prefix, urlPattern, RowSinglePathFormat, keyspaceParam, tableParam, "rowIdentifier")
+	urlQuery := url(prefix, urlPattern, QueryPathFormat, keyspaceParam, tableParam)
+
+	routes := []types.Route{
 		{
 			Method:  http.MethodGet,
-			Pattern: "/v1/keyspaces/{keyspaceName}/tables/{tableName}/columns",
-			Handler: http.HandlerFunc(rl.GetColumns),
+			Pattern: urlColumns,
+			Handler: rl.validateKeyspace(rl.GetColumns),
 		},
 		{
 			Method:  http.MethodPost,
-			Pattern: "/v1/keyspaces/{keyspaceName}/tables/{tableName}/columns",
-			Handler: http.HandlerFunc(rl.AddColumn),
+			Pattern: urlColumns,
+			Handler: rl.validateKeyspace(rl.isSupported(config.TableAlterAdd, rl.AddColumn)),
+		},
+		{
+			Method:  http.MethodDelete,
+			Pattern: urlSingleColumn,
+			Handler: rl.validateKeyspace(rl.isSupported(config.TableAlterDrop, rl.DeleteColumn)),
 		},
 		{
 			Method:  http.MethodGet,
-			Pattern: "/v1/keyspaces/{keyspaceName}/tables/{tableName}/columns/{columnName}",
-			Handler: http.HandlerFunc(rl.GetColumn),
+			Pattern: urlSingleColumn,
+			Handler: rl.validateKeyspace(rl.GetColumn),
+		},
+		{
+			Method:  http.MethodPost,
+			Pattern: urlRows,
+			Handler: rl.validateKeyspace(rl.AddRow),
+		},
+		{
+			Method:  http.MethodGet,
+			Pattern: urlSingleRow,
+			Handler: rl.validateKeyspace(rl.GetRow),
 		},
 		{
 			Method:  http.MethodPut,
-			Pattern: "/v1/keyspaces/{keyspaceName}/tables/{tableName}/columns/{columnName}",
-			Handler: http.HandlerFunc(rl.UpdateColumn),
+			Pattern: urlSingleRow,
+			Handler: rl.validateKeyspace(rl.UpdateRow),
 		},
 		{
 			Method:  http.MethodDelete,
-			Pattern: "/v1/keyspaces/{keyspaceName}/tables/{tableName}/columns/{columnName}",
-			Handler: http.HandlerFunc(rl.DeleteColumn),
+			Pattern: urlSingleRow,
+			Handler: rl.validateKeyspace(rl.DeleteRow),
+		},
+		{
+			Method:  http.MethodPost,
+			Pattern: urlQuery,
+			Handler: rl.validateKeyspace(rl.Query),
 		},
 		{
 			Method:  http.MethodGet,
-			Pattern: "/v1/keyspaces/{keyspaceName}/tables/{tableName}/rows/{rowIdentifier}",
-			Handler: http.HandlerFunc(rl.GetRow),
+			Pattern: urlTables,
+			Handler: rl.validateKeyspace(rl.GetTables),
 		},
 		{
 			Method:  http.MethodPost,
-			Pattern: "/v1/keyspaces/{keyspaceName}/tables/{tableName}/rows",
-			Handler: http.HandlerFunc(rl.AddRow),
+			Pattern: urlTables,
+			Handler: rl.validateKeyspace(rl.isSupported(config.TableCreate, rl.AddTable)),
 		},
 		{
-			Method:  http.MethodPost,
-			Pattern: "/v1/keyspaces/{keyspaceName}/tables/{tableName}/rows/query",
-			Handler: http.HandlerFunc(rl.Query),
-		},
-		{
-			Method:  http.MethodPut,
-			Pattern: "/v1/keyspaces/{keyspaceName}/tables/{tableName}/rows/{rowIdentifier}",
-			Handler: http.HandlerFunc(rl.UpdateRow),
+			Method:  http.MethodGet,
+			Pattern: urlSingleTable,
+			Handler: rl.validateKeyspace(rl.GetTable),
 		},
 		{
 			Method:  http.MethodDelete,
-			Pattern: "/v1/keyspaces/{keyspaceName}/tables/{tableName}/rows/{rowIdentifier}",
-			Handler: http.HandlerFunc(rl.DeleteRow),
+			Pattern: urlSingleTable,
+			Handler: rl.validateKeyspace(rl.isSupported(config.TableDrop, rl.DeleteTable)),
 		},
 		{
 			Method:  http.MethodGet,
-			Pattern: "/v1/keyspaces/{keyspaceName}/tables",
-			Handler: http.HandlerFunc(rl.GetTables),
-		},
-		{
-			Method:  http.MethodGet,
-			Pattern: "/v1/keyspaces/{keyspaceName}/tables/{tableName}",
-			Handler: http.HandlerFunc(rl.GetTable),
-		},
-		{
-			Method:  http.MethodPost,
-			Pattern: "/v1/keyspaces/{keyspaceName}/tables",
-			Handler: http.HandlerFunc(rl.AddTable),
-		},
-		{
-			Method:  http.MethodDelete,
-			Pattern: "/v1/keyspaces/{keyspaceName}/tables/{tableName}",
-			Handler: http.HandlerFunc(rl.DeleteTable),
-		},
-		{
-			Method:  http.MethodGet,
-			Pattern: "/v1/keyspaces",
+			Pattern: urlKeyspaces,
 			Handler: http.HandlerFunc(rl.GetKeyspaces),
 		},
 	}
+
 	return routes
+}
+
+func url(prefix string, urlPattern config.UrlPattern, format string, parameterNames ...string) string {
+	return path.Join(prefix, urlPattern.UrlPathFormat(format, parameterNames...))
+}
+
+func (s *routeList) validateKeyspace(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		keyspaceName := s.params(r, keyspaceParam)
+
+		if s.singleKeyspace != "" && s.singleKeyspace != keyspaceName {
+			// Only a single keyspace is allowed and it's not the provided one
+			RespondWithKeyspaceNotAllowed(w)
+			return
+		}
+
+		if s.excludedKeyspaces[keyspaceName] {
+			RespondWithKeyspaceNotAllowed(w)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
+func (s *routeList) isSupported(requiredOp config.SchemaOperations, handler http.HandlerFunc) http.HandlerFunc {
+	if s.operations.IsSupported(requiredOp) {
+		return handler
+	}
+
+	return forbiddenHandler
+}
+
+func forbiddenHandler(w http.ResponseWriter, _ *http.Request) {
+	http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 }

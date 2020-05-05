@@ -11,7 +11,7 @@ type TableAdd struct {
 	ColumnDefinitions []ColumnDefinition `json:"columnDefinitions,omitempty"`
 
 	// Defines a column list for the primary key. Can be either a single column, compound primary key, or composite partition key.
-	PrimaryKey *PrimaryKey `validate:"required"`
+	PrimaryKey *PrimaryKey `json:"primaryKey" validate:"required"`
 
 	TableOptions *TableOptions `json:"tableOptions,omitempty"`
 }
@@ -21,7 +21,7 @@ type TableAdd struct {
 type PrimaryKey struct {
 
 	// The column(s) that will constitute the partition key.
-	PartitionKey []string `validate:"required"`
+	PartitionKey []string `json:"partitionKey" validate:"required"`
 
 	// The column(s) that will constitute the clustering key.
 	ClusteringKey []string `json:"clusteringKey,omitempty"`
@@ -33,7 +33,7 @@ type TableOptions struct {
 	// TTL (Time To Live) in seconds, where zero is disabled. The maximum configurable value is 630720000 (20 years). If
 	// the value is greater than zero, TTL is enabled for the entire table and an expiration timestamp is added to each
 	// column. A new TTL timestamp is calculated each time the data is updated and the row is removed after all the data expires.
-	DefaultTimeToLive *int32 `validate:"gte=0,lte=630720000"`
+	DefaultTimeToLive *int32 `json:"defaultTimeToLive,omitempty" validate:"gte=0,lte=630720000"`
 
 	ClusteringExpression []ClusteringExpression `json:"clusteringExpression,omitempty"`
 }
@@ -41,6 +41,6 @@ type TableOptions struct {
 // ClusteringExpression allows for ordering rows so that storage is able to make use of the on-disk sorting of columns. Specifying
 // order can make query results more efficient.
 type ClusteringExpression struct {
-	Column *string `validate:"required"`
-	Order  *string `validate:"required"`
+	Column *string `json:"column" validate:"required"`
+	Order  *string `json:"order" validate:"required"`
 }

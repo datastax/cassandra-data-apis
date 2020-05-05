@@ -15,7 +15,3 @@ func (e *InternalError) Error() string {
 func (e *InternalError) StatusCode() int {
 	return http.StatusNotFound
 }
-
-func NewInternalError(text string) error {
-	return &InternalError{text}
-}

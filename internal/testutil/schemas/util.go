@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/datastax/cassandra-data-apis/graphql"
 	"github.com/datastax/cassandra-data-apis/internal/testutil"
+	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/gocql/gocql"
 	"github.com/iancoleman/strcase"
 	. "github.com/onsi/gomega"
@@ -94,7 +95,7 @@ func NewUuid() string {
 	return uuid.String()
 }
 
-func ExecutePost(routes []graphql.Route, target string, body string) *bytes.Buffer {
+func ExecutePost(routes []types.Route, target string, body string) *bytes.Buffer {
 	b, err := json.Marshal(graphql.RequestBody{Query: body})
 	Expect(err).ToNot(HaveOccurred())
 	targetUrl := fmt.Sprintf("http://%s", path.Join(host, target))
@@ -105,7 +106,7 @@ func ExecutePost(routes []graphql.Route, target string, body string) *bytes.Buff
 	return w.Body
 }
 
-func ExpectQueryToReturnError(routes []graphql.Route, query string, expectedMessage string) {
+func ExpectQueryToReturnError(routes []types.Route, query string, expectedMessage string) {
 	b, err := json.Marshal(graphql.RequestBody{Query: query})
 	Expect(err).ToNot(HaveOccurred())
 	targetUrl := fmt.Sprintf("http://%s", path.Join(host, "/graphql"))

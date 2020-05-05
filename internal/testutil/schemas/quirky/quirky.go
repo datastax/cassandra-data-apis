@@ -2,13 +2,20 @@ package quirky
 
 import (
 	"fmt"
-	"github.com/datastax/cassandra-data-apis/graphql"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas"
+	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/iancoleman/strcase"
 	. "github.com/onsi/gomega"
 )
 
-func InsertAndSelect(routes []graphql.Route, name string) {
+var intId = 0
+
+func newIntId() int {
+	intId++
+	return intId
+}
+
+func InsertAndSelect(routes []types.Route, name string) int {
 	insertQuery := `mutation {
 	  insert%s(value:{id:%d, value:"%s"}) {
 		applied
@@ -23,14 +30,16 @@ func InsertAndSelect(routes []graphql.Route, name string) {
 	  }
 	}`
 
+	id := newIntId()
 	value := schemas.NewUuid()
-	schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(insertQuery, name, 1, value))
-	buffer := schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(selectQuery, strcase.ToLowerCamel(name), 1))
+	schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(insertQuery, name, id, value))
+	buffer := schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(selectQuery, strcase.ToLowerCamel(name), id))
 	values := schemas.DecodeDataAsSliceOfMaps(buffer, strcase.ToLowerCamel(name), "values")
 	Expect(values[0]["value"]).To(Equal(value))
+	return id
 }
 
-func InsertWeirdCase(routes []graphql.Route, id int) {
+func InsertWeirdCase(routes []types.Route, id int) {
 	query := `mutation { 
 	  insertWEIRDCASE(value: { id: %d, aBCdef: "one", qAData: "two", abcXYZ: "three" }) {
 		applied
@@ -41,7 +50,7 @@ func InsertWeirdCase(routes []graphql.Route, id int) {
 	Expect(data["applied"]).To(Equal(true))
 }
 
-func SelectWeirdCase(routes []graphql.Route, id int) {
+func SelectWeirdCase(routes []types.Route, id int) {
 	query := `{
 	  wEIRDCASE(value: {id: %d }) { 
 		values { aBCdef, abcXYZ, qAData }

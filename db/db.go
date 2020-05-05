@@ -1,7 +1,9 @@
 package db
 
 import (
+	"fmt"
 	"github.com/datastax/cassandra-data-apis/config"
+	e "github.com/datastax/cassandra-data-apis/errors"
 	"github.com/gocql/gocql"
 	"time"
 )
@@ -86,10 +88,34 @@ func NewDbWithConnectedInstance(session *gocql.Session) *Db {
 	return &Db{session: &GoCqlSession{ref: session}}
 }
 
-// Keyspace Retrieves a keyspace
+// Keyspace retrieves the keyspace metadata for all users
 func (db *Db) Keyspace(keyspace string) (*gocql.KeyspaceMetadata, error) {
 	// We expose gocql types for now, we should wrap them in the future instead
-	return db.session.KeyspaceMetadata(keyspace)
+	ks, err := db.session.KeyspaceMetadata(keyspace)
+
+	if err != nil && err.Error() == "keyspace does not exist" {
+		return nil, &DbObjectNotFound{"keyspace", keyspace}
+	}
+
+	return ks, err
+}
+
+// Keyspace retrieves the table metadata for all users
+func (db *Db) Table(keyspaceName string, tableName string) (*gocql.TableMetadata, error) {
+	// We expose gocql types for now, we should wrap them in the future instead
+	ks, err := db.Keyspace(keyspaceName)
+
+	if err != nil {
+		return nil, err
+	}
+
+	table, ok := ks.Tables[tableName]
+
+	if !ok {
+		return nil, &DbObjectNotFound{"table", tableName}
+	}
+
+	return table, nil
 }
 
 // KeyspaceNamingInfo Retrieves the keyspace naming information
@@ -118,8 +144,9 @@ func (k *keyspaceNamingInfo) Tables() map[string][]string {
 }
 
 // Keyspaces Retrieves all the keyspace names
-func (db *Db) Keyspaces() ([]string, error) {
-	iter, err := db.session.ExecuteIter("SELECT keyspace_name FROM system_schema.keyspaces", nil)
+func (db *Db) Keyspaces(userOrRole string) ([]string, error) {
+	iter, err := db.session.ExecuteIter("SELECT keyspace_name FROM system_schema.keyspaces",
+		NewQueryOptions().WithUserOrRole(userOrRole))
 	if err != nil {
 		return nil, err
 	}
@@ -145,4 +172,61 @@ func (db *Db) Views(ksName string) (map[string]bool, error) {
 	}
 
 	return views, nil
+}
+
+// DescribeTables returns the tables that the user is authorized to see
+func (db *Db) DescribeTable(keyspace, table, username string) (*gocql.TableMetadata, error) {
+	// Query system_schema first to make sure user is authorized
+	stmt := "SELECT table_name FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?"
+
+	result, retErr := db.Execute(stmt, NewQueryOptions().WithUserOrRole(username), keyspace, table)
+	if retErr != nil {
+		return nil, retErr
+	}
+
+	if len(result.Values()) == 0 {
+		return nil, e.NewNotFoundError(fmt.Sprintf("table %s in keyspace %s not found", table, keyspace))
+	}
+
+	keyspaceMetadata, retErr := db.Keyspace(keyspace)
+	if retErr != nil {
+		return nil, retErr
+	}
+
+	tableMetadata, found := keyspaceMetadata.Tables[table]
+	if found {
+		return tableMetadata, nil
+	}
+
+	return nil, e.NewNotFoundError(fmt.Sprintf("table %s in keyspace %s not found", table, keyspace))
+}
+
+// DescribeTables returns the tables that the user is authorized to see
+func (db *Db) DescribeTables(keyspace, username string) ([]string, error) {
+	// Query system_schema to make sure user is authorized
+	stmt := "SELECT table_name FROM system_schema.tables WHERE keyspace_name = ?"
+	result, retErr := db.Execute(stmt, NewQueryOptions().WithUserOrRole(username), keyspace)
+	if retErr != nil {
+		return nil, retErr
+	}
+
+	tables := make([]string, 0, len(result.Values()))
+	for _, row := range result.Values() {
+		value := row["table_name"].(*string)
+		if value == nil {
+			continue
+		}
+		tables = append(tables, *value)
+	}
+
+	return tables, nil
+}
+
+type DbObjectNotFound struct {
+	objectType string
+	keyspace   string
+}
+
+func (e *DbObjectNotFound) Error() string {
+	return fmt.Sprintf("%s '%s' does not exist", e.objectType, e.keyspace)
 }

@@ -2,8 +2,6 @@ package endpoint
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"net/http"
 
 	m "github.com/datastax/cassandra-data-apis/rest/models"
@@ -23,22 +21,27 @@ func RespondJSONObjectWithCode(w http.ResponseWriter, code int, obj interface{})
 
 func writeJSONBytes(w http.ResponseWriter, jsonBytes []byte, err error, code int) {
 	if err != nil {
-		RespondWithError(w, errors.New("unable to marshal response"), http.StatusInternalServerError)
+		RespondWithError(w, "Unable to marshal response", http.StatusInternalServerError)
 	}
 
 	w.WriteHeader(code)
 	if jsonBytes != nil {
-		w.Write(jsonBytes)
+		_, _ = w.Write(jsonBytes)
 	}
 }
 
-func RespondWithError(w http.ResponseWriter, err error, code int) {
+func RespondWithError(w http.ResponseWriter, message string, code int) {
 	requestError := m.ModelError{
-		Description: fmt.Sprintf(err.Error()),
+		Description: message,
 	}
+
 	RespondJSONObjectWithCode(w, code, requestError)
 }
 
 func setCommonHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+}
+
+func RespondWithKeyspaceNotAllowed(w http.ResponseWriter) {
+	RespondWithError(w, "keyspace not found", http.StatusBadRequest)
 }

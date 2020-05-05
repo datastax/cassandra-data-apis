@@ -4,5 +4,5 @@ package models
 type ColumnUpdate struct {
 
 	// NewName is the new name of the column.
-	NewName string `validate:"required"`
+	NewName string `json:"newName" validate:"required"`
 }
