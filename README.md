@@ -155,7 +155,7 @@ is a path to the chain of certificates used to generate the database server's ce
 certificate chain is used by API endpoints to verify the database server's certificates.  The
 `ssl-client-cert-path` and `ssl-client-key-path` options are not required, but can be use to provide
 client-side certificates that are used by the database servers to authenticate and verify the API
-servers, this is know as mutual authentication. 
+servers, this is known as mutual authentication. 
 
 ## Building 
 
