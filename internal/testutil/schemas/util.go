@@ -117,6 +117,10 @@ func ExpectQueryToReturnError(routes []graphql.Route, query string, expectedMess
 	Expect(w.Code).To(Equal(http.StatusOK))
 	response := DecodeResponse(w.Body)
 	Expect(response.Data).To(HaveLen(0))
+	ExpectError(response, expectedMessage)
+}
+
+func ExpectError(response ResponseBody, expectedMessage string) {
 	Expect(response.Errors).To(HaveLen(1))
 	Expect(response.Errors[0].Message).To(ContainSubstring(expectedMessage))
 }

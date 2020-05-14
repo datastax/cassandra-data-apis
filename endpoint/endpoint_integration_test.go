@@ -897,7 +897,6 @@ var _ = Describe("DataEndpoint", func() {
 				tableName := "table1"
 				ddl.CreateKeyspace(routes, ksName)
 				ddl.CreateTable(routes, ksName, tableName, []string{"{ basic: TEXT }"})
-				ddl.AlterTableAdd(routes, ksName, tableName, ddl.ColumnTypes)
 				ddl.WaitUntilExists(func() schemas.ResponseBody {
 					return ddl.Table(routes, ksName, tableName)
 				})
@@ -908,6 +907,56 @@ var _ = Describe("DataEndpoint", func() {
 				response := ddl.Table(routes, ksName, tableName)
 				Expect(response.Errors).To(HaveLen(1))
 				Expect(response.Errors[0].Message).To(ContainSubstring("table does not exist"))
+			})
+			It("Should only be able to modify tables inside single keyspace", func() {
+				ksName := randomName()
+				otherKsName := randomName()
+				tableName := "table1"
+				{ // Create keyspace
+					routes := getSchemaRoutes(cfg)
+					ddl.CreateKeyspace(routes, ksName)
+					ddl.CreateKeyspace(routes, otherKsName)
+				}
+				routes := getSchemaRoutesKeyspace(cfg, ksName)
+
+				// Valid cases
+				ddl.CreateTable(routes, ksName, tableName, []string{"{ basic: TEXT }"})
+				ddl.WaitUntilExists(func() schemas.ResponseBody {
+					return ddl.Table(routes, ksName, tableName)
+				})
+				ddl.AlterTableAdd(routes, ksName, tableName, ddl.ColumnTypes)
+				ddl.WaitUntilColumnExists("addedValue01", func() schemas.ResponseBody {
+					return ddl.Table(routes, ksName, tableName)
+				})
+				ddl.AlterTableDrop(routes, ksName, tableName, []string{"addedValue01"})
+				ddl.WaitUntilColumnIsGone("addedValue01", func() schemas.ResponseBody {
+					return ddl.Table(routes, ksName, tableName)
+				})
+				ddl.DropTable(routes, ksName, tableName)
+				ddl.WaitUntilGone(func() schemas.ResponseBody {
+					return ddl.Table(routes, ksName, tableName)
+				})
+
+				// Invalid cases
+				ddl.ExpectInvalidKeyspace(routes, otherKsName, tableName)
+				keyspaces := ddl.Keyspaces(routes)
+				Expect(keyspaces.Data["keyspaces"]).To(HaveLen(1))
+			})
+			It("Should not be able to modify tables inside excluded keyspace", func() {
+				ksName := randomName()
+				tableName := "table1"
+
+				{ // Setup and valid case
+					routes := getSchemaRoutes(cfg)
+					ddl.CreateKeyspace(routes, ksName)
+					ddl.CreateTable(routes, ksName, tableName, []string{"{ basic: TEXT }"})
+				}
+
+				{ // Invalid cases
+					cfg.WithExcludedKeyspaces([]string{ksName})
+					routes := getSchemaRoutes(cfg)
+					ddl.ExpectInvalidKeyspace(routes, ksName, tableName)
+				}
 			})
 		})
 	})
@@ -923,6 +972,13 @@ func getRoutes(config *DataEndpointConfig, keyspace string) []graphql.Route {
 func getSchemaRoutes(cfg *DataEndpointConfig) []graphql.Route {
 	var endpoint = cfg.newEndpointWithDb(db.NewDbWithConnectedInstance(GetSession()))
 	routes, err := endpoint.RoutesSchemaManagementGraphQL("/graphql-schema", config.AllSchemaOperations)
+	Expect(err).ToNot(HaveOccurred())
+	return routes
+}
+
+func getSchemaRoutesKeyspace(cfg *DataEndpointConfig, singleKeyspace string) []graphql.Route {
+	var endpoint = cfg.newEndpointWithDb(db.NewDbWithConnectedInstance(GetSession()))
+	routes, err := endpoint.RoutesSchemaManagementKeyspaceGraphQL("/graphql-schema", singleKeyspace,  config.AllSchemaOperations)
 	Expect(err).ToNot(HaveOccurred())
 	return routes
 }

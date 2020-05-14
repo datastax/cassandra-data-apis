@@ -111,16 +111,26 @@ func CreateTableIfNotExists(routes []graphql.Route, ksName string, tableName str
 }
 
 func AlterTableAdd(routes []graphql.Route, ksName string, tableName string, columnTypes []string) {
+	response := AlterTableAddResponse(routes, ksName, tableName, columnTypes)
+	Expect(response.Errors).To(HaveLen(0))
+}
+
+func AlterTableAddResponse(routes []graphql.Route, ksName string,
+	tableName string, columnTypes []string) schemas.ResponseBody {
 	mutation := `mutation {
   alterTableAdd(keyspaceName:"%s", tableName:"%s", toAdd: [ %s ])
 }`
 	buffer := schemas.ExecutePost(routes, "/graphql-schema",
 		fmt.Sprintf(mutation, ksName, tableName, buildColumnList("addedValue", columnTypes)))
-	response := schemas.DecodeResponse(buffer)
-	Expect(response.Errors).To(HaveLen(0))
+	return schemas.DecodeResponse(buffer)
 }
 
 func AlterTableDrop(routes []graphql.Route, ksName string, tableName string, columns []string) {
+	response := AlterTableDropResponse(routes, ksName, tableName, columns)
+	Expect(response.Errors).To(HaveLen(0))
+}
+
+func AlterTableDropResponse(routes []graphql.Route, ksName string, tableName string, columns []string) schemas.ResponseBody {
 	mutation := `mutation {
   alterTableDrop(keyspaceName:"%s", tableName:"%s", toDrop: [ %s ])
 }`
@@ -130,15 +140,18 @@ func AlterTableDrop(routes []graphql.Route, ksName string, tableName string, col
 	}
 	buffer := schemas.ExecutePost(routes, "/graphql-schema",
 		fmt.Sprintf(mutation, ksName, tableName, b.String()[2:]))
-	response := schemas.DecodeResponse(buffer)
-	Expect(response.Errors).To(HaveLen(0))
+	return schemas.DecodeResponse(buffer)
 }
 
 func DropTable(routes []graphql.Route, ksName string, tableName string) {
+	response := DropTableResponse(routes, ksName, tableName)
+	Expect(response.Errors).To(HaveLen(0))
+}
+
+func DropTableResponse(routes []graphql.Route, ksName string, tableName string) schemas.ResponseBody {
 	mutation := `mutation { dropTable(keyspaceName:"%s", tableName:"%s") }`
 	buffer := schemas.ExecutePost(routes, "/graphql-schema", fmt.Sprintf(mutation, ksName, tableName))
-	response := schemas.DecodeResponse(buffer)
-	Expect(response.Errors).To(HaveLen(0))
+	return schemas.DecodeResponse(buffer)
 }
 
 func Keyspaces(routes []graphql.Route) schemas.ResponseBody {
@@ -222,6 +235,20 @@ func Table(routes []graphql.Route, ksName string, tableName string) schemas.Resp
 	buffer := schemas.ExecutePost(routes, "/graphql-schema", fmt.Sprintf(query, ksName, tableName))
 	response := schemas.DecodeResponse(buffer)
 	return response
+}
+
+func ExpectInvalidKeyspace(routes []graphql.Route, ksName string, tableName string) {
+	expectedMessage := fmt.Sprintf("keyspace does not exist '%s'", ksName)
+	response := CreateTableIfNotExists(routes, ksName, tableName, []string{"{ basic: TEXT }"}, false)
+	schemas.ExpectError(response, expectedMessage)
+	response = AlterTableAddResponse(routes, ksName, tableName, ColumnTypes)
+	schemas.ExpectError(response, expectedMessage)
+	response = AlterTableDropResponse(routes, ksName, tableName, []string{"addedValue01"})
+	schemas.ExpectError(response, expectedMessage)
+	response = DropTableResponse(routes, ksName, tableName)
+	schemas.ExpectError(response, expectedMessage)
+	response = Keyspace(routes, ksName)
+	schemas.ExpectError(response, expectedMessage)
 }
 
 func SortColumns(response schemas.ResponseBody) {

@@ -50,8 +50,8 @@ func NewRouteGenerator(dbClient *db.Db, cfg config.Config) *RouteGenerator {
 	}
 }
 
-func (rg *RouteGenerator) RoutesSchemaManagement(pattern string, ops config.SchemaOperations) ([]Route, error) {
-	schema, err := rg.schemaGen.BuildKeyspaceSchema(ops)
+func (rg *RouteGenerator) RoutesSchemaManagement(pattern string, singleKeyspace string, ops config.SchemaOperations) ([]Route, error) {
+	schema, err := rg.schemaGen.BuildKeyspaceSchema(singleKeyspace, ops)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build graphql schema for schema management: %s", err)
 	}
