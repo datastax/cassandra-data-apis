@@ -121,7 +121,7 @@ func (sg *SchemaGenerator) buildKeyspaceQuery(singleKeyspace string) *graphql.Ob
 				},
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) {
 					ksName := params.Args["name"].(string)
-					if sg.isKeyspaceExcluded(ksName) || (singleKeyspace != "" && ksName != singleKeyspace) {
+					if sg.isKeyspaceExcludedOrNotSingle(ksName, singleKeyspace) {
 						return nil, fmt.Errorf("keyspace does not exist '%s'", ksName)
 					}
 					keyspace, err := sg.dbClient.Keyspace(ksName)
@@ -265,7 +265,7 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(singleKeyspace string, ops conf
 				},
 			},
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				return checkSingleKeyspace(singleKeyspace, p, sg.createTable)
+				return sg.checkKeyspace(singleKeyspace, p, sg.createTable)
 			},
 		}
 	}
@@ -285,7 +285,7 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(singleKeyspace string, ops conf
 				},
 			},
 			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
-				return checkSingleKeyspace(singleKeyspace, p, sg.alterTableAdd)
+				return sg.checkKeyspace(singleKeyspace, p, sg.alterTableAdd)
 			},
 		}
 	}
@@ -305,7 +305,7 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(singleKeyspace string, ops conf
 				},
 			},
 			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
-				return checkSingleKeyspace(singleKeyspace, p, sg.alterTableDrop)
+				return sg.checkKeyspace(singleKeyspace, p, sg.alterTableDrop)
 			},
 		}
 	}
@@ -325,7 +325,7 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(singleKeyspace string, ops conf
 				},
 			},
 			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
-				return checkSingleKeyspace(singleKeyspace, p, sg.dropTable)
+				return sg.checkKeyspace(singleKeyspace, p, sg.dropTable)
 			},
 		}
 	}
@@ -336,19 +336,22 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(singleKeyspace string, ops conf
 	})
 }
 
+func (sg *SchemaGenerator) checkKeyspace(singleKeyspace string, p graphql.ResolveParams,
+	op func(params graphql.ResolveParams) (i interface{}, err error)) (i interface{}, err error) {
+	ksName := p.Args["keyspaceName"].(string)
+	if  sg.isKeyspaceExcludedOrNotSingle(ksName, singleKeyspace){
+		return nil, fmt.Errorf("keyspace does not exist '%s'", ksName)
+	}
+	return op(p)
+}
+
+func (sg *SchemaGenerator) isKeyspaceExcludedOrNotSingle(ksName string, singleKeyspace string) bool {
+	return sg.isKeyspaceExcluded(ksName) || singleKeyspace != "" && ksName != singleKeyspace
+}
+
 func getBoolArg(args map[string]interface{}, name string) bool {
 	if value, ok := args[name]; ok {
 		return value.(bool)
 	}
 	return false
 }
-
-func checkSingleKeyspace(singleKeyspace string, p graphql.ResolveParams,
-	op func(params graphql.ResolveParams) (i interface{}, err error)) (i interface{}, err error) {
-	ksName := p.Args["keyspaceName"].(string)
-	if singleKeyspace != "" && ksName != singleKeyspace {
-		return nil, fmt.Errorf("keyspace does not exist '%s'", ksName)
-	}
-	return op(p)
-}
-

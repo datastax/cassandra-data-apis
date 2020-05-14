@@ -910,10 +910,12 @@ var _ = Describe("DataEndpoint", func() {
 			})
 			It("Should only be able to modify tables inside single keyspace", func() {
 				ksName := randomName()
+				otherKsName := randomName()
 				tableName := "table1"
 				{ // Create keyspace
 					routes := getSchemaRoutes(cfg)
 					ddl.CreateKeyspace(routes, ksName)
+					ddl.CreateKeyspace(routes, otherKsName)
 				}
 				routes := getSchemaRoutesKeyspace(cfg, ksName)
 
@@ -935,21 +937,26 @@ var _ = Describe("DataEndpoint", func() {
 					return ddl.Table(routes, ksName, tableName)
 				})
 
-				const expectedMessage = "keyspace does not exist 'invalid'"
-
 				// Invalid cases
-				response := ddl.CreateTableIfNotExists(routes, "invalid", tableName, []string{"{ basic: TEXT }"}, false)
-				schemas.ExpectError(response, expectedMessage)
-				response = ddl.AlterTableAddResponse(routes, "invalid", tableName, ddl.ColumnTypes)
-				schemas.ExpectError(response, expectedMessage)
-				response = ddl.AlterTableDropResponse(routes, "invalid", tableName, []string{"addedValue01"})
-				schemas.ExpectError(response, expectedMessage)
-				response = ddl.DropTableResponse(routes, "invalid", tableName)
-				schemas.ExpectError(response, expectedMessage)
-				response = ddl.Keyspace(routes, "invalid")
-				schemas.ExpectError(response, expectedMessage)
+				ddl.ExpectInvalidKeyspace(routes, otherKsName, tableName)
 				keyspaces := ddl.Keyspaces(routes)
 				Expect(keyspaces.Data["keyspaces"]).To(HaveLen(1))
+			})
+			It("Should not be able to modify tables inside excluded keyspace", func() {
+				ksName := randomName()
+				tableName := "table1"
+
+				{ // Setup and valid case
+					routes := getSchemaRoutes(cfg)
+					ddl.CreateKeyspace(routes, ksName)
+					ddl.CreateTable(routes, ksName, tableName, []string{"{ basic: TEXT }"})
+				}
+
+				{ // Invalid cases
+					cfg.WithExcludedKeyspaces([]string{ksName})
+					routes := getSchemaRoutes(cfg)
+					ddl.ExpectInvalidKeyspace(routes, ksName, tableName)
+				}
 			})
 		})
 	})

@@ -237,6 +237,20 @@ func Table(routes []graphql.Route, ksName string, tableName string) schemas.Resp
 	return response
 }
 
+func ExpectInvalidKeyspace(routes []graphql.Route, ksName string, tableName string) {
+	expectedMessage := fmt.Sprintf("keyspace does not exist '%s'", ksName)
+	response := CreateTableIfNotExists(routes, ksName, tableName, []string{"{ basic: TEXT }"}, false)
+	schemas.ExpectError(response, expectedMessage)
+	response = AlterTableAddResponse(routes, ksName, tableName, ColumnTypes)
+	schemas.ExpectError(response, expectedMessage)
+	response = AlterTableDropResponse(routes, ksName, tableName, []string{"addedValue01"})
+	schemas.ExpectError(response, expectedMessage)
+	response = DropTableResponse(routes, ksName, tableName)
+	schemas.ExpectError(response, expectedMessage)
+	response = Keyspace(routes, ksName)
+	schemas.ExpectError(response, expectedMessage)
+}
+
 func SortColumns(response schemas.ResponseBody) {
 	sortColumns(getColumns(response))
 }
