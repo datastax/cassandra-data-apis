@@ -235,7 +235,11 @@ func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint
 		logger.Fatal("invalid supported operation", "operations", supportedOps, "error", err)
 	}
 
-	routes, err = endpoint.RoutesSchemaManagementGraphQL(viper.GetString("graphql-schema-path"), ops)
+	if singleKeyspace != "" {
+		routes, err = endpoint.RoutesSchemaManagementKeyspaceGraphQL(viper.GetString("graphql-schema-path"), singleKeyspace,  ops)
+	} else {
+		routes, err = endpoint.RoutesSchemaManagementGraphQL(viper.GetString("graphql-schema-path"), ops)
+	}
 
 	if err != nil {
 		logger.Fatal("unable to generate graphql schema routes",

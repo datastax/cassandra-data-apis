@@ -127,7 +127,11 @@ func (e *DataEndpoint) RoutesKeyspaceGraphQL(pattern string, ksName string) ([]g
 }
 
 func (e *DataEndpoint) RoutesSchemaManagementGraphQL(pattern string, ops config.SchemaOperations) ([]graphql.Route, error) {
-	return e.graphQLRouteGen.RoutesSchemaManagement(pattern, ops)
+	return e.graphQLRouteGen.RoutesSchemaManagement(pattern, "", ops)
+}
+
+func (e *DataEndpoint) RoutesSchemaManagementKeyspaceGraphQL(pattern string, ksName string, ops config.SchemaOperations) ([]graphql.Route, error) {
+	return e.graphQLRouteGen.RoutesSchemaManagement(pattern, ksName, ops)
 }
 
 // Keyspaces gets a slice of keyspace names that are considered by the endpoint when used in multi-keyspace mode.
