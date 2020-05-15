@@ -16,12 +16,6 @@ const (
 	updatePrefix = "update"
 )
 
-var systemKeyspaces = []string{
-	"system", "system_auth", "system_distributed", "system_schema", "system_traces", "system_views", "system_virtual_schema",
-	"dse_insights", "dse_insights_local", "dse_leases", "dse_perf", "dse_security", "dse_system", "dse_system_local",
-	"solr_admin",
-}
-
 type SchemaGenerator struct {
 	dbClient          *db.Db
 	namingFn          config.NamingConventionFn
@@ -32,7 +26,7 @@ type SchemaGenerator struct {
 
 func NewSchemaGenerator(dbClient *db.Db, cfg config.Config) *SchemaGenerator {
 	ksExcluded := map[string]bool{}
-	for _, ksName := range systemKeyspaces {
+	for _, ksName := range config.SystemKeyspaces {
 		ksExcluded[ksName] = true
 	}
 	for _, ksName := range cfg.ExcludedKeyspaces() {
