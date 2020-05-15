@@ -120,6 +120,11 @@ func (sg *SchemaGenerator) buildKeyspaceQuery(singleKeyspace string) *graphql.Ob
 					},
 				},
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) {
+					err := sg.checkAuthorizedForSchema(params)
+					if err != nil {
+						return nil, err
+					}
+
 					ksName := params.Args["name"].(string)
 					if sg.isKeyspaceExcludedOrNotSingle(ksName, singleKeyspace) {
 						return nil, fmt.Errorf("keyspace does not exist '%s'", ksName)
@@ -135,6 +140,11 @@ func (sg *SchemaGenerator) buildKeyspaceQuery(singleKeyspace string) *graphql.Ob
 			"keyspaces": &graphql.Field{
 				Type: graphql.NewList(keyspaceType),
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) {
+					err := sg.checkAuthorizedForSchema(params)
+					if err != nil {
+						return nil, err
+					}
+
 					ksValues := make([]ksValue, 0)
 					if singleKeyspace == "" {
 						ksNames, err := sg.dbClient.Keyspaces()
@@ -347,6 +357,15 @@ func (sg *SchemaGenerator) checkKeyspace(singleKeyspace string, p graphql.Resolv
 
 func (sg *SchemaGenerator) isKeyspaceExcludedOrNotSingle(ksName string, singleKeyspace string) bool {
 	return sg.isKeyspaceExcluded(ksName) || singleKeyspace != "" && ksName != singleKeyspace
+}
+
+func (sg* SchemaGenerator) checkAuthorizedForSchema(p graphql.ResolveParams) error {
+	userOrRole, err := sg.checkUserOrRoleAuth(p)
+	if err != nil {
+		return err
+	}
+	return sg.dbClient.ExecuteNoResult("SELECT COUNT(*) FROM system_schema.keyspaces",
+		db.NewQueryOptions().WithUserOrRole(userOrRole))
 }
 
 func getBoolArg(args map[string]interface{}, name string) bool {
