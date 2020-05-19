@@ -166,12 +166,12 @@ var tableType = graphql.NewObject(graphql.ObjectConfig{
 	},
 })
 
-func getTables(keyspace *gocql.KeyspaceMetadata, args map[string]interface{}) (interface{}, error) {
+func (sg *SchemaGenerator) getTables(keyspace *gocql.KeyspaceMetadata, userOrRole string, args map[string]interface{}) (interface{}, error) {
 	if args["name"] != nil {
 		// Filter by name
 		name := args["name"].(string)
 		table := keyspace.Tables[name]
-		if table == nil {
+		if table == nil  || !sg.checkAuthorizedForTable(name, userOrRole)  {
 			return nil, fmt.Errorf("table does not exist '%s'", name)
 		}
 
@@ -188,6 +188,9 @@ func getTables(keyspace *gocql.KeyspaceMetadata, args map[string]interface{}) (i
 
 	tableValues := make([]*tableValue, 0)
 	for _, table := range keyspace.Tables {
+		if !sg.checkAuthorizedForTable(table.Name, userOrRole) {
+			continue
+		}
 		columns, err := toColumnValues(table.Columns)
 		if err != nil {
 			return nil, err
@@ -368,6 +371,15 @@ func (sg *SchemaGenerator) dropTable(params graphql.ResolveParams) (interface{},
 		IfExists: getBoolArg(args, "ifExists")},
 		db.NewQueryOptions().WithUserOrRole(userOrRole).WithContext(params.Context))
 	return err != nil, err
+}
+
+func (sg *SchemaGenerator) checkAuthorizedForTable(table string, userOrRole string) bool {
+	if userOrRole == "" { // Disabled if no user or role provided
+		return  true
+	}
+	err := sg.dbClient.ExecuteNoResult("SELECT table_name FROM system_schema.tables table_name = ?",
+		db.NewQueryOptions().WithUserOrRole(userOrRole), table)
+	return err != nil
 }
 
 func toColumnType(info gocql.TypeInfo) (*dataTypeValue, error) {

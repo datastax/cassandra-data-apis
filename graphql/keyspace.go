@@ -16,9 +16,11 @@ type dataCenterValue struct {
 }
 
 type ksValue struct {
-	Name     string            `json:"name"`
-	DCs      []dataCenterValue `json:"dcs"`
-	keyspace *gocql.KeyspaceMetadata
+	Name       string            `json:"name"`
+	DCs        []dataCenterValue `json:"dcs"`
+	keyspace   *gocql.KeyspaceMetadata
+	userOrRole string
+	sg         *SchemaGenerator
 }
 
 var dataCenterType = graphql.NewObject(graphql.ObjectConfig{
@@ -63,14 +65,14 @@ var keyspaceType = graphql.NewObject(graphql.ObjectConfig{
 			},
 			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
 				parent := p.Source.(ksValue)
-				return getTables(parent.keyspace, p.Args)
+				return parent.sg.getTables(parent.keyspace, parent.userOrRole, p.Args)
 			},
 		},
 		"tables": &graphql.Field{
 			Type: graphql.NewList(tableType),
 			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
 				parent := p.Source.(ksValue)
-				return getTables(parent.keyspace, p.Args)
+				return parent.sg.getTables(parent.keyspace, parent.userOrRole, p.Args)
 			},
 		},
 	},
@@ -84,7 +86,7 @@ func (sg *SchemaGenerator) BuildKeyspaceSchema(singleKeyspace string, ops config
 		})
 }
 
-func (sg *SchemaGenerator) buildKeyspaceValue(keyspace *gocql.KeyspaceMetadata) ksValue {
+func (sg *SchemaGenerator) buildKeyspaceValue(keyspace *gocql.KeyspaceMetadata, userOrRole string) ksValue {
 	dcs := make([]dataCenterValue, 0)
 	if strings.Contains(keyspace.StrategyClass, "NetworkTopologyStrategy") {
 		for dc, replicas := range keyspace.StrategyOptions {
@@ -105,6 +107,8 @@ func (sg *SchemaGenerator) buildKeyspaceValue(keyspace *gocql.KeyspaceMetadata) 
 		keyspace.Name,
 		dcs,
 		keyspace,
+		userOrRole,
+		sg,
 	}
 }
 
@@ -120,13 +124,12 @@ func (sg *SchemaGenerator) buildKeyspaceQuery(singleKeyspace string) *graphql.Ob
 					},
 				},
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) {
-					err := sg.checkAuthorizedForSchema(params)
+					userOrRole, err := sg.checkUserOrRoleAuth(params)
 					if err != nil {
 						return nil, err
 					}
-
 					ksName := params.Args["name"].(string)
-					if sg.isKeyspaceExcludedOrNotSingle(ksName, singleKeyspace) {
+					if sg.isKeyspaceExcludedOrNotSingle(ksName, singleKeyspace) || !sg.checkAuthorizedForKeyspace(ksName, userOrRole) {
 						return nil, fmt.Errorf("keyspace does not exist '%s'", ksName)
 					}
 					keyspace, err := sg.dbClient.Keyspace(ksName)
@@ -134,13 +137,13 @@ func (sg *SchemaGenerator) buildKeyspaceQuery(singleKeyspace string) *graphql.Ob
 						return nil, err
 					}
 
-					return sg.buildKeyspaceValue(keyspace), nil
+					return sg.buildKeyspaceValue(keyspace, userOrRole), nil
 				},
 			},
 			"keyspaces": &graphql.Field{
 				Type: graphql.NewList(keyspaceType),
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) {
-					err := sg.checkAuthorizedForSchema(params)
+					userOrRole, err := sg.checkUserOrRoleAuth(params)
 					if err != nil {
 						return nil, err
 					}
@@ -153,18 +156,18 @@ func (sg *SchemaGenerator) buildKeyspaceQuery(singleKeyspace string) *graphql.Ob
 						}
 
 						for _, ksName := range ksNames {
-							if sg.isKeyspaceExcluded(ksName) {
+							if sg.isKeyspaceExcluded(ksName) || !sg.checkAuthorizedForKeyspace(ksName, userOrRole) {
 								continue
 							}
 							keyspace, err := sg.dbClient.Keyspace(ksName)
 							if err != nil {
 								return nil, err
 							}
-							ksValues = append(ksValues, sg.buildKeyspaceValue(keyspace))
+							ksValues = append(ksValues, sg.buildKeyspaceValue(keyspace, userOrRole))
 						}
-					} else {
+					} else if sg.checkAuthorizedForKeyspace(singleKeyspace, userOrRole) {
 						if keyspace, err := sg.dbClient.Keyspace(singleKeyspace); err == nil {
-							ksValues = append(ksValues, sg.buildKeyspaceValue(keyspace))
+							ksValues = append(ksValues, sg.buildKeyspaceValue(keyspace, userOrRole))
 						} else {
 							sg.logger.Warn("unable to get single keyspace",
 								"keyspace", singleKeyspace,
@@ -349,7 +352,7 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(singleKeyspace string, ops conf
 func (sg *SchemaGenerator) checkKeyspace(singleKeyspace string, p graphql.ResolveParams,
 	op func(params graphql.ResolveParams) (i interface{}, err error)) (i interface{}, err error) {
 	ksName := p.Args["keyspaceName"].(string)
-	if  sg.isKeyspaceExcludedOrNotSingle(ksName, singleKeyspace){
+	if sg.isKeyspaceExcludedOrNotSingle(ksName, singleKeyspace) {
 		return nil, fmt.Errorf("keyspace does not exist '%s'", ksName)
 	}
 	return op(p)
@@ -359,13 +362,13 @@ func (sg *SchemaGenerator) isKeyspaceExcludedOrNotSingle(ksName string, singleKe
 	return sg.isKeyspaceExcluded(ksName) || singleKeyspace != "" && ksName != singleKeyspace
 }
 
-func (sg* SchemaGenerator) checkAuthorizedForSchema(p graphql.ResolveParams) error {
-	userOrRole, err := sg.checkUserOrRoleAuth(p)
-	if err != nil {
-		return err
+func (sg *SchemaGenerator) checkAuthorizedForKeyspace(ksName string, userOrRole string) bool {
+	if userOrRole == "" { // Disabled if no user or role provided
+		return  true
 	}
-	return sg.dbClient.ExecuteNoResult("SELECT COUNT(*) FROM system_schema.keyspaces",
-		db.NewQueryOptions().WithUserOrRole(userOrRole))
+	err := sg.dbClient.ExecuteNoResult("SELECT keyspace_name FROM system_schema.keyspaces keyspace_name = ?",
+		db.NewQueryOptions().WithUserOrRole(userOrRole), ksName)
+	return err != nil
 }
 
 func getBoolArg(args map[string]interface{}, name string) bool {
