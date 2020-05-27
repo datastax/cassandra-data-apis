@@ -10,6 +10,7 @@ import (
 type SelectInfo struct {
 	Keyspace string
 	Table    string
+	Columns  []string
 	Where    []types.ConditionItem
 	Options  *types.QueryOptions
 	OrderBy  []ColumnOrder
@@ -51,7 +52,16 @@ type ColumnOrder struct {
 func (db *Db) Select(info *SelectInfo, options *QueryOptions) (ResultSet, error) {
 	values := make([]interface{}, 0, len(info.Where))
 	whereClause := buildCondition(info.Where, &values)
-	query := fmt.Sprintf(`SELECT * FROM "%s"."%s"`, info.Keyspace, info.Table)
+	columns := "  *"
+
+	if len(info.Columns) > 0 {
+		columns = ""
+		for _, columnName := range info.Columns {
+			columns += fmt.Sprintf(`, "%s"`, columnName)
+		}
+	}
+
+	query := fmt.Sprintf(`SELECT %s FROM "%s"."%s"`, columns[2:], info.Keyspace, info.Table)
 
 	if whereClause != "" {
 		query += fmt.Sprintf(" WHERE %s", whereClause)
@@ -67,7 +77,7 @@ func (db *Db) Select(info *SelectInfo, options *QueryOptions) (ResultSet, error)
 		}
 	}
 
-	if info.Options.Limit > 0 {
+	if info.Options != nil && info.Options.Limit > 0 {
 		query += " LIMIT ?"
 		values = append(values, info.Options.Limit)
 	}

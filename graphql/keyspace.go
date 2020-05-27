@@ -137,7 +137,7 @@ func (sg *SchemaGenerator) buildKeyspaceQuery(singleKeyspace string) *graphql.Ob
 				Resolve: func(params graphql.ResolveParams) (interface{}, error) {
 					ksValues := make([]ksValue, 0)
 					if singleKeyspace == "" {
-						ksNames, err := sg.dbClient.Keyspaces()
+						ksNames, err := sg.dbClient.Keyspaces("")
 						if err != nil {
 							return nil, err
 						}

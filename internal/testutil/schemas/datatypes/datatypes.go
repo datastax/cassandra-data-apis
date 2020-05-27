@@ -3,15 +3,17 @@ package datatypes
 import (
 	"bytes"
 	"fmt"
-	"github.com/datastax/cassandra-data-apis/graphql"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas"
+	"github.com/datastax/cassandra-data-apis/types"
+	"github.com/gocql/gocql"
 	. "github.com/onsi/gomega"
+	"math"
 )
 
 type ConvertFn func(value interface{}) interface{}
 
 func MutateAndQueryScalar(
-	routes []graphql.Route,
+	routes []types.Route,
 	datatype string,
 	value interface{},
 	format string,
@@ -78,7 +80,7 @@ func MutateAndQueryScalar(
 	Expect(convert(values[0][datatype+"Col"])).To(Equal(value))
 }
 
-func InsertScalarErrors(routes []graphql.Route, datatype string, value string) {
+func InsertScalarErrors(routes []types.Route, datatype string, value string) {
 	insertQuery := `mutation {
 	  insertScalars(value:{id:"%s", %sCol:%s}) {
 		applied
@@ -91,7 +93,7 @@ func InsertScalarErrors(routes []graphql.Route, datatype string, value string) {
 	Expect(response.Errors[0].Message).To(ContainSubstring("invalid"))
 }
 
-func InsertAndUpdateNulls(routes []graphql.Route, datatype string, jsonValue interface{}) {
+func InsertAndUpdateNulls(routes []types.Route, datatype string, jsonValue interface{}) {
 	insertQuery := `mutation {
 	  insertScalars(value:{id:"%s", %sCol:%s}) {
 		applied
@@ -139,7 +141,7 @@ func InsertAndUpdateNulls(routes []graphql.Route, datatype string, jsonValue int
 }
 
 func MutateAndQueryCollection(
-	routes []graphql.Route,
+	routes []types.Route,
 	fieldName string,
 	stringValue string,
 	jsonValue []interface{},
@@ -178,7 +180,7 @@ func MutateAndQueryCollection(
 	}
 }
 
-func MutateAndQueryStatic(routes []graphql.Route) {
+func MutateAndQueryStatic(routes []types.Route) {
 	insertQueryWithStatic := `mutation {
 	  insertTableStatic(value:{id1: "%s", id2: %d, value: %d, valueStatic: %v}) {
 		applied
@@ -216,5 +218,26 @@ func MutateAndQueryStatic(routes []graphql.Route) {
 	// The static value should be present in all rows for the partition
 	for _, value := range values {
 		Expect(value["valueStatic"]).To(Equal(jsonValue))
+	}
+}
+
+// ScalarJsonValues gets a slice containing one slice per scalar data type with name in first position and json values in
+// the following positions.
+func ScalarJsonValues() [][]interface{} {
+	return [][]interface{}{
+		{"float", float64(0), float64(-1), 1.25, 3.40282},
+		{"double", float64(1), float64(0), -1.25, math.MaxFloat64},
+		{"boolean", true, false},
+		{"tinyint", float64(1)},
+		{"int", float64(2)},
+		{"bigint", "123"},
+		{"varint", "123"},
+		{"decimal", "123.080000"},
+		{"timeuuid", gocql.TimeUUID().String()},
+		{"uuid", schemas.NewUuid()},
+		{"inet", "10.11.150.201"},
+		{"blob", "ABEi"},
+		{"timestamp", "2005-08-05T13:20:21.52Z"},
+		{"time", "08:45:02"},
 	}
 }

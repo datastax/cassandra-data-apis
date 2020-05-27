@@ -19,6 +19,7 @@ var shouldStartCassandra = false
 var shouldStartSimulacron = false
 var setupQueries = make([]string, 0)
 var setupHandlers = make([]func(), 0)
+var createdSchemas = make(map[string]bool)
 var session *gocql.Session
 
 type commandOptions int
@@ -105,6 +106,11 @@ func cassandraVersion() string {
 }
 
 func CreateSchema(name string) {
+	if createdSchemas[name] {
+		return
+	}
+
+	createdSchemas[name] = true
 	_, currentFile, _, _ := runtime.Caller(0)
 	dir := path.Dir(currentFile)
 	filePath := path.Join(dir, "schemas", name, "schema.cql")

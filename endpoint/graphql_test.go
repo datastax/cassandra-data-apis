@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/datastax/cassandra-data-apis/auth"
+	"github.com/datastax/cassandra-data-apis/config"
 	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/graphql"
 	"github.com/datastax/cassandra-data-apis/internal/testutil"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas"
+	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/gocql/gocql"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -99,8 +101,8 @@ func TestDataEndpoint_Auth(t *testing.T) {
 				NewQueryOptions().
 				WithUserOrRole("user1").
 				WithPageState([]byte{}).
-				WithPageSize(graphql.DefaultPageSize).
-				WithConsistency(graphql.DefaultConsistencyLevel),
+				WithPageSize(config.DefaultPageSize).
+				WithConsistency(config.DefaultConsistencyLevel),
 			mock.Anything).
 		Return(resultMock, nil)
 
@@ -161,8 +163,8 @@ func TestDataEndpoint_PageSize(t *testing.T) {
 	var resp schemas.ResponseBody
 	dbQueryOptions := db.NewQueryOptions().
 		WithPageState([]byte{}).
-		WithPageSize(graphql.DefaultPageSize).
-		WithConsistency(graphql.DefaultConsistencyLevel)
+		WithPageSize(config.DefaultPageSize).
+		WithConsistency(config.DefaultConsistencyLevel)
 
 	// Query with no options
 	buffer, err := executePost(routes, "/graphql", graphql.RequestBody{
@@ -192,7 +194,7 @@ func TestDataEndpoint_PageSize(t *testing.T) {
 	err = json.NewDecoder(buffer).Decode(&resp)
 	assert.NoError(t, err)
 	// Page size is still default (100)
-	dbQueryOptions.WithConsistency(graphql.DefaultConsistencyLevel)
+	dbQueryOptions.WithConsistency(config.DefaultConsistencyLevel)
 	session.AssertCalled(t, "ExecuteIter", query+" LIMIT ?", dbQueryOptions, mock.Anything)
 }
 
@@ -240,7 +242,7 @@ func TestDataEndpoint_AuthNotProvided(t *testing.T) {
 	assert.Equal(t, "expected user or role for this operation", resp.Errors[0].Message)
 }
 
-func executePost(routes []graphql.Route, target string, body graphql.RequestBody, header http.Header) (*bytes.Buffer, error) {
+func executePost(routes []types.Route, target string, body graphql.RequestBody, header http.Header) (*bytes.Buffer, error) {
 	b, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -262,7 +264,7 @@ func createConfig(t *testing.T) *DataEndpointConfig {
 	return cfg
 }
 
-func createRoutes(t *testing.T, cfg *DataEndpointConfig, pattern string, ksName string) (*db.SessionMock, []graphql.Route) {
+func createRoutes(t *testing.T, cfg *DataEndpointConfig, pattern string, ksName string) (*db.SessionMock, []types.Route) {
 	sessionMock := db.NewSessionMock().Default()
 
 	endpoint := cfg.newEndpointWithDb(db.NewDbWithSession(sessionMock))
@@ -274,7 +276,7 @@ func createRoutes(t *testing.T, cfg *DataEndpointConfig, pattern string, ksName 
 	return sessionMock, routes
 }
 
-func withAuth(t *testing.T, routes []graphql.Route, authTokens map[string]string) []graphql.Route {
+func withAuth(t *testing.T, routes []types.Route, authTokens map[string]string) []types.Route {
 	for i, route := range routes {
 		routes[i].Handler = &authHandler{t, route.Handler, authTokens}
 	}

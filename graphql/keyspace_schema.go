@@ -9,12 +9,6 @@ import (
 	"github.com/graphql-go/graphql"
 )
 
-const (
-	DefaultPageSize               = 100
-	DefaultConsistencyLevel       = gocql.LocalQuorum
-	DefaultSerialConsistencyLevel = gocql.Serial
-)
-
 type KeyspaceGraphQLSchema struct {
 	// A set of ignored tables
 	ignoredTables map[string]bool
@@ -42,9 +36,9 @@ var inputQueryOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 	Name:        "QueryOptions",
 	Fields: graphql.InputObjectConfigFieldMap{
 		"limit":       {Type: graphql.Int},
-		"pageSize":    {Type: graphql.Int, DefaultValue: DefaultPageSize},
+		"pageSize":    {Type: graphql.Int, DefaultValue: config.DefaultPageSize},
 		"pageState":   {Type: graphql.String},
-		"consistency": {Type: queryConsistencyEnum, DefaultValue: DefaultConsistencyLevel},
+		"consistency": {Type: queryConsistencyEnum, DefaultValue: config.DefaultConsistencyLevel},
 	},
 })
 
@@ -53,21 +47,21 @@ var inputMutationOptions = graphql.NewInputObject(graphql.InputObjectConfig{
 	Description: "An input type to determine consistency and other mutation settings.",
 	Fields: graphql.InputObjectConfigFieldMap{
 		"ttl":               {Type: graphql.Int, DefaultValue: -1},
-		"consistency":       {Type: mutationConsistencyEnum, DefaultValue: DefaultConsistencyLevel},
-		"serialConsistency": {Type: serialConsistencyEnum, DefaultValue: DefaultSerialConsistencyLevel},
+		"consistency":       {Type: mutationConsistencyEnum, DefaultValue: config.DefaultConsistencyLevel},
+		"serialConsistency": {Type: serialConsistencyEnum, DefaultValue: config.DefaultSerialConsistencyLevel},
 	},
 })
 
 var inputQueryOptionsDefault = types.QueryOptions{
-	Consistency:       int(DefaultConsistencyLevel),
-	PageSize:          DefaultPageSize,
-	SerialConsistency: int(DefaultSerialConsistencyLevel),
+	Consistency:       int(config.DefaultConsistencyLevel),
+	PageSize:          config.DefaultPageSize,
+	SerialConsistency: int(config.DefaultSerialConsistencyLevel),
 }
 
 var inputMutationOptionsDefault = types.MutationOptions{
 	TTL:               -1,
-	Consistency:       int(DefaultConsistencyLevel),
-	SerialConsistency: int(DefaultSerialConsistencyLevel),
+	Consistency:       int(config.DefaultConsistencyLevel),
+	SerialConsistency: int(config.DefaultSerialConsistencyLevel),
 }
 
 var queryConsistencyEnum = graphql.NewEnum(graphql.EnumConfig{
@@ -383,7 +377,7 @@ func (s *KeyspaceGraphQLSchema) adaptCondition(tableName string, data map[string
 		for operatorName, itemValue := range mapValue {
 			result = append(result, types.ConditionItem{
 				Column:   s.naming.ToCQLColumn(tableName, key),
-				Operator: cqlOperators[operatorName],
+				Operator: types.CqlOperators[operatorName],
 				Value:    adaptParameterValue(itemValue),
 			})
 		}

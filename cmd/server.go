@@ -9,6 +9,7 @@ import (
 	"github.com/datastax/cassandra-data-apis/endpoint"
 	"github.com/datastax/cassandra-data-apis/graphql"
 	"github.com/datastax/cassandra-data-apis/log"
+	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/julienschmidt/httprouter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -23,7 +24,7 @@ import (
 
 const defaultGraphQLPath = "/graphql"
 const defaultGraphQLSchemaPath = "/graphql-schema"
-const defaultRESTPath = "/todo"
+const defaultRESTPath = "/rest"
 const defaultGraphQLPlaygroundPath = "/graphql-playground"
 
 // Environment variables prefixed with "DATA_API_" can override settings e.g. "DATA_API_HOSTS"
@@ -45,9 +46,6 @@ var serverCmd = &cobra.Command{
 		startGraphQL := viper.GetBool("start-graphql")
 		startREST := viper.GetBool("start-rest")
 
-		if startREST {
-			return errors.New("REST endpoint is not currently supported")
-		}
 		if !startGraphQL && !startREST {
 			return errors.New("at least one endpoint type should be started")
 		}
@@ -69,6 +67,12 @@ var serverCmd = &cobra.Command{
 		startGraphQL := viper.GetBool("start-graphql")
 		startREST := viper.GetBool("start-rest")
 
+		supportedOps := getStringSlice("operations")
+		ops, err := config.Ops(supportedOps...)
+		if err != nil {
+			logger.Fatal("invalid supported operation", "operations", supportedOps, "error", err)
+		}
+
 		if graphqlPort == restPort {
 			if startGraphQL && startREST && viper.GetString("graphql-path") == viper.GetString("rest-path") {
 				logger.Fatal("graphql and rest paths can not be the same when using the same port")
@@ -77,11 +81,11 @@ var serverCmd = &cobra.Command{
 			router := createRouter()
 			endpointNames := ""
 			if startGraphQL {
-				addGraphQLRoutes(router, endpoint)
+				addGraphQLRoutes(router, endpoint, ops)
 				endpointNames += "GraphQL"
 			}
 			if startREST {
-				addRESTRoutes(router, endpoint)
+				addRESTRoutes(router, endpoint, ops)
 				if endpointNames != "" {
 					endpointNames += "/"
 				}
@@ -92,12 +96,12 @@ var serverCmd = &cobra.Command{
 			finish := make(chan bool)
 			if startGraphQL {
 				router := createRouter()
-				addGraphQLRoutes(router, endpoint)
+				addGraphQLRoutes(router, endpoint, ops)
 				go listenAndServe(router, graphqlPort, "GraphQL")
 			}
 			if startREST {
 				router := httprouter.New()
-				addRESTRoutes(router, endpoint)
+				addRESTRoutes(router, endpoint, ops)
 				go listenAndServe(router, restPort, "REST")
 			}
 			<-finish
@@ -147,15 +151,18 @@ func Execute() {
 	flags.String("graphql-playground-path", defaultGraphQLPlaygroundPath, "path for the GraphQL playground static file")
 	flags.Int("graphql-port", 8080, "GraphQL endpoint port")
 
-	// TODO:
 	// REST specific flags
-	// flags.Bool("start-rest", false, "start the REST endpoint")
-	// flags.String("rest-path", defaultRESTPath, "REST endpoint path")
-	// flags.Int("rest-port", 8080, "REST endpoint port")
+	flags.Bool("start-rest", true, "start the REST endpoint")
+	flags.String("rest-path", defaultRESTPath, "REST endpoint path")
+	flags.Int("rest-port", 8080, "REST endpoint port")
 
 	flags.VisitAll(func(flag *pflag.Flag) {
 		if flag.Name != "config" {
-			viper.BindPFlag(flag.Name, flags.Lookup(flag.Name))
+			err := viper.BindPFlag(flag.Name, flags.Lookup(flag.Name))
+
+			if err != nil {
+				log2.Fatalf("unable to initialize flags: %v", err)
+			}
 		}
 	})
 
@@ -198,17 +205,17 @@ func createEndpoint() *endpoint.DataEndpoint {
 		WithExcludedKeyspaces(getStringSlice("excluded-keyspaces")).
 		WithSchemaUpdateInterval(updateInterval)
 
-	endpoint, err := cfg.NewEndpoint()
+	dataEndpoint, err := cfg.NewEndpoint()
 	if err != nil {
-		logger.Fatal("unable create new endpoint",
+		logger.Fatal("unable create new dataEndpoint",
 			"error", err)
 	}
 
-	return endpoint
+	return dataEndpoint
 }
 
-func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint) {
-	var routes []graphql.Route
+func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint, ops config.SchemaOperations) {
+	var routes []types.Route
 	var err error
 
 	singleKeyspace := viper.GetString("keyspace")
@@ -227,12 +234,6 @@ func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint
 
 	for _, route := range routes {
 		router.Handler(route.Method, route.Pattern, route.Handler)
-	}
-
-	supportedOps := getStringSlice("operations")
-	ops, err := config.Ops(supportedOps...)
-	if err != nil {
-		logger.Fatal("invalid supported operation", "operations", supportedOps, "error", err)
 	}
 
 	if singleKeyspace != "" {
@@ -272,8 +273,14 @@ func addGraphQLRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint
 	}
 }
 
-func addRESTRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint) {
-	// TODO: Implement
+func addRESTRoutes(router *httprouter.Router, endpoint *endpoint.DataEndpoint, ops config.SchemaOperations) {
+	singleKeyspace := viper.GetString("keyspace")
+	rootPath := viper.GetString("rest-path")
+	routes := endpoint.RoutesRest(rootPath, ops, singleKeyspace)
+
+	for _, route := range routes {
+		router.Handler(route.Method, route.Pattern, route.Handler)
+	}
 }
 
 func maybeAddRequestLogging(handler http.Handler) http.Handler {

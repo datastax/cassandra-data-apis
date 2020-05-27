@@ -3,11 +3,11 @@ package graphql
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/datastax/cassandra-data-apis/config"
 	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/log"
+	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/graphql-go/graphql"
 	"net/http"
 	"path"
@@ -23,13 +23,7 @@ type RouteGenerator struct {
 	updateInterval time.Duration
 	logger         log.Logger
 	schemaGen      *SchemaGenerator
-	urlPattern     config.UrlPattern
-}
-
-type Route struct {
-	Method  string
-	Pattern string
-	Handler http.Handler
+	routerInfo     config.HttpRouterInfo
 }
 
 type Config struct {
@@ -46,11 +40,11 @@ func NewRouteGenerator(dbClient *db.Db, cfg config.Config) *RouteGenerator {
 		updateInterval: cfg.SchemaUpdateInterval(),
 		logger:         cfg.Logger(),
 		schemaGen:      NewSchemaGenerator(dbClient, cfg),
-		urlPattern:     cfg.UrlPattern(),
+		routerInfo:     cfg.RouterInfo(),
 	}
 }
 
-func (rg *RouteGenerator) RoutesSchemaManagement(pattern string, singleKeyspace string, ops config.SchemaOperations) ([]Route, error) {
+func (rg *RouteGenerator) RoutesSchemaManagement(pattern string, singleKeyspace string, ops config.SchemaOperations) ([]types.Route, error) {
 	schema, err := rg.schemaGen.BuildKeyspaceSchema(singleKeyspace, ops)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build graphql schema for schema management: %s", err)
@@ -60,7 +54,7 @@ func (rg *RouteGenerator) RoutesSchemaManagement(pattern string, singleKeyspace 
 	}), nil
 }
 
-func (rg *RouteGenerator) Routes(pattern string, singleKeyspace string) ([]Route, error) {
+func (rg *RouteGenerator) Routes(pattern string, singleKeyspace string) ([]types.Route, error) {
 	updater, err := NewUpdater(rg.schemaGen, singleKeyspace, rg.updateInterval, rg.logger)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build graphql schema: %s", err)
@@ -71,14 +65,7 @@ func (rg *RouteGenerator) Routes(pattern string, singleKeyspace string) ([]Route
 	pathParser := getPathParser(pattern)
 	if singleKeyspace == "" {
 		// Use a single route with keyspace as dynamic parameter
-		switch rg.urlPattern {
-		case config.UrlPatternColon:
-			pattern = path.Join(pattern, ":keyspace")
-		case config.UrlPatternBrackets:
-			pattern = path.Join(pattern, "{keyspace}")
-		default:
-			return nil, errors.New("URL pattern not supported")
-		}
+		pattern = rg.routerInfo.UrlPattern().UrlPathFormat(path.Join(pattern, "%s"), "keyspace")
 	}
 
 	return routesForSchema(pattern, func(query string, urlPath string, ctx context.Context) *graphql.Result {
@@ -105,7 +92,7 @@ func (rg *RouteGenerator) Routes(pattern string, singleKeyspace string) ([]Route
 
 // Keyspaces gets a slice of keyspace names that are considered by the route generator.
 func (rg *RouteGenerator) Keyspaces() ([]string, error) {
-	keyspaces, err := rg.dbClient.Keyspaces()
+	keyspaces, err := rg.dbClient.Keyspaces("")
 
 	if err != nil {
 		return nil, err
@@ -136,8 +123,8 @@ func getPathParser(root string) func(string) string {
 	}
 }
 
-func routesForSchema(pattern string, execute executeQueryFunc) []Route {
-	return []Route{
+func routesForSchema(pattern string, execute executeQueryFunc) []types.Route {
+	return []types.Route{
 		{
 			Method:  http.MethodGet,
 			Pattern: pattern,

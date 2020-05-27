@@ -5,6 +5,8 @@ import (
 	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/graphql"
 	"github.com/datastax/cassandra-data-apis/log"
+	"github.com/datastax/cassandra-data-apis/rest"
+	"github.com/datastax/cassandra-data-apis/types"
 	"go.uber.org/zap"
 	"time"
 )
@@ -19,7 +21,7 @@ type DataEndpointConfig struct {
 	naming            config.NamingConventionFn
 	useUserOrRoleAuth bool
 	logger            log.Logger
-	urlPattern        config.UrlPattern
+	routerInfo        config.HttpRouterInfo
 }
 
 func (cfg DataEndpointConfig) ExcludedKeyspaces() []string {
@@ -46,8 +48,8 @@ func (cfg DataEndpointConfig) Logger() log.Logger {
 	return cfg.logger
 }
 
-func (cfg DataEndpointConfig) UrlPattern() config.UrlPattern {
-	return cfg.urlPattern
+func (cfg DataEndpointConfig) RouterInfo() config.HttpRouterInfo {
+	return cfg.routerInfo
 }
 
 func (cfg *DataEndpointConfig) WithExcludedKeyspaces(ksExcluded []string) *DataEndpointConfig {
@@ -75,10 +77,9 @@ func (cfg *DataEndpointConfig) WithDbConfig(dbConfig db.Config) *DataEndpointCon
 	return cfg
 }
 
-// WithUrlPattern sets the url pattern to be use to separate url parameters
-// For example: "/graphql/:param1" (colon, default) or "/graphql/{param1}" (brackets)
-func (cfg *DataEndpointConfig) WithUrlPattern(pattern config.UrlPattern) *DataEndpointConfig {
-	cfg.urlPattern = pattern
+// WithRouterInfo sets the http router information to be used for url parameters
+func (cfg *DataEndpointConfig) WithRouterInfo(routerInfo config.HttpRouterInfo) *DataEndpointConfig {
+	cfg.routerInfo = routerInfo
 	return cfg
 }
 
@@ -93,11 +94,13 @@ func (cfg DataEndpointConfig) NewEndpoint() (*DataEndpoint, error) {
 func (cfg DataEndpointConfig) newEndpointWithDb(dbClient *db.Db) *DataEndpoint {
 	return &DataEndpoint{
 		graphQLRouteGen: graphql.NewRouteGenerator(dbClient, cfg),
+		restRouteGen:    rest.NewRouteGenerator(dbClient, cfg),
 	}
 }
 
 type DataEndpoint struct {
 	graphQLRouteGen *graphql.RouteGenerator
+	restRouteGen    *rest.RouteGenerator
 }
 
 func NewEndpointConfig(hosts ...string) (*DataEndpointConfig, error) {
@@ -114,27 +117,31 @@ func NewEndpointConfigWithLogger(logger log.Logger, hosts ...string) *DataEndpoi
 		updateInterval: DefaultSchemaUpdateDuration,
 		naming:         config.NewDefaultNaming,
 		logger:         logger,
-		urlPattern:     config.UrlPatternColon,
+		routerInfo:     config.DefaultRouterInfo(),
 	}
 }
 
-func (e *DataEndpoint) RoutesGraphQL(pattern string) ([]graphql.Route, error) {
+func (e *DataEndpoint) RoutesGraphQL(pattern string) ([]types.Route, error) {
 	return e.graphQLRouteGen.Routes(pattern, "")
 }
 
-func (e *DataEndpoint) RoutesKeyspaceGraphQL(pattern string, ksName string) ([]graphql.Route, error) {
+func (e *DataEndpoint) RoutesKeyspaceGraphQL(pattern string, ksName string) ([]types.Route, error) {
 	return e.graphQLRouteGen.Routes(pattern, ksName)
 }
 
-func (e *DataEndpoint) RoutesSchemaManagementGraphQL(pattern string, ops config.SchemaOperations) ([]graphql.Route, error) {
+func (e *DataEndpoint) RoutesSchemaManagementGraphQL(pattern string, ops config.SchemaOperations) ([]types.Route, error) {
 	return e.graphQLRouteGen.RoutesSchemaManagement(pattern, "", ops)
 }
 
-func (e *DataEndpoint) RoutesSchemaManagementKeyspaceGraphQL(pattern string, ksName string, ops config.SchemaOperations) ([]graphql.Route, error) {
+func (e *DataEndpoint) RoutesSchemaManagementKeyspaceGraphQL(pattern string, ksName string, ops config.SchemaOperations) ([]types.Route, error) {
 	return e.graphQLRouteGen.RoutesSchemaManagement(pattern, ksName, ops)
 }
 
 // Keyspaces gets a slice of keyspace names that are considered by the endpoint when used in multi-keyspace mode.
 func (e *DataEndpoint) Keyspaces() ([]string, error) {
 	return e.graphQLRouteGen.Keyspaces()
+}
+
+func (e *DataEndpoint) RoutesRest(pattern string, operations config.SchemaOperations, singleKs string) []types.Route {
+	return e.restRouteGen.Routes(pattern, operations, singleKs)
 }

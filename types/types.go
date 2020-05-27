@@ -2,6 +2,8 @@
 // that are shared between both REST and GraphQL
 package types
 
+import "net/http"
+
 type ModificationResult struct {
 	Applied bool                   `json:"applied"`
 	Value   map[string]interface{} `json:"value"`
@@ -27,7 +29,25 @@ type MutationOptions struct {
 }
 
 type ConditionItem struct {
-	Column   string
-	Operator string
-	Value    interface{}
+	Column   string      `json:"column"` // json representation using for error information only
+	Operator string      `json:"operator"`
+	Value    interface{} `json:"value"`
+}
+
+// CqlOperators contains the CQL operator for a given "graphql" operator
+var CqlOperators = map[string]string{
+	"eq":    "=",
+	"notEq": "!=",
+	"gt":    ">",
+	"gte":   ">=",
+	"lt":    "<",
+	"lte":   "<=",
+	"in":    "IN",
+}
+
+// Route represents a request route to be served
+type Route struct {
+	Method  string
+	Pattern string
+	Handler http.Handler
 }

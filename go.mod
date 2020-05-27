@@ -4,6 +4,9 @@ go 1.13
 
 require (
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
+	github.com/go-playground/locales v0.13.0
+	github.com/go-playground/universal-translator v0.17.0
+	github.com/go-playground/validator/v10 v10.2.0
 	github.com/gocql/gocql v0.0.0-20200228163523-cd4b606dd2fb
 	github.com/graphql-go/graphql v0.7.9
 	github.com/iancoleman/strcase v0.0.0-20191112232945-16388991a334
@@ -12,6 +15,7 @@ require (
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0
 	github.com/pelletier/go-toml v1.7.0 // indirect
+	github.com/sergi/go-diff v1.1.0
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
 	github.com/spf13/cobra v0.0.7

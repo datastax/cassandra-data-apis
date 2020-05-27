@@ -49,9 +49,9 @@ func (o *ConfigMock) Logger() log.Logger {
 	return args.Get(0).(log.Logger)
 }
 
-func (o *ConfigMock) UrlPattern() UrlPattern {
+func (o *ConfigMock) RouterInfo() HttpRouterInfo {
 	args := o.Called()
-	return args.Get(0).(UrlPattern)
+	return args.Get(0).(HttpRouterInfo)
 }
 
 type KeyspaceNamingInfoMock struct {

@@ -6,7 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/datastax/cassandra-data-apis/config"
+	c "github.com/datastax/cassandra-data-apis/config"
 	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/graphql"
 	. "github.com/datastax/cassandra-data-apis/internal/testutil"
@@ -15,6 +15,7 @@ import (
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas/ddl"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas/killrvideo"
 	"github.com/datastax/cassandra-data-apis/internal/testutil/schemas/quirky"
+	"github.com/datastax/cassandra-data-apis/types"
 	"github.com/gocql/gocql"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -122,7 +123,7 @@ var _ = Describe("DataEndpoint", func() {
 
 			It("Should support querying without where clause", func() {
 				// Insert some data
-				length := graphql.DefaultPageSize + 2
+				length := c.DefaultPageSize + 2
 				for i := 1; i <= length; i++ {
 					killrvideo.CqlInsertTagByLetter(session, fmt.Sprintf("b%d", i))
 				}
@@ -131,7 +132,7 @@ var _ = Describe("DataEndpoint", func() {
 				query := killrvideo.SelectTagsByLetterNoWhereClause("")
 				buffer := schemas.ExecutePost(routes, "/graphql", query)
 				data := schemas.DecodeData(buffer, "tagsByLetter")
-				Expect(data["values"]).To(HaveLen(graphql.DefaultPageSize))
+				Expect(data["values"]).To(HaveLen(c.DefaultPageSize))
 				pageState := data["pageState"]
 				// Further pages should be signaled
 				Expect(pageState).NotTo(BeEmpty())
@@ -400,7 +401,7 @@ var _ = Describe("DataEndpoint", func() {
 				routes := getRoutes(config, keyspace)
 
 				// Insert value into the view's table
-				quirky.InsertAndSelect(routes, "TableWithView")
+				id := quirky.InsertAndSelect(routes, "TableWithView")
 
 				// Queries should still work
 				query := `query {
@@ -415,7 +416,7 @@ var _ = Describe("DataEndpoint", func() {
 				expected := schemas.NewResponseBody("tablesView", map[string]interface{}{
 					"values": []interface{}{
 						map[string]interface{}{
-							"id": float64(1),
+							"id": float64(id),
 						},
 					},
 				})
@@ -433,7 +434,7 @@ var _ = Describe("DataEndpoint", func() {
 		})
 
 		Context("With datatypes schema", func() {
-			var routes []graphql.Route
+			var routes []types.Route
 			config := NewEndpointConfigWithLogger(TestLogger(), host)
 
 			BeforeEach(func() {
@@ -629,29 +630,11 @@ var _ = Describe("DataEndpoint", func() {
 			})
 
 			Context("With null values", func() {
-				items := [][]interface{}{
-					{"float", float64(0)},
-					{"double", float64(1)},
-					{"double", float64(1)},
-					{"boolean", true},
-					{"tinyint", float64(1)},
-					{"int", float64(2)},
-					{"bigint", "123"},
-					{"varint", "123"},
-					{"decimal", "123.08"},
-					{"timeuuid", gocql.TimeUUID().String()},
-					{"uuid", schemas.NewUuid()},
-					{"inet", "10.11.150.201"},
-					{"blob", "ABEi"},
-					{"timestamp", "2005-08-05T13:20:21.52Z"},
-					{"time", "08:45:02"},
-				}
-
-				for _, itemEach := range items {
+				for _, itemEach := range datatypes.ScalarJsonValues() {
 					// Capture item
 					item := itemEach
 					datatype := item[0].(string)
-					It("Should set the tombstones for values of type"+datatype, func() {
+					It("Should set the tombstones for values of type "+datatype, func() {
 						datatypes.InsertAndUpdateNulls(routes, datatype, item[1])
 					})
 				}
@@ -714,7 +697,7 @@ var _ = Describe("DataEndpoint", func() {
 	})
 
 	Describe("RoutesGraphQL()", func() {
-		var routes []graphql.Route
+		var routes []types.Route
 		config := NewEndpointConfigWithLogger(TestLogger(), host)
 
 		BeforeEach(func() {
@@ -779,7 +762,7 @@ var _ = Describe("DataEndpoint", func() {
 				})
 				response := ddl.Keyspace(routes, ksName)
 				Expect(response.Errors).To(HaveLen(1))
-				Expect(response.Errors[0].Message).To(ContainSubstring("keyspace does not exist"))
+				Expect(response.Errors[0].Message).To(ContainSubstring("does not exist"))
 			})
 			It("Should create keyspace if not exists", func() {
 				routes := getSchemaRoutes(cfg)
@@ -962,23 +945,23 @@ var _ = Describe("DataEndpoint", func() {
 	})
 })
 
-func getRoutes(config *DataEndpointConfig, keyspace string) []graphql.Route {
+func getRoutes(config *DataEndpointConfig, keyspace string) []types.Route {
 	var endpoint = config.newEndpointWithDb(db.NewDbWithConnectedInstance(GetSession()))
 	routes, err := endpoint.RoutesKeyspaceGraphQL("/graphql", keyspace)
 	Expect(err).ToNot(HaveOccurred())
 	return routes
 }
 
-func getSchemaRoutes(cfg *DataEndpointConfig) []graphql.Route {
+func getSchemaRoutes(cfg *DataEndpointConfig) []types.Route {
 	var endpoint = cfg.newEndpointWithDb(db.NewDbWithConnectedInstance(GetSession()))
-	routes, err := endpoint.RoutesSchemaManagementGraphQL("/graphql-schema", config.AllSchemaOperations)
+	routes, err := endpoint.RoutesSchemaManagementGraphQL("/graphql-schema", c.AllSchemaOperations)
 	Expect(err).ToNot(HaveOccurred())
 	return routes
 }
 
-func getSchemaRoutesKeyspace(cfg *DataEndpointConfig, singleKeyspace string) []graphql.Route {
+func getSchemaRoutesKeyspace(cfg *DataEndpointConfig, singleKeyspace string) []types.Route {
 	var endpoint = cfg.newEndpointWithDb(db.NewDbWithConnectedInstance(GetSession()))
-	routes, err := endpoint.RoutesSchemaManagementKeyspaceGraphQL("/graphql-schema", singleKeyspace,  config.AllSchemaOperations)
+	routes, err := endpoint.RoutesSchemaManagementKeyspaceGraphQL("/graphql-schema", singleKeyspace, c.AllSchemaOperations)
 	Expect(err).ToNot(HaveOccurred())
 	return routes
 }
