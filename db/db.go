@@ -90,7 +90,6 @@ func NewDbWithConnectedInstance(session *gocql.Session) *Db {
 
 // Keyspace retrieves the keyspace metadata for all users
 func (db *Db) Keyspace(keyspace string) (*gocql.KeyspaceMetadata, error) {
-	// We expose gocql types for now, we should wrap them in the future instead
 	ks, err := db.session.KeyspaceMetadata(keyspace)
 
 	if err != nil && err.Error() == "keyspace does not exist" {
@@ -100,9 +99,8 @@ func (db *Db) Keyspace(keyspace string) (*gocql.KeyspaceMetadata, error) {
 	return ks, err
 }
 
-// Keyspace retrieves the table metadata for all users
+// Table retrieves the table metadata for all users
 func (db *Db) Table(keyspaceName string, tableName string) (*gocql.TableMetadata, error) {
-	// We expose gocql types for now, we should wrap them in the future instead
 	ks, err := db.Keyspace(keyspaceName)
 
 	if err != nil {
