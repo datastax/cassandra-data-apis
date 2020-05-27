@@ -187,7 +187,7 @@ func (s *KeyspaceGraphQLSchema) buildKeyValueType(
 						Type: value,
 					},
 				},
-			})
+			})	
 		} else {
 			t = graphql.NewObject(graphql.ObjectConfig{
 				Name: typeName,

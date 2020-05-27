@@ -46,7 +46,7 @@ var dataCenterInput = graphql.NewInputObject(graphql.InputObjectConfig{
 })
 
 var keyspaceType = graphql.NewObject(graphql.ObjectConfig{
-	Name: "Keyspace",
+	Name: "keyspaceName",
 	Fields: graphql.Fields{
 		"name": &graphql.Field{
 			Type: graphql.NewNonNull(graphql.String),
@@ -92,7 +92,7 @@ func (sg *SchemaGenerator) buildKeyspaceValue(keyspace *gocql.KeyspaceMetadata) 
 			if err != nil {
 				sg.logger.Error("invalid replicas value for keyspace",
 					"replicas", replicas,
-					"keyspace", keyspace.Name)
+					"keyspaceName", keyspace.Name)
 				continue
 			}
 			dcs = append(dcs, dataCenterValue{
@@ -112,7 +112,7 @@ func (sg *SchemaGenerator) buildKeyspaceQuery(singleKeyspace string) *graphql.Ob
 	return graphql.NewObject(graphql.ObjectConfig{
 		Name: "Query",
 		Fields: graphql.Fields{
-			"keyspace": &graphql.Field{
+			"keyspaceName": &graphql.Field{
 				Type: keyspaceType,
 				Args: graphql.FieldConfigArgument{
 					"name": &graphql.ArgumentConfig{
@@ -157,7 +157,7 @@ func (sg *SchemaGenerator) buildKeyspaceQuery(singleKeyspace string) *graphql.Ob
 							ksValues = append(ksValues, sg.buildKeyspaceValue(keyspace))
 						} else {
 							sg.logger.Warn("unable to get single keyspace",
-								"keyspace", singleKeyspace,
+								"keyspaceName", singleKeyspace,
 								"error", err)
 						}
 					}
@@ -326,6 +326,86 @@ func (sg *SchemaGenerator) buildKeyspaceMutation(singleKeyspace string, ops conf
 			},
 			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
 				return sg.checkKeyspace(singleKeyspace, p, sg.dropTable)
+			},
+		}
+	}
+
+	if ops.IsSupported(config.TypeCreate) {
+		fields["createType"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Args: graphql.FieldConfigArgument{
+				"keyspaceName": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"name": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"values": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.NewList(columnInput)),
+				},
+				"ifNotExists": &graphql.ArgumentConfig{
+					Type: graphql.Boolean,
+				},
+			},
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				return sg.checkKeyspace(singleKeyspace, p, sg.createType)
+			},
+		}
+	}
+	if ops.IsSupported(config.TypeAlterAdd) {
+		fields["alterTypeAdd"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Args: graphql.FieldConfigArgument{
+				"keyspaceName": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"name": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"values": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.NewList(columnInput)),
+				},
+			},
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				return sg.checkKeyspace(singleKeyspace, p, sg.alterTypeAdd)
+			},
+		}
+	}
+	if ops.IsSupported(config.TypeAlterRename) {
+		fields["alterTypeRename"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Args: graphql.FieldConfigArgument{
+				"keyspaceName": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"name": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"rename": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.NewList(alterTypeRenameInput)),
+				},
+			},
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				return sg.checkKeyspace(singleKeyspace, p, sg.alterTypeRename)
+			},
+		}
+	}
+	if ops.IsSupported(config.TypeDrop) {
+		fields["dropType"] = &graphql.Field{
+			Type: graphql.Boolean,
+			Args: graphql.FieldConfigArgument{
+				"keyspaceName": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"name": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+				"ifExists": &graphql.ArgumentConfig{
+					Type: graphql.Boolean,
+				},
+			},
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				return sg.checkKeyspace(singleKeyspace, p, sg.dropType)
 			},
 		}
 	}

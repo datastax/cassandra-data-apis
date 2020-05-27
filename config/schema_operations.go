@@ -13,9 +13,13 @@ const (
 	TableAlterDrop
 	KeyspaceCreate
 	KeyspaceDrop
+	TypeCreate
+	TypeAlterAdd
+	TypeAlterRename
+	TypeDrop
 )
 
-const AllSchemaOperations = TableCreate | TableDrop | TableAlterAdd | TableAlterDrop | KeyspaceCreate | KeyspaceDrop
+const AllSchemaOperations = TableCreate | TableDrop | TableAlterAdd | TableAlterDrop | KeyspaceCreate | KeyspaceDrop | TypeCreate | TypeAlterAdd | TypeAlterRename | TypeDrop
 
 func Ops(ops ...string) (SchemaOperations, error) {
 	var o SchemaOperations
@@ -42,6 +46,14 @@ func (o *SchemaOperations) Add(ops ...string) error {
 			o.Set(KeyspaceCreate)
 		case "KeyspaceDrop":
 			o.Set(KeyspaceDrop)
+		case "TypeCreate":
+			o.Set(TypeCreate)
+		case "TypeAlterAdd":
+			o.Set(TypeAlterAdd)
+		case "TypeAlterRename":
+			o.Set(TypeAlterRename)
+		case "TypeDrop":
+			o.Set(TypeDrop)
 		default:
 			return fmt.Errorf("invalid operation: %s", op)
 		}

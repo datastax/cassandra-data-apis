@@ -133,7 +133,8 @@ func Execute() {
 	flags.StringSlice("operations", []string{
 		"TableCreate",
 		"KeyspaceCreate",
-	}, "list of supported table and keyspace management operations. options: TableCreate,TableDrop,TableAlterAdd,TableAlterDrop,KeyspaceCreate,KeyspaceDrop")
+		"TypeCreate",
+	}, "list of supported table and keyspace management operations. options: TableCreate,TableDrop,TableAlterAdd,TableAlterDrop,KeyspaceCreate,KeyspaceDrop,TypeCreate,TypeAlterAdd,TypeAlterRename,TypeDrop")
 	flags.String("access-control-allow-origin", "", "Access-Control-Allow-Origin header value")
 
 	// SSL
