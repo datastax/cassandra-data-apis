@@ -46,7 +46,7 @@ var dataCenterInput = graphql.NewInputObject(graphql.InputObjectConfig{
 })
 
 var keyspaceType = graphql.NewObject(graphql.ObjectConfig{
-	Name: "keyspaceName",
+	Name: "Keyspace",
 	Fields: graphql.Fields{
 		"name": &graphql.Field{
 			Type: graphql.NewNonNull(graphql.String),
@@ -92,7 +92,7 @@ func (sg *SchemaGenerator) buildKeyspaceValue(keyspace *gocql.KeyspaceMetadata) 
 			if err != nil {
 				sg.logger.Error("invalid replicas value for keyspace",
 					"replicas", replicas,
-					"keyspaceName", keyspace.Name)
+					"keyspace", keyspace.Name)
 				continue
 			}
 			dcs = append(dcs, dataCenterValue{
@@ -112,7 +112,7 @@ func (sg *SchemaGenerator) buildKeyspaceQuery(singleKeyspace string) *graphql.Ob
 	return graphql.NewObject(graphql.ObjectConfig{
 		Name: "Query",
 		Fields: graphql.Fields{
-			"keyspaceName": &graphql.Field{
+			"keyspace": &graphql.Field{
 				Type: keyspaceType,
 				Args: graphql.FieldConfigArgument{
 					"name": &graphql.ArgumentConfig{
@@ -157,7 +157,7 @@ func (sg *SchemaGenerator) buildKeyspaceQuery(singleKeyspace string) *graphql.Ob
 							ksValues = append(ksValues, sg.buildKeyspaceValue(keyspace))
 						} else {
 							sg.logger.Warn("unable to get single keyspace",
-								"keyspaceName", singleKeyspace,
+								"keyspace", singleKeyspace,
 								"error", err)
 						}
 					}
