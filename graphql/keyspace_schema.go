@@ -2,6 +2,8 @@ package graphql
 
 import (
 	"fmt"
+	"regexp"
+
 	"github.com/datastax/cassandra-data-apis/config"
 	"github.com/datastax/cassandra-data-apis/db"
 	"github.com/datastax/cassandra-data-apis/types"
@@ -94,6 +96,8 @@ var serialConsistencyEnum = graphql.NewEnum(graphql.EnumConfig{
 		"LOCAL_SERIAL": {Value: gocql.LocalSerial},
 	},
 })
+
+var validName = regexp.MustCompile(`^[_a-zA-Z][_a-zA-Z0-9]*$`)
 
 func (s *KeyspaceGraphQLSchema) buildType(typeInfo gocql.TypeInfo, isInput bool) (graphql.Output, error) {
 	switch typeInfo.Type() {
@@ -272,6 +276,10 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 		for name, column := range table.Columns {
 			var fieldType graphql.Output
 			var inputFieldType graphql.Output
+			if !validName.MatchString(table.Name) || validName.MatchString(name) {
+				err = fmt.Errorf("Table or column didn't match regex %s", validName.String())
+				break
+			}
 			fieldName := s.naming.ToGraphQLField(table.Name, name)
 			fieldType, err = s.buildType(column.Type, false)
 			if err != nil {
@@ -300,6 +308,10 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 					Type: t,
 				}
 			}
+		}
+
+		if len(inputOperatorFields) == 0 || len(inputFields) == 0 || len(fields) == 0 {
+			err = fmt.Errorf("Value, scalar, or input array empty - perhaps a table with one unfilterable col?")
 		}
 
 		if err != nil {
