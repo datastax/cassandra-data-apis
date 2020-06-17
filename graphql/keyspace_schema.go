@@ -276,8 +276,8 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 		for name, column := range table.Columns {
 			var fieldType graphql.Output
 			var inputFieldType graphql.Output
-			if !validName.MatchString(table.Name) || validName.MatchString(name) {
-				err = fmt.Errorf("Table or column didn't match regex %s", validName.String())
+			if !validName.MatchString(table.Name) || !validName.MatchString(name) {
+				err = fmt.Errorf("Table or column %s didn't match regex %s", name, validName.String())
 				break
 			}
 			fieldName := s.naming.ToGraphQLField(table.Name, name)
@@ -310,8 +310,8 @@ func (s *KeyspaceGraphQLSchema) buildTableTypes(keyspace *gocql.KeyspaceMetadata
 			}
 		}
 
-		if len(inputOperatorFields) == 0 || len(inputFields) == 0 || len(fields) == 0 {
-			err = fmt.Errorf("Value, scalar, or input array empty - perhaps a table with one unfilterable col?")
+		if err == nil && (len(inputOperatorFields) == 0 || len(inputFields) == 0 || len(fields) == 0) {
+			err = fmt.Errorf("Value, scalar, or input array empty - perhaps a table with one unfilterable column?")
 		}
 
 		if err != nil {
