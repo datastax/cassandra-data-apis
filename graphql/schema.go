@@ -82,7 +82,7 @@ func (sg *SchemaGenerator) buildQueriesFields(
 		}
 	}
 
-	if len(keyspace.Tables) == 0 {
+	if len(keyspace.Tables) == 0 || len(keyspace.Tables) == len(ksSchema.ignoredTables) {
 		// graphql-go requires at least a single query and a single mutation
 		fields["__keyspaceEmptyQuery"] = &graphql.Field{
 			Description: "Placeholder query that is exposed when a keyspace is empty.",
@@ -158,7 +158,7 @@ func (sg *SchemaGenerator) buildMutationFields(
 		}
 	}
 
-	if len(keyspace.Tables) == 0 {
+	if len(keyspace.Tables) == 0 || len(keyspace.Tables) == len(ksSchema.ignoredTables) {
 		// graphql-go requires at least a single query and a single mutation
 		fields["__keyspaceEmptyMutation"] = &graphql.Field{
 			Description: "Placeholder mutation that is exposed when a keyspace is empty.",
