@@ -12,7 +12,7 @@ CREATE TABLE scalars (
     varchar_col varchar,
     ascii_col ascii,
     tinyint_col tinyint,
-    --smallint_col smallint,
+    smallint_col smallint,
     int_col int,
     bigint_col bigint,
     varint_col varint,
