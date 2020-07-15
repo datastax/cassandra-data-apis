@@ -7,7 +7,7 @@ require (
 	github.com/go-playground/locales v0.13.0
 	github.com/go-playground/universal-translator v0.17.0
 	github.com/go-playground/validator/v10 v10.2.0
-	github.com/gocql/gocql v0.0.0-20200228163523-cd4b606dd2fb
+	github.com/gocql/gocql v0.0.0-20200624222514-34081eda590e
 	github.com/graphql-go/graphql v0.7.9
 	github.com/iancoleman/strcase v0.0.0-20191112232945-16388991a334
 	github.com/julienschmidt/httprouter v1.3.0

@@ -497,6 +497,16 @@ var _ = Describe("DataEndpoint", func() {
 				}
 			})
 
+			It("Should support smallint data type", func() {
+				values := []int16{1, -2, 0, math.MaxInt16, math.MinInt16}
+				toInt16 := jsonNumberTo(func(v float64) interface{} {
+					return int16(v)
+				})
+				for _, value := range values {
+					datatypes.MutateAndQueryScalar(routes, "int", value, "%d", toInt16)
+				}
+			})
+
 			It("Should support float data type", func() {
 				values := []float32{1, -2, 0, 1.123, -1.31}
 				toFloat32 := jsonNumberTo(func(v float64) interface{} {
