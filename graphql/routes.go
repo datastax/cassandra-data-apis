@@ -21,6 +21,7 @@ type executeQueryFunc func(query string, urlPath string, ctx context.Context) *g
 type RouteGenerator struct {
 	dbClient       *db.Db
 	updateInterval time.Duration
+	expireInterval time.Duration
 	logger         log.Logger
 	schemaGen      *SchemaGenerator
 	routerInfo     config.HttpRouterInfo
@@ -55,7 +56,7 @@ func (rg *RouteGenerator) RoutesSchemaManagement(pattern string, singleKeyspace 
 }
 
 func (rg *RouteGenerator) Routes(pattern string, singleKeyspace string) ([]types.Route, error) {
-	updater, err := NewUpdater(rg.schemaGen, singleKeyspace, rg.updateInterval, rg.logger)
+	updater, err := NewUpdater(rg.schemaGen, singleKeyspace, rg.updateInterval, rg.expireInterval, rg.logger)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build graphql schema: %s", err)
 	}

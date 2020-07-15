@@ -91,6 +91,7 @@ docker run -p 8080:8080 -v "${PWD}/<your_config_file>.yaml:/root/config.yaml" da
 | operations             | strings  | DATA_API_OPERATIONS             | A list of supported schema management operations. See below. (default `"TableCreate, KeyspaceCreate"`) |
 | request-logging        | bool     | DATA_API_REQUEST_LOGGING        | Enable request logging |
 | schema-update-interval | duration | DATA_API_SCHEMA_UPDATE_INTERVAL | Interval in seconds used to update the graphql schema (default `10s`) |
+| schema-expire-interval | duration | DATA_API_SCHEMA_EXPIRE_INTERVAL | Interval in seconds used to expire the graphql schema (default `30s`) |
 | ssl-enabled            | bool     | DATA_API_SSL_ENABLED            | Enable SSL (client-to-node encryption)? |
 | ssl-ca-cert-path       | string   | DATA_API_SSL_CA_CERT_PATH       | SSL CA certificate path |
 | ssl-client-cert-path   | string   | DATA_API_SSL_CLIENT_CERT_PATH   | SSL client certificate path |

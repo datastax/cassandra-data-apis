@@ -18,6 +18,7 @@ var SystemKeyspaces = []string{
 type Config interface {
 	ExcludedKeyspaces() []string
 	SchemaUpdateInterval() time.Duration
+	SchemaExpireInterval() time.Duration
 	Naming() NamingConventionFn
 	UseUserOrRoleAuth() bool
 	Logger() log.Logger

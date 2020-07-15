@@ -130,6 +130,7 @@ func Execute() {
 	flags.Bool("request-logging", false, "enable request logging")
 	flags.StringSlice("excluded-keyspaces", nil, "keyspaces to exclude from the endpoint")
 	flags.Duration("schema-update-interval", endpoint.DefaultSchemaUpdateDuration, "interval in seconds used to update the graphql schema")
+	flags.Duration("schema-expire-interval", endpoint.DefaultSchemaExpireDuration, "interval in seconds used to expire the graphql schema")
 	flags.StringSlice("operations", []string{
 		"TableCreate",
 		"KeyspaceCreate",
@@ -184,6 +185,11 @@ func createEndpoint() *endpoint.DataEndpoint {
 	updateInterval := viper.GetDuration("schema-update-interval")
 	if updateInterval <= 0 {
 		updateInterval = endpoint.DefaultSchemaUpdateDuration
+	}
+
+	expireInterval := viper.GetDuration("schema-expire-interval")
+	if expireInterval <= 0 {
+		expireInterval = endpoint.DefaultSchemaExpireDuration
 	}
 
 	var sslOptions *db.SslOptions
