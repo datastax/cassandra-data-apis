@@ -12,14 +12,12 @@ import (
 )
 
 const DefaultSchemaUpdateDuration = 10 * time.Second
-const DefaultSchemaExpireDuration = 30 * time.Second
 
 type DataEndpointConfig struct {
 	dbConfig          db.Config
 	dbHosts           []string
 	ksExcluded        []string
 	updateInterval    time.Duration
-	expireInterval    time.Duration
 	naming            config.NamingConventionFn
 	useUserOrRoleAuth bool
 	logger            log.Logger
@@ -32,10 +30,6 @@ func (cfg DataEndpointConfig) ExcludedKeyspaces() []string {
 
 func (cfg DataEndpointConfig) SchemaUpdateInterval() time.Duration {
 	return cfg.updateInterval
-}
-
-func (cfg DataEndpointConfig) SchemaExpireInterval() time.Duration {
-	return cfg.expireInterval
 }
 
 func (cfg DataEndpointConfig) Naming() config.NamingConventionFn {
@@ -121,7 +115,6 @@ func NewEndpointConfigWithLogger(logger log.Logger, hosts ...string) *DataEndpoi
 	return &DataEndpointConfig{
 		dbHosts:        hosts,
 		updateInterval: DefaultSchemaUpdateDuration,
-		expireInterval: DefaultSchemaExpireDuration,
 		naming:         config.NewDefaultNaming,
 		logger:         logger,
 		routerInfo:     config.DefaultRouterInfo(),

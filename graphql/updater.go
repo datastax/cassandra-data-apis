@@ -14,8 +14,6 @@ type SchemaUpdater struct {
 	cancel         context.CancelFunc
 	mutex          sync.Mutex
 	updateInterval time.Duration
-	expireInterval time.Duration
-	expireTime     time.Time
 	schemas        *map[string]*graphql.Schema
 	schemaGen      *SchemaGenerator
 	singleKeyspace string
@@ -35,7 +33,6 @@ func NewUpdater(
 	schemaGen *SchemaGenerator,
 	singleKeyspace string,
 	updateInterval time.Duration,
-	expireInterval time.Duration,
 	logger log.Logger,
 ) (*SchemaUpdater, error) {
 	schemas, err := schemaGen.BuildSchemas(singleKeyspace)
@@ -48,8 +45,6 @@ func NewUpdater(
 		cancel:         nil,
 		mutex:          sync.Mutex{},
 		updateInterval: updateInterval,
-		expireInterval: expireInterval,
-		expireTime:     time.Now().Add(expireInterval),
 		schemas:        &schemas,
 		schemaGen:      schemaGen,
 		singleKeyspace: singleKeyspace,
@@ -89,12 +84,10 @@ func (su *SchemaUpdater) update() {
 		return
 	}
 
-	now := time.Now()
 	shouldUpdate := false
-	if version != su.schemaVersion || su.expireTime.Before(now)  {
+	if version != su.schemaVersion {
 		shouldUpdate = true
 		su.schemaVersion = version
-		su.expireTime = now.Add(su.expireInterval)
 	}
 
 	if shouldUpdate {

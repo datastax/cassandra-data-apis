@@ -18,7 +18,6 @@ func NewConfigMock() *ConfigMock {
 func (o *ConfigMock) Default() *ConfigMock {
 	o.On("ExcludedKeyspaces").Return([]string{"system"})
 	o.On("SchemaUpdateInterval").Return(10 * time.Second)
-	o.On("SchemaExpireInterval").Return(30 * time.Second)
 	o.On("Naming").Return(NamingConventionFn(NewDefaultNaming))
 	o.On("UseUserOrRoleAuth").Return(false)
 	o.On("Logger").Return(log.NewZapLogger(zap.NewExample()))
@@ -31,11 +30,6 @@ func (o *ConfigMock) ExcludedKeyspaces() []string {
 }
 
 func (o *ConfigMock) SchemaUpdateInterval() time.Duration {
-	args := o.Called()
-	return args.Get(0).(time.Duration)
-}
-
-func (o *ConfigMock) SchemaExpireInterval() time.Duration {
 	args := o.Called()
 	return args.Get(0).(time.Duration)
 }
