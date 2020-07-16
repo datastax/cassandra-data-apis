@@ -2,7 +2,6 @@ package graphql
 
 import (
 	"context"
-	"errors"
 	"github.com/datastax/cassandra-data-apis/log"
 	"github.com/graphql-go/graphql"
 	"sync"
@@ -17,7 +16,6 @@ type SchemaUpdater struct {
 	schemas        *map[string]*graphql.Schema
 	schemaGen      *SchemaGenerator
 	singleKeyspace string
-	schemaVersion  string
 	logger         log.Logger
 }
 
@@ -51,13 +49,6 @@ func NewUpdater(
 		logger:         logger,
 	}
 
-	version, err := updater.getSchemaVersion()
-	if err != nil {
-		logger.Error("unable to query schema version",
-			"error", err)
-	}
-	updater.schemaVersion = version
-
 	return updater, nil
 }
 
@@ -76,43 +67,14 @@ func (su *SchemaUpdater) Stop() {
 }
 
 func (su *SchemaUpdater) update() {
-	version, err := su.getSchemaVersion()
-
+	schemas, err := su.schemaGen.BuildSchemas(su.singleKeyspace)
 	if err != nil {
-		su.logger.Error("unable to query schema version",
-			"error", err)
-		return
+		su.logger.Error("unable to build graphql schema for keyspace", "error", err)
+	} else {
+		su.mutex.Lock()
+		su.schemas = &schemas
+		su.mutex.Unlock()
 	}
-
-	shouldUpdate := false
-	if version != su.schemaVersion {
-		shouldUpdate = true
-		su.schemaVersion = version
-	}
-
-	if shouldUpdate {
-		schemas, err := su.schemaGen.BuildSchemas(su.singleKeyspace)
-		if err != nil {
-			su.logger.Error("unable to build graphql schema for keyspace", "error", err)
-		} else {
-			su.mutex.Lock()
-			su.schemas = &schemas
-			su.mutex.Unlock()
-		}
-	}
-}
-
-func (su *SchemaUpdater) getSchemaVersion() (string, error) {
-	result, err := su.schemaGen.dbClient.Execute("SELECT schema_version FROM system.local", nil)
-	if err != nil {
-		return "", err
-	}
-	row := result.Values()[0]
-	version := row["schema_version"].(*string)
-	if version == nil {
-		return "", errors.New("schema version value is empty")
-	}
-	return *version, nil
 }
 
 func (su *SchemaUpdater) sleep() bool {
