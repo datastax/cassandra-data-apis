@@ -106,6 +106,17 @@ func ExecutePost(routes []types.Route, target string, body string) *bytes.Buffer
 	return w.Body
 }
 
+func ExecutePostWithVariables(routes []types.Route, target string, body string, variables map[string]interface{}) *bytes.Buffer {
+	b, err := json.Marshal(graphql.RequestBody{Query: body, Variables: variables})
+	Expect(err).ToNot(HaveOccurred())
+	targetUrl := fmt.Sprintf("http://%s", path.Join(host, target))
+	r := httptest.NewRequest(http.MethodPost, targetUrl, bytes.NewReader(b))
+	w := httptest.NewRecorder()
+	routes[postIndex].Handler.ServeHTTP(w, r)
+	Expect(w.Code).To(Equal(http.StatusOK))
+	return w.Body
+}
+
 func ExpectQueryToReturnError(routes []types.Route, query string, expectedMessage string) {
 	b, err := json.Marshal(graphql.RequestBody{Query: query})
 	Expect(err).ToNot(HaveOccurred())

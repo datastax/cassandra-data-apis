@@ -12,15 +12,26 @@ import (
 
 type ConvertFn func(value interface{}) interface{}
 
+func identityConvert(value interface{}) interface{}  {
+	return value
+}
+
 func MutateAndQueryScalar(
 	routes []types.Route,
 	datatype string,
+	graphqlDatatype string,
 	value interface{},
 	format string,
 	convert ConvertFn,
+	jsonConvert ConvertFn,
 ) {
 	insertQuery := `mutation {
 	  insertScalars(value:{id:"%s", %sCol:%s}) {
+		applied
+	  }
+	}`
+	insertQueryVariables := `mutation InsertScalars($value: %s) {
+	  insertScalars(value:{id:"%s", %sCol:$value}) {
 		applied
 	  }
 	}`
@@ -47,10 +58,10 @@ func MutateAndQueryScalar(
 	id := schemas.NewUuid()
 	var buffer *bytes.Buffer
 	var values []map[string]interface{}
-	if convert == nil {
-		convert = func(value interface{}) interface{} {
-			return value
-		}
+
+	if convert == nil { convert = identityConvert
+	}
+	if jsonConvert == nil { jsonConvert = identityConvert
 	}
 
 	// Insert
@@ -58,6 +69,20 @@ func MutateAndQueryScalar(
 	Expect(schemas.DecodeData(buffer, "insertScalars")["applied"]).To(Equal(true))
 
 	// Select
+	buffer = schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(selectQuery, id, datatype))
+	values = schemas.DecodeDataAsSliceOfMaps(buffer, "scalars", "values")
+	Expect(convert(values[0][datatype+"Col"])).To(Equal(value))
+
+	// Insert with variables
+	buffer = schemas.ExecutePostWithVariables(routes,
+		"/graphql",
+		fmt.Sprintf(insertQueryVariables, graphqlDatatype, id, datatype),
+		map[string]interface{}{
+			"value": jsonConvert(value),
+		})
+	Expect(schemas.DecodeData(buffer, "insertScalars")["applied"]).To(Equal(true))
+
+	// Verify value after inserting with variables
 	buffer = schemas.ExecutePost(routes, "/graphql", fmt.Sprintf(selectQuery, id, datatype))
 	values = schemas.DecodeDataAsSliceOfMaps(buffer, "scalars", "values")
 	Expect(convert(values[0][datatype+"Col"])).To(Equal(value))
