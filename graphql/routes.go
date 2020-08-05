@@ -32,6 +32,7 @@ type Config struct {
 
 type RequestBody struct {
 	Query string `json:"query"`
+	OperationName string `json:"operationName"`
 	Variables map[string]interface{} `json:"variables"`
 }
 
@@ -130,8 +131,21 @@ func routesForSchema(pattern string, execute executeQueryFunc) []types.Route {
 			Method:  http.MethodGet,
 			Pattern: pattern,
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				vars := r.URL.Query().Get("variables")
+
+				var variables map[string]interface{}
+				if len(vars) > 0 {
+					err := json.Unmarshal([]byte(vars), &variables)
+					if err != nil {
+						http.Error(w, "'variables' query variable is invalid: " + err.Error(), 400)
+						return
+					}
+				}
+
 				result := execute(RequestBody{
 					Query: r.URL.Query().Get("query"),
+					OperationName: r.URL.Query().Get("operationName"),
+					Variables: variables,
 				}, r.URL.Path, r.Context())
 				if result == nil {
 					// The execution function is signaling that it shouldn't be processing this request
@@ -156,7 +170,7 @@ func routesForSchema(pattern string, execute executeQueryFunc) []types.Route {
 				var body RequestBody
 				err := json.NewDecoder(r.Body).Decode(&body)
 				if err != nil {
-					http.Error(w, "Request body is invalid", 400)
+					http.Error(w, "request body is invalid", 400)
 					return
 				}
 
@@ -179,8 +193,9 @@ func routesForSchema(pattern string, execute executeQueryFunc) []types.Route {
 func (rg *RouteGenerator) executeQuery(request RequestBody, ctx context.Context, schema graphql.Schema) *graphql.Result {
 	result := graphql.Do(graphql.Params{
 		Schema:        schema,
-		RequestString: request.Query,
 		Context:       ctx,
+		RequestString: request.Query,
+		OperationName: request.OperationName,
 		VariableValues: request.Variables,
 	})
 	if len(result.Errors) > 0 {
