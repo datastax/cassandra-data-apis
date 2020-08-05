@@ -30,6 +30,35 @@ const (
 
 const host = "127.0.0.1"
 
+const bookQuery =
+	`query {
+  books(value:{title:"abc"}) {
+    values {
+      pages
+      title
+    }
+  }
+}`
+
+const bookQueryWithVariables =
+`query GetBook($title: String!) {
+  books(value:{title: $title}) {
+    values {
+      pages
+      title
+    }
+  }
+}`
+
+const bookTitleQueryWithVariables =
+	`query GetBookTitle($title: String!) {
+  books(value:{title: $title}) {
+    values {
+      title
+    }
+  }
+}`
+
 func TestDataEndpoint_Query(t *testing.T) {
 	session, routes := createRoutes(t, createConfig(t), "/graphql", "store")
 
@@ -47,26 +76,38 @@ func TestDataEndpoint_Query(t *testing.T) {
 		Return(resultMock, nil)
 
 	body := graphql.RequestBody{
-		Query: `query {
-  books(value:{title:"abc"}) {
-    values {
-      pages
-      title
-    }
-  }
-}`,
+		Query: bookQuery,
 	}
 
-	expected := schemas.ResponseBody{
-		Data: map[string]interface{}{
-			"books": map[string]interface{}{
-				"values": []interface{}{
-					map[string]interface{}{
-						"pages": float64(pages),
-						"title": title,
-					},
-				},
-			},
+	buffer, err := executePost(routes, "/graphql", body, nil)
+	assert.NoError(t, err, "error executing query")
+
+	var resp schemas.ResponseBody
+	err = json.NewDecoder(buffer).Decode(&resp)
+	assert.NoError(t, err, "error decoding response")
+	assert.Equal(t, expectedBooksResponse(pages, title), resp)
+}
+
+func TestDataEndpoint_QueryPOSTWithVariables(t *testing.T) {
+	session, routes := createRoutes(t, createConfig(t), "/graphql", "store")
+
+	title := "book1"
+	pages := 42
+	resultMock := &db.ResultMock{}
+	resultMock.
+		On("PageState").Return([]byte{}).
+		On("Values").Return([]map[string]interface{}{
+		map[string]interface{}{"title": &title, "pages": &pages},
+	}, nil)
+
+	session.
+		On("ExecuteIter", `SELECT * FROM "store"."books" WHERE "title" = ?`, mock.Anything, mock.Anything).
+		Return(resultMock, nil)
+
+	body := graphql.RequestBody{
+		Query: bookQueryWithVariables,
+		Variables: map[string]interface{}{
+			"title": "abc",
 		},
 	}
 
@@ -76,7 +117,105 @@ func TestDataEndpoint_Query(t *testing.T) {
 	var resp schemas.ResponseBody
 	err = json.NewDecoder(buffer).Decode(&resp)
 	assert.NoError(t, err, "error decoding response")
-	assert.Equal(t, expected, resp)
+	assert.Equal(t, expectedBooksResponse(pages, title), resp)
+}
+
+func TestDataEndpoint_QueryPOSTWithOperationName(t *testing.T) {
+	session, routes := createRoutes(t, createConfig(t), "/graphql", "store")
+
+	title := "book1"
+	pages := 42
+	resultMock := &db.ResultMock{}
+	resultMock.
+		On("PageState").Return([]byte{}).
+		On("Values").Return([]map[string]interface{}{
+		map[string]interface{}{"title": &title, "pages": &pages},
+	}, nil)
+
+	session.
+		On("ExecuteIter", `SELECT * FROM "store"."books" WHERE "title" = ?`, mock.Anything, mock.Anything).
+		Return(resultMock, nil)
+
+	body := graphql.RequestBody{
+		Query: bookQueryWithVariables + "\n" + bookTitleQueryWithVariables,
+		OperationName: "GetBook",
+		Variables: map[string]interface{}{
+			"title": "abc",
+		},
+	}
+
+	buffer, err := executePost(routes, "/graphql", body, nil)
+	assert.NoError(t, err, "error executing query")
+
+	var resp schemas.ResponseBody
+	err = json.NewDecoder(buffer).Decode(&resp)
+	assert.NoError(t, err, "error decoding response")
+	assert.Equal(t, expectedBooksResponse(pages, title), resp)
+}
+
+func TestDataEndpoint_QueryGETWithVariables(t *testing.T) {
+	session, routes := createRoutes(t, createConfig(t), "/graphql", "store")
+
+	title := "book1"
+	pages := 42
+	resultMock := &db.ResultMock{}
+	resultMock.
+		On("PageState").Return([]byte{}).
+		On("Values").Return([]map[string]interface{}{
+		map[string]interface{}{"title": &title, "pages": &pages},
+	}, nil)
+
+	session.
+		On("ExecuteIter", `SELECT * FROM "store"."books" WHERE "title" = ?`, mock.Anything, mock.Anything).
+		Return(resultMock, nil)
+
+	params := graphql.RequestBody{
+		Query: bookQueryWithVariables,
+		Variables: map[string]interface{}{
+			"title": "abc",
+		},
+	}
+
+	buffer, err := executeGet(routes, "/graphql", params, nil)
+	assert.NoError(t, err, "error executing query")
+
+	var resp schemas.ResponseBody
+	err = json.NewDecoder(buffer).Decode(&resp)
+	assert.NoError(t, err, "error decoding response")
+	assert.Equal(t, expectedBooksResponse(pages, title), resp)
+}
+
+func TestDataEndpoint_QueryGETWithOperationName(t *testing.T) {
+	session, routes := createRoutes(t, createConfig(t), "/graphql", "store")
+
+	title := "book1"
+	pages := 42
+	resultMock := &db.ResultMock{}
+	resultMock.
+		On("PageState").Return([]byte{}).
+		On("Values").Return([]map[string]interface{}{
+		map[string]interface{}{"title": &title, "pages": &pages},
+	}, nil)
+
+	session.
+		On("ExecuteIter", `SELECT * FROM "store"."books" WHERE "title" = ?`, mock.Anything, mock.Anything).
+		Return(resultMock, nil)
+
+	params := graphql.RequestBody{
+		Query: bookQueryWithVariables + "\n" + bookTitleQueryWithVariables,
+		OperationName: "GetBook",
+		Variables: map[string]interface{}{
+			"title": "abc",
+		},
+	}
+
+	buffer, err := executeGet(routes, "/graphql", params, nil)
+	assert.NoError(t, err, "error executing query")
+
+	var resp schemas.ResponseBody
+	err = json.NewDecoder(buffer).Decode(&resp)
+	assert.NoError(t, err, "error decoding response")
+	assert.Equal(t, expectedBooksResponse(pages, title), resp)
 }
 
 func TestDataEndpoint_Auth(t *testing.T) {
@@ -107,27 +246,7 @@ func TestDataEndpoint_Auth(t *testing.T) {
 		Return(resultMock, nil)
 
 	body := graphql.RequestBody{
-		Query: `query {
-  books(value:{title:"abc"}) {
-    values {
-      pages
-      title
-    }
-  }
-}`,
-	}
-
-	expected := schemas.ResponseBody{
-		Data: map[string]interface{}{
-			"books": map[string]interface{}{
-				"values": []interface{}{
-					map[string]interface{}{
-						"pages": float64(pages),
-						"title": title,
-					},
-				},
-			},
-		},
+		Query: bookQuery,
 	}
 
 	buffer, err := executePost(withAuth(t, routes, authTokens), "/graphql", body,
@@ -137,7 +256,7 @@ func TestDataEndpoint_Auth(t *testing.T) {
 	var resp schemas.ResponseBody
 	err = json.NewDecoder(buffer).Decode(&resp)
 	assert.NoError(t, err, "error decoding response")
-	assert.Equal(t, expected, resp)
+	assert.Equal(t, expectedBooksResponse(pages, title), resp)
 }
 
 func TestDataEndpoint_PageSize(t *testing.T) {
@@ -222,14 +341,7 @@ func TestDataEndpoint_AuthNotProvided(t *testing.T) {
 		Return(resultMock, errors.New("invalid cre"))
 
 	body := graphql.RequestBody{
-		Query: `query {
-  books(value:{title:"abc"}) {
-    values {
-      pages
-      title
-    }
-  }
-}`,
+		Query: bookQuery,
 	}
 
 	buffer, err := executePost(routes, "/graphql", body, nil) // No auth
@@ -258,6 +370,34 @@ func executePost(routes []types.Route, target string, body graphql.RequestBody, 
 	return w.Body, nil
 }
 
+func executeGet(routes []types.Route, target string, params graphql.RequestBody,  header http.Header) (*bytes.Buffer, error) {
+	r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("http://%s", path.Join(host, target)), nil)
+
+	q := r.URL.Query()
+
+	q.Add("query", params.Query)
+	if len(params.OperationName) > 0 {
+		q.Add("operationName", params.OperationName)
+	}
+	if params.Variables != nil {
+		vars, err := json.Marshal(params.Variables)
+		if err != nil {
+			return nil, err
+		}
+		q.Add("variables", string(vars))
+	}
+
+	r.URL.RawQuery = q.Encode();
+
+	if header != nil {
+		r.Header = header
+	}
+	w := httptest.NewRecorder()
+	routes[getIndex].Handler.ServeHTTP(w, r)
+
+	return w.Body, nil
+}
+
 func createConfig(t *testing.T) *DataEndpointConfig {
 	cfg, err := NewEndpointConfig(host)
 	assert.NoError(t, err, "error creating endpoint config")
@@ -274,6 +414,21 @@ func createRoutes(t *testing.T, cfg *DataEndpointConfig, pattern string, ksName 
 	assert.NoError(t, err, "error getting routes for keyspace")
 
 	return sessionMock, routes
+}
+
+func expectedBooksResponse(pages int, title string) schemas.ResponseBody {
+	return schemas.ResponseBody{
+		Data: map[string]interface{}{
+			"books": map[string]interface{}{
+				"values": []interface{}{
+					map[string]interface{}{
+						"pages": float64(pages),
+						"title": title,
+					},
+				},
+			},
+		},
+	}
 }
 
 func withAuth(t *testing.T, routes []types.Route, authTokens map[string]string) []types.Route {

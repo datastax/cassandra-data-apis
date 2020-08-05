@@ -444,36 +444,36 @@ var _ = Describe("DataEndpoint", func() {
 			It("Should support text and varchar data types", func() {
 				values := []string{"Привет мир", "नमस्ते दुनिया", "Jürgen"}
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "text", value, `"%s"`, nil)
-					datatypes.MutateAndQueryScalar(routes, "varchar", value, `"%s"`, nil)
+					datatypes.MutateAndQueryScalar(routes, "text", "String!", value, `"%s"`, nil, nil)
+					datatypes.MutateAndQueryScalar(routes, "varchar", "String!", value, `"%s"`, nil, nil)
 				}
 			})
 
 			It("Should support ascii data type", func() {
 				values := []string{"ABC", "><=;#{}[]", "abc"}
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "ascii", value, `"%s"`, nil)
+					datatypes.MutateAndQueryScalar(routes, "ascii", "Ascii!", value, `"%s"`, nil, nil)
 				}
 			})
 
 			It("Should support inet data type", func() {
 				values := []string{"127.0.0.1", "::1", "10.1.2.250", "8.8.8.8", "fe80::aede:48ff:fe00:1122"}
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "inet", value, `"%s"`, nil)
+					datatypes.MutateAndQueryScalar(routes, "inet", "Inet!", value, `"%s"`, nil, nil)
 				}
 			})
 
 			It("Should support blob data type", func() {
 				values := []string{"VGhl", "ABEi", "AA==", "ESIira0="}
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "blob", value, `"%s"`, nil)
+					datatypes.MutateAndQueryScalar(routes, "blob", "Blob!", value, `"%s"`, nil, nil)
 				}
 			})
 
 			It("Should support boolean data type", func() {
 				values := []bool{true, false}
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "boolean", value, `%t`, nil)
+					datatypes.MutateAndQueryScalar(routes, "boolean", "Boolean!", value, `%t`, nil, nil)
 				}
 			})
 
@@ -483,7 +483,7 @@ var _ = Describe("DataEndpoint", func() {
 					return int(v)
 				})
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "int", value, "%d", toInt)
+					datatypes.MutateAndQueryScalar(routes, "int", "Int!", value, "%d", toInt, nil)
 				}
 			})
 
@@ -493,7 +493,7 @@ var _ = Describe("DataEndpoint", func() {
 					return int8(v)
 				})
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "int", value, "%d", toInt8)
+					datatypes.MutateAndQueryScalar(routes, "int", "Int!", value, "%d", toInt8, nil)
 				}
 			})
 
@@ -503,7 +503,7 @@ var _ = Describe("DataEndpoint", func() {
 					return int16(v)
 				})
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "int", value, "%d", toInt16)
+					datatypes.MutateAndQueryScalar(routes, "int", "Int!", value, "%d", toInt16, nil)
 				}
 			})
 
@@ -517,12 +517,12 @@ var _ = Describe("DataEndpoint", func() {
 				})
 
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "float", value, "%f", toFloat32)
+					datatypes.MutateAndQueryScalar(routes, "float", "Float32!", value, "%f", toFloat32, nil)
 				}
 
 				stringValues := []string{"1", "0", "-1", "123.46"}
 				for _, value := range stringValues {
-					datatypes.MutateAndQueryScalar(routes, "float", value, "%s", toString)
+					datatypes.MutateAndQueryScalar(routes, "float", "Float32!", value, "%s", toString, nil)
 				}
 			})
 
@@ -533,12 +533,12 @@ var _ = Describe("DataEndpoint", func() {
 				values := []float64{1, -2, 0, 1.123, -1.31}
 
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "double", value, "%f", nil)
+					datatypes.MutateAndQueryScalar(routes, "double", "Float!", value, "%f", nil, nil)
 				}
 
 				stringValues := []string{"1", "0", "-1", "123.46"}
 				for _, value := range stringValues {
-					datatypes.MutateAndQueryScalar(routes, "double", value, "%s", toString)
+					datatypes.MutateAndQueryScalar(routes, "double", "Float!", value, "%s", toString, nil)
 				}
 			})
 
@@ -548,8 +548,15 @@ var _ = Describe("DataEndpoint", func() {
 					i, _ := strconv.ParseInt(v, 10, 64)
 					return i
 				})
+				toJson := func(v interface{}) interface{} {
+					switch v := v.(type) {
+					case int64:
+						return fmt.Sprintf("%d", v)
+					}
+					panic("unexpected type")
+				}
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "bigint", value, `"%d"`, toBigInt)
+					datatypes.MutateAndQueryScalar(routes, "bigint", "BigInt!", value, `"%d"`, toBigInt, toJson)
 				}
 			})
 
@@ -562,8 +569,15 @@ var _ = Describe("DataEndpoint", func() {
 					i.SetString(v, 10)
 					return i
 				})
+				toJson := func(v interface{}) interface{} {
+					switch v := v.(type) {
+					case *big.Int:
+						return v.Text(10)
+					}
+					panic("unexpected type")
+				}
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "varint", value, `"%s"`, toInt)
+					datatypes.MutateAndQueryScalar(routes, "varint", "Varint!", value, `"%s"`, toInt, toJson)
 				}
 			})
 
@@ -575,28 +589,28 @@ var _ = Describe("DataEndpoint", func() {
 					return i
 				})
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "decimal", value, `"%s"`, toDec)
+					datatypes.MutateAndQueryScalar(routes, "decimal", "Decimal!", value, `"%s"`, toDec, nil)
 				}
 			})
 
 			It("Should support time data type", func() {
 				values := []string{"00:00:01.000000001", "14:29:31.800600000", "08:00:00", "21:59:32.800000000"}
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "time", value, `"%s"`, nil)
+					datatypes.MutateAndQueryScalar(routes, "time", "Time!", value, `"%s"`, nil, nil)
 				}
 			})
 
 			It("Should timestamp data type", func() {
 				values := []string{"1983-02-23T00:00:50Z", "2010-04-29T23:20:21.52Z"}
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "timestamp", value, `"%s"`, nil)
+					datatypes.MutateAndQueryScalar(routes, "timestamp", "Timestamp!", value, `"%s"`, nil, nil)
 				}
 			})
 
 			It("Should uuid data type", func() {
 				values := []string{schemas.NewUuid(), schemas.NewUuid(), schemas.NewUuid()}
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "uuid", value, `"%s"`, nil)
+					datatypes.MutateAndQueryScalar(routes, "uuid", "Uuid!", value, `"%s"`, nil, nil)
 				}
 			})
 
@@ -606,7 +620,7 @@ var _ = Describe("DataEndpoint", func() {
 					gocql.UUIDFromTime(time.Date(2005, 8, 5, 0, 0, 0, 0, time.UTC)).String(),
 				}
 				for _, value := range values {
-					datatypes.MutateAndQueryScalar(routes, "timeuuid", value, `"%s"`, nil)
+					datatypes.MutateAndQueryScalar(routes, "timeuuid", "TimeUuid!", value, `"%s"`, nil, nil)
 				}
 			})
 

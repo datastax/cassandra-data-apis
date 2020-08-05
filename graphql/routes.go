@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-type executeQueryFunc func(query string, urlPath string, ctx context.Context) *graphql.Result
+type executeQueryFunc func(request RequestBody, urlPath string, ctx context.Context) *graphql.Result
 
 type RouteGenerator struct {
 	dbClient       *db.Db
@@ -32,6 +32,8 @@ type Config struct {
 
 type RequestBody struct {
 	Query string `json:"query"`
+	OperationName string `json:"operationName"`
+	Variables map[string]interface{} `json:"variables"`
 }
 
 func NewRouteGenerator(dbClient *db.Db, cfg config.Config) *RouteGenerator {
@@ -49,8 +51,8 @@ func (rg *RouteGenerator) RoutesSchemaManagement(pattern string, singleKeyspace 
 	if err != nil {
 		return nil, fmt.Errorf("unable to build graphql schema for schema management: %s", err)
 	}
-	return routesForSchema(pattern, func(query string, urlPath string, ctx context.Context) *graphql.Result {
-		return rg.executeQuery(query, ctx, schema)
+	return routesForSchema(pattern, func(request RequestBody, urlPath string, ctx context.Context) *graphql.Result {
+		return rg.executeQuery(request, ctx, schema)
 	}), nil
 }
 
@@ -68,7 +70,7 @@ func (rg *RouteGenerator) Routes(pattern string, singleKeyspace string) ([]types
 		pattern = rg.routerInfo.UrlPattern().UrlPathFormat(path.Join(pattern, "%s"), "keyspace")
 	}
 
-	return routesForSchema(pattern, func(query string, urlPath string, ctx context.Context) *graphql.Result {
+	return routesForSchema(pattern, func(request RequestBody, urlPath string, ctx context.Context) *graphql.Result {
 		ksName := singleKeyspace
 		if ksName == "" {
 			// Multiple keyspace support
@@ -86,7 +88,7 @@ func (rg *RouteGenerator) Routes(pattern string, singleKeyspace string) ([]types
 			return nil
 		}
 
-		return rg.executeQuery(query, ctx, *schema)
+		return rg.executeQuery(request, ctx, *schema)
 	}), nil
 }
 
@@ -129,7 +131,22 @@ func routesForSchema(pattern string, execute executeQueryFunc) []types.Route {
 			Method:  http.MethodGet,
 			Pattern: pattern,
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				result := execute(r.URL.Query().Get("query"), r.URL.Path, r.Context())
+				vars := r.URL.Query().Get("variables")
+
+				var variables map[string]interface{}
+				if len(vars) > 0 {
+					err := json.Unmarshal([]byte(vars), &variables)
+					if err != nil {
+						http.Error(w, "'variables' query variable is invalid: " + err.Error(), 400)
+						return
+					}
+				}
+
+				result := execute(RequestBody{
+					Query: r.URL.Query().Get("query"),
+					OperationName: r.URL.Query().Get("operationName"),
+					Variables: variables,
+				}, r.URL.Path, r.Context())
 				if result == nil {
 					// The execution function is signaling that it shouldn't be processing this request
 					http.NotFound(w, r)
@@ -153,11 +170,11 @@ func routesForSchema(pattern string, execute executeQueryFunc) []types.Route {
 				var body RequestBody
 				err := json.NewDecoder(r.Body).Decode(&body)
 				if err != nil {
-					http.Error(w, "Request body is invalid", 400)
+					http.Error(w, "request body is invalid", 400)
 					return
 				}
 
-				result := execute(body.Query, r.URL.Path, r.Context())
+				result := execute(body, r.URL.Path, r.Context())
 				if result == nil {
 					// The execution function is signaling that it shouldn't be processing this request
 					http.NotFound(w, r)
@@ -173,11 +190,13 @@ func routesForSchema(pattern string, execute executeQueryFunc) []types.Route {
 	}
 }
 
-func (rg *RouteGenerator) executeQuery(query string, ctx context.Context, schema graphql.Schema) *graphql.Result {
+func (rg *RouteGenerator) executeQuery(request RequestBody, ctx context.Context, schema graphql.Schema) *graphql.Result {
 	result := graphql.Do(graphql.Params{
 		Schema:        schema,
-		RequestString: query,
 		Context:       ctx,
+		RequestString: request.Query,
+		OperationName: request.OperationName,
+		VariableValues: request.Variables,
 	})
 	if len(result.Errors) > 0 {
 		rg.logger.Error("unexpected errors processing graphql query", "errors", result.Errors)
