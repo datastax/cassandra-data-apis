@@ -1,4 +1,6 @@
-# Data APIs for Apache Cassandra
+# Data APIs for Apache Cassandra (Deprecated)
+
+(Project has been moved to Stargate)
 
 Easy to use APIs for accessing data stored in Apache Cassandra. 
 
