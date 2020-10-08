@@ -119,7 +119,7 @@ func (db *Db) Execute(query string, options *QueryOptions, values ...interface{}
 }
 
 func (db *Db) ExecuteNoResult(query string, options *QueryOptions, values ...interface{}) error {
-	return db.session.Execute(query, options, values)
+	return db.session.Execute(query, options, values...)
 }
 
 func (session *GoCqlSession) Execute(query string, options *QueryOptions, values ...interface{}) error {
