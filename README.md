@@ -1,6 +1,7 @@
+> :warning: **Project has been moved to [Stargate](https://github.com/stargate/stargate)**
+
 # Data APIs for Apache Cassandra (Deprecated)
 
-(Project has been moved to Stargate)
 
 Easy to use APIs for accessing data stored in Apache Cassandra. 
 
